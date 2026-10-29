@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { runReminders } from "@/lib/server/reminders";
 import { maybeAutoBackup } from "@/lib/server/backup";
 import { logError } from "@/lib/server/log";
+import { healStuckQueries } from "@/lib/server/heal";
 
 function authorized(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -22,7 +23,9 @@ async function handle(req: NextRequest) {
       await logError("backup", err);
       return null;
     });
-    return NextResponse.json({ ok: true, ...result, backup });
+    // alle zehn Minuten verwaiste Datenbank-Befehle abräumen
+    const healed = new Date().getUTCMinutes() % 10 === 0 ? await healStuckQueries().catch(() => 0) : 0;
+    return NextResponse.json({ ok: true, ...result, backup, healed });
   } catch (err) {
     await logError("reminders", err);
     return NextResponse.json({ ok: false }, { status: 500 });
