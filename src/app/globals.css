@@ -3,6 +3,7 @@
 /* Grundtöne nach iOS-Systemfarben, Personenfarben getrennt in data.ts */
 :root {
   --bg: #f2f2f7;
+  --dock: #f7f7f9;
   --label: #1c1c1e;
   --label-2: rgba(60, 60, 67, 0.62);
   --label-3: rgba(60, 60, 67, 0.32);
@@ -23,6 +24,7 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #000000;
+    --dock: #1c1c1e;
     --label: #f5f5f7;
     --label-2: rgba(235, 235, 245, 0.6);
     --label-3: rgba(235, 235, 245, 0.3);
@@ -209,6 +211,29 @@ body {
 }
 html.ios-gap {
   --safe-b: 0px;
+  /* iOS färbt den Streifen unterhalb der App mit der Seitenfarbe: gleiche Farbe wie das Dock */
+  background: var(--dock);
+}
+
+.tabbar {
+  bottom: calc(var(--safe-b) + 10px);
+}
+/* Bei der iOS-Lücke wird die schwebende Leiste zum flachen Dock, das nahtlos in den Streifen übergeht */
+html.ios-gap .tabbar {
+  bottom: 0;
+  max-width: none;
+  padding: 0;
+}
+html.ios-gap .tabbar-inner {
+  border-radius: 0;
+  border: none;
+  background: var(--dock);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: 0 -0.5px 0 var(--separator);
+}
+html.ios-gap .tabbar-inner > * {
+  max-width: 100%;
 }
 
 .safe-bottom {
