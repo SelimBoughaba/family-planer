@@ -6,6 +6,7 @@ import type { TaskFields, AppState, CalEvent, EventFields, EventRecurrence, Item
 import { aiInfo } from "./ai";
 import { getLists } from "./lists";
 import { removeFiles } from "./storage";
+import { BoardInputError, loadBoards, mutateBoard } from "./board";
 import { personColors } from "@/lib/types";
 
 type Row = Record<string, unknown>;
@@ -108,6 +109,7 @@ export async function loadState(from: Date, to: Date): Promise<AppState> {
     recipes: recipes.map(toRecipe),
     meals: meals.map(toMeal),
     attendance: attendance.map((r) => ({ day: String(r.day).slice(0, 10), personId: r.person_id as string, present: !!r.present })),
+    boards: await loadBoards(),
     ai: await aiInfo(),
   };
 }
@@ -218,6 +220,14 @@ function eventFields(m: EventFields) {
 
 /** Führt eine Änderung aus und gibt den betroffenen Bereich zurück */
 export async function mutate(m: Mutation, by: string | null): Promise<string> {
+  if (m.op.startsWith("board.") || m.op.startsWith("bitem.")) {
+    try {
+      return await mutateBoard(m, by && /^[0-9a-f-]{36}$/i.test(by) ? by : null);
+    } catch (err) {
+      if (err instanceof BoardInputError) throw new InvalidInput(err.message);
+      throw err;
+    }
+  }
   const sql = db();
   const actor = by && /^[0-9a-f-]{36}$/i.test(by) ? by : null;
 

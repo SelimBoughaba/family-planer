@@ -118,6 +118,34 @@ export type Meal = {
   note: string | null;
 };
 
+export type Board = { id: string; name: string; sort: number; count: number; preview: BoardPreview[] };
+export type BoardPreview = { kind: BoardItemKind; color: string | null; text: string | null; thumb: string | null };
+export type BoardItemKind = "note" | "photo" | "pdf" | "ink";
+/** Strich: Farbe, Stärke, Punkte als flache Liste x, y, Druck */
+export type Stroke = { c: string; s: number; p: number[] };
+export type BoardItem = {
+  id: string;
+  boardId: string;
+  kind: BoardItemKind;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  rot: number;
+  z: number;
+  color: string | null;
+  text: string | null;
+  ink: Stroke[] | null;
+  file: string | null;
+  thumb: string | null;
+  fileName: string | null;
+  expires: string | null;
+  createdBy: string | null;
+  updatedAt: string;
+  deletedAt: string | null;
+};
+export type BoardItemPatch = Partial<Pick<BoardItem, "x" | "y" | "w" | "h" | "rot" | "z" | "color" | "text" | "ink" | "expires">>;
+
 /** Ausdrückliche Angabe, ob jemand an einem Tag zum Abendessen da ist; ohne Eintrag gilt „da“ */
 export type Attendance = { day: string; personId: string; present: boolean };
 
@@ -132,6 +160,7 @@ export type AppState = {
   recipes: Recipe[];
   meals: Meal[];
   attendance: Attendance[];
+  boards: Board[];
   ai: AiInfo;
 };
 
@@ -158,6 +187,14 @@ export type Mutation =
   | { op: "meal.set"; day: string; recipeId: string | null; title: string; cook: string | null; note: string | null }
   | { op: "meal.clear"; day: string }
   | { op: "meal.attend"; day: string; personId: string; present: boolean | null }
+  | { op: "board.create"; id?: string; name: string }
+  | { op: "board.rename"; id: string; name: string }
+  | { op: "board.delete"; id: string }
+  | ({ op: "bitem.create"; id: string; boardId: string; kind: BoardItemKind } & BoardItemPatch & { file?: string | null; thumb?: string | null; fileName?: string | null })
+  | { op: "bitem.update"; id: string; patch: BoardItemPatch }
+  | { op: "bitem.delete"; id: string }
+  | { op: "bitem.restore"; id: string }
+  | { op: "bitem.purge"; id: string }
   | ({ op: "event.create" } & EventFields)
   | ({ op: "event.update"; id: string } & EventFields)
   | { op: "event.move"; id: string; startsAt: string; endsAt: string }

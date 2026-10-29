@@ -185,3 +185,38 @@ create table if not exists meal_attendance (
 );
 alter table meal_attendance enable row level security;
 alter table recipes add column if not exists images text[] not null default '{}';
+
+-- Etappe 9: Pinnwand (Zettel, Fotos, PDFs, Stift-Zeichnungen), mehrere Wände, Papierkorb
+create table if not exists boards (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  sort int not null default 0,
+  created_at timestamptz not null default now()
+);
+alter table boards enable row level security;
+insert into boards (name, sort) select 'Familie', 1 where not exists (select 1 from boards);
+
+create table if not exists board_items (
+  id uuid primary key default gen_random_uuid(),
+  board_id uuid not null references boards(id) on delete cascade,
+  kind text not null, -- note, photo, pdf, ink
+  x real not null default 0,
+  y real not null default 0,
+  w real not null default 200,
+  h real not null default 200,
+  rot real not null default 0,
+  z int not null default 0,
+  color text,
+  text text,
+  ink jsonb, -- [{ "c": Farbe, "s": Stärke, "p": [x, y, Druck, ...] }] relativ zum Element
+  file text,
+  thumb text,
+  file_name text,
+  expires date,
+  created_by uuid references people(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  deleted_at timestamptz
+);
+create index if not exists board_items_board_idx on board_items (board_id, deleted_at);
+alter table board_items enable row level security;

@@ -9,6 +9,7 @@ import { NewEntrySheet } from "./NewEntrySheet";
 import { CalendarView } from "./CalendarView";
 import { FoodView } from "./food/FoodView";
 import { TasksView } from "./TasksView";
+import { BoardScreen } from "./board/BoardScreen";
 import type { Task } from "@/lib/types";
 import { EventEditor, type EditorTarget } from "./EventEditor";
 import { SubscribeSheet } from "./SubscribeSheet";
@@ -56,6 +57,7 @@ function Main() {
   const [quickMenu, setQuickMenu] = useState(false);
   const [shopFocus, setShopFocus] = useState(false);
   const [foodDay, setFoodDay] = useState<string | null>(null);
+  const [boardOpen, setBoardOpen] = useState<string | null>(null);
 
   const newEvent = () => {
     const start = new Date();
@@ -143,6 +145,7 @@ function Main() {
           onOpenEvent={(occ) => setEditor({ mode: "edit", occ })}
           onOpenFood={() => setTab("essen")}
           onEditTask={setTaskEdit}
+          onOpenBoard={setBoardOpen}
         />
       )}
       {tab === "kalender" && (
@@ -191,6 +194,13 @@ function Main() {
             },
           },
           {
+            label: "Zettel an die Pinnwand",
+            onSelect: () => {
+              const first = state?.boards[0];
+              if (first) setBoardOpen(first.id);
+            },
+          },
+          {
             label: "Essen für heute planen",
             icon: <IconFork size={18} />,
             onSelect: () => {
@@ -220,6 +230,7 @@ function Main() {
         }}
       />
       <NewEntrySheet open={!!taskEdit} task={taskEdit} onClose={() => setTaskEdit(null)} />
+      <BoardScreen boardId={boardOpen} onClose={() => setBoardOpen(null)} />
       <EventEditor target={editor} onClose={() => setEditor(null)} />
       <SubscribeSheet open={subscribe} onClose={() => setSubscribe(false)} />
       <NotifySheet open={notify} onClose={() => setNotify(false)} />

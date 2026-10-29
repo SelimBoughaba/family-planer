@@ -7,6 +7,7 @@ import { addDays, occurrences, startOfDay, type Occurrence } from "@/lib/recurre
 import { recipeEmoji } from "@/lib/recipes";
 import { Avatar, AvatarStack, Card, PersonFilter, SectionTitle, useLongPress } from "./ui";
 import { TaskRow, useAssignDrop, useTaskMenus } from "./TaskRow";
+import { BoardTile } from "./board/BoardTile";
 import { AttendanceRow, MaybeHint, eatersLabel, usePresence } from "./food/Attendance";
 import { IconPin, IconPlus } from "./icons";
 
@@ -73,6 +74,7 @@ export function TodayView({
   onOpenEvent,
   onOpenFood,
   onEditTask,
+  onOpenBoard,
 }: {
   now: Date;
   filter: string | null;
@@ -83,6 +85,7 @@ export function TodayView({
   onOpenEvent: (o: Occurrence) => void;
   onOpenFood: () => void;
   onEditTask: (t: Task) => void;
+  onOpenBoard: (boardId: string) => void;
 }) {
   const { state, person, color, me } = useFamily();
   const plusPress = useLongPress(onQuick, onNew);
@@ -350,6 +353,8 @@ export function TodayView({
           </>
         );
       })()}
+
+      <BoardTile onOpen={onOpenBoard} />
 
       {menus}
     </div>

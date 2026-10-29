@@ -2,7 +2,7 @@ import "server-only";
 import { db } from "./db";
 import { wall } from "./berlin";
 
-export const BACKUP_VERSION = 3;
+export const BACKUP_VERSION = 4;
 const KEEP_AUTO = 14;
 
 export type Snapshot = {
@@ -17,6 +17,8 @@ export type Snapshot = {
     recipes?: Record<string, unknown>[];
     meal_plan?: Record<string, unknown>[];
     meal_attendance?: Record<string, unknown>[];
+    boards?: Record<string, unknown>[];
+    board_items?: Record<string, unknown>[];
     lists: unknown;
   };
 };
@@ -49,6 +51,8 @@ export async function snapshot(): Promise<Snapshot> {
     () => sql`select id, title, description, servings, minutes, ingredients, steps, tags, source_url, images, favorite, created_by, created_at, updated_at from recipes`,
   );
   const meals = await step("Wochenplan", () => sql`select id, day::text as day, recipe_id, title, cook, note, created_by, created_at from meal_plan`);
+  const boards = await step("Pinnwände", () => sql`select id, name, sort, created_at from boards`);
+  const boardItems = await step("Pinnwand", () => sql`select * from board_items where deleted_at is null`);
   const attendance = await step("Wer isst mit", () => sql`select day::text as day, person_id, present from meal_attendance where day >= current_date - 30`);
   return {
     app: "familienplaner",
@@ -62,6 +66,8 @@ export async function snapshot(): Promise<Snapshot> {
       recipes: [...recipes],
       meal_plan: [...meals],
       meal_attendance: [...attendance],
+      boards: [...boards],
+      board_items: [...boardItems],
       lists: lists[0]?.value ?? null,
     },
   };
@@ -172,6 +178,18 @@ export async function restore(data: unknown) {
     for (const a of d.tables.meal_attendance ?? []) {
       if (!ids.includes(a.person_id as string)) continue;
       await tx`insert into meal_attendance (day, person_id, present) values (${a.day as string}, ${a.person_id as string}, ${!!a.present}) on conflict do nothing`;
+    }
+    // Pinnwand nur ersetzen, wenn die Sicherung sie enthält (Dateien selbst liegen im Speicher und bleiben)
+    if (Array.isArray(d.tables.boards) && d.tables.boards.length) {
+      await tx`delete from boards`;
+      for (const b of d.tables.boards) await tx`insert into boards (id, name, sort, created_at) values (${b.id as string}, ${b.name as string}, ${Number(b.sort) || 0}, ${(b.created_at as string) ?? new Date().toISOString()})`;
+      for (const i of d.tables.board_items ?? []) {
+        await tx`insert into board_items (id, board_id, kind, x, y, w, h, rot, z, color, text, ink, file, thumb, file_name, expires, created_by, created_at, updated_at)
+          values (${i.id as string}, ${i.board_id as string}, ${i.kind as string}, ${Number(i.x)}, ${Number(i.y)}, ${Number(i.w)}, ${Number(i.h)}, ${Number(i.rot)}, ${Number(i.z)},
+            ${(i.color as string) ?? null}, ${(i.text as string) ?? null}, ${i.ink ? tx.json(i.ink as never) : null}, ${(i.file as string) ?? null}, ${(i.thumb as string) ?? null},
+            ${(i.file_name as string) ?? null}, ${i.expires ? String(i.expires).slice(0, 10) : null}, ${ids.includes(i.created_by as string) ? (i.created_by as string) : null},
+            ${(i.created_at as string) ?? new Date().toISOString()}, now())`;
+      }
     }
     if (d.tables.lists) {
       await tx`insert into app_meta (key, value) values ('lists', ${tx.json(d.tables.lists as never)}) on conflict (key) do update set value = excluded.value, updated_at = now()`;

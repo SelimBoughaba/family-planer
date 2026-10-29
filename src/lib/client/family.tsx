@@ -20,6 +20,8 @@ type Ctx = {
   /** Kalender meldet, welcher Zeitraum gebraucht wird; lädt bei Bedarf nach */
   ensureRange: (from: Date, to: Date) => void;
   syncing: boolean;
+  /** zählt bei jeder Änderung von anderswo hoch; die Pinnwand lädt daraufhin nach */
+  tick: number;
 };
 
 const FamilyCtx = createContext<Ctx | null>(null);
@@ -109,6 +111,18 @@ function optimistic(s: AppState, m: Mutation, me: string | null): AppState {
       const rest = s.attendance.filter((a) => !(a.day === m.day && a.personId === m.personId));
       return { ...s, attendance: m.present === null ? rest : [...rest, { day: m.day, personId: m.personId, present: m.present }] };
     }
+    case "board.create":
+      return { ...s, boards: [...s.boards, { id: m.id ?? tmp, name: m.name, sort: s.boards.length + 1, count: 0, preview: [] }] };
+    case "board.rename":
+      return { ...s, boards: s.boards.map((b) => (b.id === m.id ? { ...b, name: m.name } : b)) };
+    case "board.delete":
+      return { ...s, boards: s.boards.filter((b) => b.id !== m.id) };
+    case "bitem.create":
+    case "bitem.update":
+    case "bitem.delete":
+    case "bitem.restore":
+    case "bitem.purge":
+      return s;
     case "meal.clear":
       return { ...s, meals: s.meals.filter((x) => x.day !== m.day) };
     case "event.create": {
@@ -157,6 +171,7 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
     }
   });
   const [syncing, setSyncing] = useState(false);
+  const [tick, setTick] = useState(0);
   const pending = useRef(0);
   const win = useRef(initialWindow());
 
@@ -196,6 +211,7 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
       const ch = sb
         .channel(SYNC_TOPIC)
         .on("broadcast", { event: "changed" }, () => {
+          setTick((n) => n + 1);
           if (t) clearTimeout(t);
           t = setTimeout(refresh, 150);
         })
@@ -276,8 +292,8 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ state, error, me, setMe, person, color, run, refresh, ensureRange, syncing }),
-    [state, error, me, setMe, person, color, run, refresh, ensureRange, syncing],
+    () => ({ state, error, me, setMe, person, color, run, refresh, ensureRange, syncing, tick }),
+    [state, error, me, setMe, person, color, run, refresh, ensureRange, syncing, tick],
   );
   return <FamilyCtx.Provider value={value}>{children}</FamilyCtx.Provider>;
 }

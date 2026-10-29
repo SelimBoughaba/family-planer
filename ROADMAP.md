@@ -19,8 +19,9 @@
 
 - Etappe 8: Essens-Glücksrad, „Wer isst mit“ (Heute, Wochenplan, Essen-Fenster, Kalender-Hinweis, Portionen, Koch-Mitteilung 16 Uhr und Nachmeldung), Rezepte aus Foto und PDF mit privatem Dateispeicher
 
+- Etappe 9: Pinnwand (Korkwand mit Zoomen und Verschieben, Zettel getippt oder mit Apple Pencil, freies Schreiben auf der Wand, Radierer, Fotos, PDFs mit Vorschau, mehrere Wände, Papierkorb 30 Tage, Ablaufdatum, Kachel in Heute)
+
 ## Als Nächstes
-- Etappe 9: Pinnwand mit Zetteln, Apple Pencil, Fotos und PDFs (mehrere Wände, Papierkorb, Ablaufdatum)
 - Etappe 10: Punkte, Belohnungen (Bestätigung durch Samir oder Denise), Rangliste, Wochenvorschau sonntags 18 Uhr
 
 ## Vorgemerkt

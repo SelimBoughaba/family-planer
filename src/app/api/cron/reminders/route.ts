@@ -5,6 +5,7 @@ import { maybeAutoBackup } from "@/lib/server/backup";
 import { logError } from "@/lib/server/log";
 import { healStuckQueries } from "@/lib/server/heal";
 import { dinnerHeadsUp } from "@/lib/server/dinner";
+import { boardCleanup } from "@/lib/server/board";
 
 export const maxDuration = 55;
 
@@ -33,7 +34,9 @@ async function handle(req: NextRequest) {
     });
     // alle zehn Minuten verwaiste Datenbank-Befehle abräumen
     const healed = new Date().getUTCMinutes() % 10 === 0 ? await healStuckQueries().catch(() => 0) : 0;
-    return NextResponse.json({ ok: true, ...result, dinner, backup, healed });
+    // einmal pro Stunde den Papierkorb der Pinnwand leeren
+    const purged = new Date().getUTCMinutes() === 37 ? await boardCleanup().catch(async (err) => (await logError("board", err), 0)) : 0;
+    return NextResponse.json({ ok: true, ...result, dinner, backup, healed, purged });
   } catch (err) {
     await logError("reminders", err);
     return NextResponse.json({ ok: false }, { status: 500 });
