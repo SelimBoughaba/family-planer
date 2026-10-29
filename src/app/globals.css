@@ -3,7 +3,6 @@
 /* Grundtöne nach iOS-Systemfarben, Personenfarben getrennt in data.ts */
 :root {
   --bg: #f2f2f7;
-  --dock: #f7f7f9;
   --label: #1c1c1e;
   --label-2: rgba(60, 60, 67, 0.62);
   --label-3: rgba(60, 60, 67, 0.32);
@@ -24,7 +23,6 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #000000;
-    --dock: #1c1c1e;
     --label: #f5f5f7;
     --label-2: rgba(235, 235, 245, 0.6);
     --label-3: rgba(235, 235, 245, 0.3);
@@ -204,41 +202,19 @@ body {
   }
 }
 
-/* Abstand zum Home-Balken und Freiraum über der Tab-Leiste.
-   iOS 27 gibt Home-Bildschirm-Apps einen um die Statusleiste zu kurzen Bildschirm (--gap). Die Fläche
-   darunter wird aber noch gezeichnet: Leiste, Hintergrund und Fenster reichen deshalb bis ganz nach unten. */
+/* Abstand zum Home-Balken und Freiraum über der Tab-Leiste */
 :root {
   --safe-b: env(safe-area-inset-bottom);
-  --gap: 0px;
-  --clear: calc(var(--safe-b) + 96px);
-}
-html.ios-gap {
-  --clear: calc(var(--safe-b) + 96px - var(--gap));
-  /* falls iOS den Streifen doch selbst füllt: wenigstens in Leistenfarbe */
-  background: var(--dock);
-}
-html.ios-gap .fixed.inset-0 {
-  bottom: calc(-1 * var(--gap));
+  --clear: calc(var(--safe-b) + 84px);
 }
 
+/* Tab-Leiste wie bei Apple-Apps: flach am unteren Rand, Glas, Haarlinie oben */
 .tabbar {
-  bottom: calc(var(--safe-b) + 10px);
-}
-/* Bei der iOS-Lücke liegt die Leiste wie bei Apple-Apps flach am unteren Rand */
-html.ios-gap .tabbar {
-  bottom: calc(-1 * var(--gap));
-  max-width: none;
-  padding: 0;
-}
-html.ios-gap .tabbar-inner {
-  border-radius: 0;
-  border: none;
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: blur(28px) saturate(185%);
+  backdrop-filter: blur(28px) saturate(185%);
   border-top: 0.5px solid var(--separator);
-  padding-bottom: var(--safe-b);
-  box-shadow: none;
-}
-html.ios-gap .tabbar-inner > span:first-child {
-  bottom: var(--safe-b);
+  padding-bottom: max(var(--safe-b), 4px);
 }
 
 .safe-bottom {

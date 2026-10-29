@@ -84,8 +84,8 @@ const tabs: { id: Tab; label: string; Icon: typeof IconToday }[] = [
 export function TabBar({ tab, onChange, badge }: { tab: Tab; onChange: (t: Tab) => void; badge?: Partial<Record<Tab, number>> }) {
   const index = tabs.findIndex((t) => t.id === tab);
   return (
-    <nav className="tabbar fixed inset-x-0 z-30 mx-auto flex max-w-md justify-center px-4" aria-label="Bereiche">
-      <div className="tabbar-inner glass glass-strong relative flex w-full rounded-[30px] p-1.5">
+    <nav className="tabbar fixed inset-x-0 bottom-0 z-30" aria-label="Bereiche">
+      <div className="relative mx-auto flex w-full max-w-md p-1.5">
         {/* gleitende Linse unter dem aktiven Tab */}
         <span
           className="absolute top-1.5 bottom-1.5 rounded-[24px]"
