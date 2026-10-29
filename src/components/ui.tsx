@@ -86,7 +86,7 @@ export function TabBar({ tab, onChange, badge }: { tab: Tab; onChange: (t: Tab) 
   return (
     <nav
       className="fixed inset-x-0 z-30 mx-auto flex max-w-md justify-center px-4"
-      style={{ bottom: "calc(env(safe-area-inset-bottom) + 10px)" }}
+      style={{ bottom: "calc(var(--safe-b) + 10px)" }}
       aria-label="Bereiche"
     >
       <div className="glass glass-strong relative flex w-full rounded-[30px] p-1.5">
@@ -271,7 +271,7 @@ export function Sheet({
       <button className="fade-in absolute inset-0" style={{ background: "rgba(0,0,0,.25)" }} onClick={onClose} aria-label="Schließen" />
       <div
         className="sheet-in glass glass-strong relative max-h-[94dvh] w-full max-w-md overflow-y-auto rounded-t-[30px] px-4 pt-2"
-        style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 24px)" }}
+        style={{ paddingBottom: "calc(var(--safe-b) + 24px)" }}
       >
         <span className="mx-auto mb-2 block h-[5px] w-9 rounded-full" style={{ background: "var(--label-3)" }} aria-hidden />
         <div className="flex items-center justify-between gap-2 py-1">

@@ -153,7 +153,7 @@ function TaskForm({ onClose, onEvent, task }: { onClose: () => void; onEvent?: (
           void save();
         }}
         className="sheet-in glass glass-strong relative max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-[30px] px-4 pt-2"
-        style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 20px)" }}
+        style={{ paddingBottom: "calc(var(--safe-b) + 20px)" }}
       >
         <span className="mx-auto mb-2 block h-[5px] w-9 rounded-full" style={{ background: "var(--label-3)" }} aria-hidden />
         <div className="flex items-center justify-between py-1">

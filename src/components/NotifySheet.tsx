@@ -85,7 +85,7 @@ export function NotifySheet({ open, onClose }: { open: boolean; onClose: () => v
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center" role="dialog" aria-modal aria-label="Mitteilungen">
       <button className="fade-in absolute inset-0" style={{ background: "rgba(0,0,0,.25)" }} onClick={onClose} aria-label="Schließen" />
-      <div className="sheet-in glass glass-strong relative max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-[30px] px-4 pt-2" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 24px)" }}>
+      <div className="sheet-in glass glass-strong relative max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-[30px] px-4 pt-2" style={{ paddingBottom: "calc(var(--safe-b) + 24px)" }}>
         <span className="mx-auto mb-2 block h-[5px] w-9 rounded-full" style={{ background: "var(--label-3)" }} aria-hidden />
         <div className="flex items-center justify-between py-1">
           <span className="w-16" />

@@ -202,8 +202,17 @@ body {
   }
 }
 
+/* Abstand zum Home-Balken. Manche iOS-Versionen geben Home-Bildschirm-Apps einen kürzeren
+   Bildschirm und reservieren den unteren Rand selbst; dann darf die App ihn nicht noch einmal abziehen. */
+:root {
+  --safe-b: env(safe-area-inset-bottom);
+}
+html.ios-gap {
+  --safe-b: 0px;
+}
+
 .safe-bottom {
-  padding-bottom: calc(env(safe-area-inset-bottom) + 96px);
+  padding-bottom: calc(var(--safe-b) + 96px);
 }
 .safe-top {
   padding-top: calc(env(safe-area-inset-top) + 12px);

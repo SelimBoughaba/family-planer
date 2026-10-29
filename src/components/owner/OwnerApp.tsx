@@ -320,7 +320,7 @@ export function OwnerApp() {
       </div>
 
       {toast && (
-        <div className="fixed inset-x-0 z-50 mx-auto max-w-md px-4" style={{ bottom: "calc(env(safe-area-inset-bottom) + 20px)" }}>
+        <div className="fixed inset-x-0 z-50 mx-auto max-w-md px-4" style={{ bottom: "calc(var(--safe-b) + 20px)" }}>
           <div className="sheet-in glass glass-strong subhead rounded-[16px] px-4 py-3 text-center font-medium" style={{ color: toast.bad ? "var(--danger)" : "var(--label)" }} role="status">
             {toast.text}
           </div>
