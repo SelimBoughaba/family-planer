@@ -3,7 +3,7 @@ import { unauthorized } from "@/lib/server/auth";
 import { loadState } from "@/lib/server/data";
 
 export async function GET(req: NextRequest) {
-  const denied = unauthorized(req);
+  const denied = await unauthorized(req);
   if (denied) return denied;
 
   const p = req.nextUrl.searchParams;

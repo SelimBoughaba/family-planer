@@ -6,7 +6,7 @@ const isUuid = (v: unknown) => typeof v === "string" && /^[0-9a-f-]{36}$/i.test(
 
 /** Gerät für Mitteilungen anmelden oder einer anderen Person zuordnen */
 export async function POST(req: NextRequest) {
-  const denied = unauthorized(req);
+  const denied = await unauthorized(req);
   if (denied) return denied;
   const b = await req.json().catch(() => ({}));
   const sub = b.subscription;
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const denied = unauthorized(req);
+  const denied = await unauthorized(req);
   if (denied) return denied;
   const b = await req.json().catch(() => ({}));
   if (typeof b.endpoint !== "string") return NextResponse.json({ error: "invalid_input" }, { status: 400 });

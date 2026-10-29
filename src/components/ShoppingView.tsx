@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useFamily } from "@/lib/client/family";
-import { categories, guessCategory, parseItem } from "@/lib/shopping";
+import { guessCategory, parseItem } from "@/lib/shopping";
 import type { Item } from "@/lib/types";
 import { Avatar, Card, ContextMenu } from "./ui";
 import { SwipeRow } from "./SwipeRow";
@@ -16,6 +16,10 @@ export function ShoppingView() {
   const [moveFor, setMoveFor] = useState<Item | null>(null);
 
   const items = state?.items ?? [];
+  const categories = state?.lists.categories ?? [];
+  // Abteilungen, die der Owner gelöscht hat, landen sichtbar unter der letzten
+  const fallback = categories.includes("Vorrat") ? "Vorrat" : categories[categories.length - 1];
+  const bucket = (c: string) => (categories.includes(c) ? c : fallback);
   const open = items.filter((i) => !i.done);
   const done = items.filter((i) => i.done);
 
@@ -25,7 +29,7 @@ export function ShoppingView() {
   const add = () => {
     if (!draft.trim()) return;
     const { name, amount } = parseItem(draft);
-    void run({ op: "item.create", name, amount, category: guessCategory(name) });
+    void run({ op: "item.create", name, amount, category: bucket(guessCategory(name)) });
     setDraft("");
   };
 
@@ -67,7 +71,7 @@ export function ShoppingView() {
       </form>
 
       {categories.map((cat) => {
-        const list = open.filter((i) => i.category === cat);
+        const list = open.filter((i) => bucket(i.category) === cat);
         if (!list.length) return null;
         return (
           <div key={cat}>

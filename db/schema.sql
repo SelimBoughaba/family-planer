@@ -107,3 +107,26 @@ create table if not exists app_meta (
   updated_at timestamptz not null default now()
 );
 alter table app_meta enable row level security;
+
+-- Etappe Owner: Fehlerprotokoll, Backups, Art des Login-Versuchs
+alter table login_attempts add column if not exists kind text not null default 'family';
+
+create table if not exists error_log (
+  id bigint generated always as identity primary key,
+  source text not null,
+  message text not null,
+  detail text,
+  created_at timestamptz not null default now()
+);
+create index if not exists error_log_time_idx on error_log (created_at desc);
+alter table error_log enable row level security;
+
+create table if not exists backups (
+  id uuid primary key default gen_random_uuid(),
+  kind text not null default 'auto',
+  data jsonb not null,
+  size_bytes int not null default 0,
+  created_at timestamptz not null default now()
+);
+create index if not exists backups_time_idx on backups (created_at desc);
+alter table backups enable row level security;

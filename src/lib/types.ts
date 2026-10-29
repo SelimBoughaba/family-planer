@@ -78,6 +78,7 @@ export type AppState = {
   events: CalEvent[];
   tasks: Task[];
   items: Item[];
+  lists: { categories: string[]; areas: string[] };
 };
 
 export type Mutation =

@@ -2,7 +2,7 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import { db } from "./db";
 import type { AppState, CalEvent, EventFields, EventRecurrence, Item, Mutation, Person, Recurrence, Task } from "@/lib/types";
-import { categories } from "@/lib/shopping";
+import { getLists } from "./lists";
 import { personColors } from "@/lib/types";
 
 type Row = Record<string, unknown>;
@@ -75,6 +75,7 @@ export async function loadState(from: Date, to: Date): Promise<AppState> {
     events: events.map(toEvent),
     tasks: tasks.map(toTask),
     items: items.map(toItem),
+    lists: await getLists(),
   };
 }
 
@@ -200,7 +201,8 @@ export async function mutate(m: Mutation, by: string | null): Promise<string> {
       return "tasks";
 
     case "item.create": {
-      const cat = categories.includes(m.category) ? m.category : "Vorrat";
+      const { categories } = await getLists();
+      const cat = categories.includes(m.category) ? m.category : (categories.includes("Vorrat") ? "Vorrat" : categories[categories.length - 1]);
       await sql`insert into shopping_items (name, amount, category, added_by)
         values (${str(m.name, 80)!}, ${str(m.amount, 30, true)}, ${cat}, ${actor})`;
       return "items";
@@ -209,7 +211,7 @@ export async function mutate(m: Mutation, by: string | null): Promise<string> {
       await sql`update shopping_items set done = ${!!m.done}, done_at = ${m.done ? sql`now()` : null} where id = ${uuid(m.id)!}`;
       return "items";
     case "item.move": {
-      if (!categories.includes(m.category)) throw new InvalidInput("Unbekannte Abteilung");
+      if (!(await getLists()).categories.includes(m.category)) throw new InvalidInput("Unbekannte Abteilung");
       await sql`update shopping_items set category = ${m.category} where id = ${uuid(m.id)!}`;
       return "items";
     }

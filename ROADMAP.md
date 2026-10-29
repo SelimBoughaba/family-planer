@@ -7,10 +7,11 @@
 
 - Etappe 4: Mitteilungen per Push (Erinnerung pro Termin, Aufgaben mit Uhrzeit, Einladung zu Termin, Aufgabe zugewiesen), Zeitplaner jede Minute über Supabase, App-Icon und Manifest
 
+- Owner-Bereich unter /owner: eigenes Passwort, Status, Personen, Geräte, Abo-Links, alle abmelden, Listen, Aufräumen, Sicherungen (täglich automatisch, manuell, Datei), Wiederherstellen, Fehlerprotokoll
+
 ## Als Nächstes
-- Owner-Bereich (siehe unten), jetzt an der Reihe
 - Etappe 5: Essen (Rezepte, Wochenplan, Zutaten auf die Liste, KI-Vorschläge mit Monatslimit)
 - Aufgaben-Tab: alle Aufgaben nach Bereich und Person, Dienstplan reihum
 
-## Vorgemerkt, Selim erinnern, wenn es passt
-- **Owner-Bereich** mit eigenem Passwort, nur für Selim: Profile/Accounts verwalten, Daten einsehen und bereinigen, Backups und Export, Fehlerprotokoll, Spezialeinstellungen (z. B. KI-Limit, Abteilungen, Bereiche), alles, was die anderen nicht ändern sollen. Passt gut nach Etappe 4, weil dort Einstellungen und Erinnerungen ohnehin zusammenkommen.
+## Vorgemerkt
+- KI-Monatslimit als Einstellung im Owner-Bereich, sobald Essen mit KI-Vorschlägen kommt

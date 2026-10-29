@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useFamily } from "@/lib/client/family";
-import { areas, localDay, recurrenceLabel, type Recurrence } from "@/lib/types";
+import { localDay, recurrenceLabel, type Recurrence } from "@/lib/types";
 import { Avatar } from "./ui";
 
 type Kind = "task" | "event";
@@ -197,7 +197,7 @@ export function NewEntrySheet({ open, onClose, onEvent }: { open: boolean; onClo
             />
             {when === "date" && <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="body glass mt-3 w-full rounded-[12px] px-3 py-2" aria-label="Datum" />}
             <Label>Bereich</Label>
-            <Chips value={area} onChange={setArea} options={areas.map((a) => ({ id: a, label: a }))} />
+            <Chips value={area} onChange={setArea} options={(state?.lists.areas ?? []).map((a) => ({ id: a, label: a }))} />
             <Label>Wiederholen</Label>
             <Chips
               value={rec}

@@ -3,7 +3,7 @@ import { unauthorized } from "@/lib/server/auth";
 import { ensureCalendarToken, InvalidInput } from "@/lib/server/data";
 
 export async function POST(req: NextRequest) {
-  const denied = unauthorized(req);
+  const denied = await unauthorized(req);
   if (denied) return denied;
   const body = await req.json().catch(() => ({}));
   try {

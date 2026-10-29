@@ -3,7 +3,7 @@ import { unauthorized } from "@/lib/server/auth";
 import { sendToPeople } from "@/lib/server/push";
 
 export async function POST(req: NextRequest) {
-  const denied = unauthorized(req);
+  const denied = await unauthorized(req);
   if (denied) return denied;
   const b = await req.json().catch(() => ({}));
   if (typeof b.personId !== "string" || !/^[0-9a-f-]{36}$/i.test(b.personId)) return NextResponse.json({ error: "invalid_input" }, { status: 400 });

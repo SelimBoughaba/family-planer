@@ -6,7 +6,7 @@ import { passwordConfigured, SESSION_COOKIE, verifySession } from "@/lib/server/
 
 async function Gatekeeper() {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
-  if (!verifySession(token)) return <LoginScreen ready={passwordConfigured()} />;
+  if (!(await verifySession(token))) return <LoginScreen ready={passwordConfigured()} />;
   return <ClientApp />;
 }
 

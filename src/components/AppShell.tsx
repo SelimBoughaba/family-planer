@@ -65,6 +65,32 @@ function Main() {
     window.scrollTo({ top: 0 });
   }, [tab]);
 
+  // Verwaltung nur auf Geräten anbieten, auf denen der Owner schon einmal entsperrt hat
+  const [ownerDevice] = useState(() => {
+    try {
+      return localStorage.getItem("fp_owner_device") === "1";
+    } catch {
+      return false;
+    }
+  });
+
+  // Fehler im Browser ins Protokoll der Verwaltung schreiben
+  useEffect(() => {
+    let sent = 0;
+    const report = (message: string, detail: string) => {
+      if (sent++ > 5) return;
+      void fetch("/api/log-error", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message, detail }) }).catch(() => {});
+    };
+    const onError = (e: ErrorEvent) => report(e.message, `${e.filename}:${e.lineno}`);
+    const onRejection = (e: PromiseRejectionEvent) => report(String(e.reason?.message ?? e.reason), "unhandledrejection");
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onRejection);
+    return () => {
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onRejection);
+    };
+  }, []);
+
   // Service Worker aktuell halten und Gerät der gewählten Person zuordnen
   const meId = me?.id;
   useEffect(() => {
@@ -164,6 +190,9 @@ function Main() {
           { label: "Mitteilungen", icon: <IconBell size={18} />, onSelect: () => setTimeout(() => setNotify(true), 50) },
           { label: "Im Apple Kalender anzeigen", icon: <IconCalendar size={18} />, onSelect: () => setTimeout(() => setSubscribe(true), 50) },
           { label: "Profil wechseln", icon: <IconPerson size={18} />, onSelect: () => setMe(null) },
+          // bewusst ganzes Neuladen, damit der Server die Owner-Sitzung prüft
+          // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+          ...(ownerDevice ? [{ label: "Verwaltung", onSelect: () => window.location.assign("/owner") }] : []),
           { label: "Auf diesem Gerät abmelden", destructive: true, onSelect: () => void logout() },
         ]}
       />

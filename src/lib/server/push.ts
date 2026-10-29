@@ -1,6 +1,7 @@
 import "server-only";
 import webpush from "web-push";
 import { db } from "./db";
+import { logError } from "./log";
 
 export type PushPayload = { title: string; body: string; url?: string; tag?: string };
 
@@ -47,7 +48,7 @@ export async function sendToPeople(personIds: string[], payload: PushPayload) {
         const code = (err as { statusCode?: number }).statusCode;
         // Gerät hat das Abo beendet: aufräumen
         if (code === 404 || code === 410) await sql`delete from push_subscriptions where id = ${s.id as string}`;
-        else console.error("[push]", code, (err as Error).message);
+        else await logError("push", err, `Status ${code ?? "unbekannt"}`);
       }
     }),
   );
