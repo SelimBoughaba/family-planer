@@ -92,11 +92,11 @@ function optimistic(s: AppState, m: Mutation, me: string | null): AppState {
       return { ...s, items: [...add, ...s.items] };
     }
     case "recipe.create": {
-      const r: Recipe = { id: m.id ?? tmp, title: m.title, description: m.description, servings: m.servings, minutes: m.minutes, ingredients: m.ingredients, steps: m.steps, tags: m.tags, sourceUrl: m.sourceUrl, favorite: false, createdBy: me };
+      const r: Recipe = { id: m.id ?? tmp, title: m.title, description: m.description, servings: m.servings, minutes: m.minutes, ingredients: m.ingredients, steps: m.steps, tags: m.tags, sourceUrl: m.sourceUrl, images: m.images ?? [], favorite: false, createdBy: me };
       return { ...s, recipes: [...s.recipes, r] };
     }
     case "recipe.update":
-      return { ...s, recipes: s.recipes.map((r) => (r.id === m.id ? { ...r, title: m.title, description: m.description, servings: m.servings, minutes: m.minutes, ingredients: m.ingredients, steps: m.steps, tags: m.tags, sourceUrl: m.sourceUrl } : r)) };
+      return { ...s, recipes: s.recipes.map((r) => (r.id === m.id ? { ...r, title: m.title, description: m.description, servings: m.servings, minutes: m.minutes, ingredients: m.ingredients, steps: m.steps, tags: m.tags, sourceUrl: m.sourceUrl, images: m.images ?? r.images } : r)) };
     case "recipe.favorite":
       return { ...s, recipes: s.recipes.map((r) => (r.id === m.id ? { ...r, favorite: m.favorite } : r)) };
     case "recipe.delete":
@@ -104,6 +104,10 @@ function optimistic(s: AppState, m: Mutation, me: string | null): AppState {
     case "meal.set": {
       const meal: Meal = { id: tmp, day: m.day, recipeId: m.recipeId, title: m.title, cook: m.cook, note: m.note };
       return { ...s, meals: [...s.meals.filter((x) => x.day !== m.day), meal].sort((a, b) => a.day.localeCompare(b.day)) };
+    }
+    case "meal.attend": {
+      const rest = s.attendance.filter((a) => !(a.day === m.day && a.personId === m.personId));
+      return { ...s, attendance: m.present === null ? rest : [...rest, { day: m.day, personId: m.personId, present: m.present }] };
     }
     case "meal.clear":
       return { ...s, meals: s.meals.filter((x) => x.day !== m.day) };

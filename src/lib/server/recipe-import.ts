@@ -4,6 +4,8 @@ import { isIP } from "node:net";
 import { callTool } from "./ai";
 import { isoMinutes, parseIngredient } from "@/lib/recipes";
 import type { RecipeFields } from "@/lib/types";
+import { download, PATH_RE, typeOfPath } from "./storage";
+import type { ContentBlock } from "./ai";
 
 export class ImportError extends Error {}
 
@@ -128,6 +130,7 @@ function fromJsonLd(html: string, url: string): RecipeFields | null {
       description: r.description ? decode(String(r.description)).slice(0, 600) : null,
       servings: servingsOf(r.recipeYield),
       minutes: isoMinutes(r.totalTime) ?? isoMinutes(r.cookTime) ?? null,
+      images: [],
       ingredients,
       steps: steps(r.recipeInstructions).slice(0, 60),
       tags: [],
@@ -163,6 +166,7 @@ type AiRecipe = { title: string; description?: string; servings: number; minutes
 
 function normalize(r: AiRecipe, url: string | null): RecipeFields {
   return {
+    images: [],
     title: String(r.title ?? "Rezept").slice(0, 140),
     description: r.description ? String(r.description).slice(0, 600) : null,
     servings: Number.isInteger(r.servings) && r.servings > 0 ? r.servings : 4,
@@ -200,3 +204,30 @@ export async function importRecipe(rawUrl: string): Promise<{ recipe: RecipeFiel
 
 export { normalize as normalizeAiRecipe, recipeTool };
 export type { AiRecipe };
+
+/** Fotos oder PDF-Seiten eines Rezepts (Kochbuch, handgeschriebener Zettel): KI liest es aus */
+export async function recipeFromFiles(paths: string[]): Promise<RecipeFields> {
+  const list = [...new Set(paths)].filter((p) => PATH_RE.test(p) && p.startsWith("recipes/")).slice(0, 5);
+  if (!list.length) throw new ImportError("Bitte mindestens ein Foto oder PDF auswählen.");
+  const blocks: ContentBlock[] = [];
+  for (const p of list) {
+    const type = typeOfPath(p);
+    const data = (await download(p)).toString("base64");
+    if (type === "application/pdf") blocks.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data } });
+    else blocks.push({ type: "image", source: { type: "base64", media_type: type as "image/jpeg", data } });
+  }
+  blocks.push({
+    type: "text",
+    text: `Lies das Rezept aus ${list.length > 1 ? "diesen Seiten" : "dieser Vorlage"} aus. Es kann gedruckt oder handgeschrieben sein. Mehrere Seiten gehören zum selben Rezept.`,
+  });
+  const r = await callTool<AiRecipe>(
+    "scan",
+    "Du liest Rezepte aus Fotos und PDFs aus. Antworte auf Deutsch. Übernimm Mengen und Zutaten genau so, wie sie dastehen, auch bei Handschrift. Was du nicht sicher lesen kannst, lässt du weg statt zu raten. Fasse Schritte knapp in eigenen Worten zusammen.",
+    blocks,
+    recipeTool,
+    2000,
+    55000,
+  );
+  if (!r.found || !r.ingredients?.length) throw new ImportError("Auf den Bildern wurde kein Rezept erkannt. Ein schärferes Foto bei gutem Licht hilft meistens.");
+  return { ...normalize(r, null), images: list };
+}

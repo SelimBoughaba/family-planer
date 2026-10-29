@@ -17,8 +17,9 @@
 - Etappe 7: Schnelleingabe in Alltagssprache, Schnellmenü am Plus, Wochenstreifen in Heute, Mengen-Rad im Einkauf, Kalender-Zoom mit zwei Fingern, Profilbild auf Aufgabe ziehen
 - iOS: Tab-Leiste als Dock am Rand, Statusleiste undurchsichtig (sonst kürzt iOS 27 die App unten)
 
+- Etappe 8: Essens-Glücksrad, „Wer isst mit“ (Heute, Wochenplan, Essen-Fenster, Kalender-Hinweis, Portionen, Koch-Mitteilung 16 Uhr und Nachmeldung), Rezepte aus Foto und PDF mit privatem Dateispeicher
+
 ## Als Nächstes
-- Etappe 8: Essens-Glücksrad, „Wer isst mit“ mit Portionen und Mitteilung an den Koch, Rezepte aus Foto und PDF (braucht ANTHROPIC_API_KEY)
 - Etappe 9: Pinnwand mit Zetteln, Apple Pencil, Fotos und PDFs (mehrere Wände, Papierkorb, Ablaufdatum)
 - Etappe 10: Punkte, Belohnungen (Bestätigung durch Samir oder Denise), Rangliste, Wochenvorschau sonntags 18 Uhr
 

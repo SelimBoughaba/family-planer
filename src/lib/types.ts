@@ -102,6 +102,7 @@ export type Recipe = {
   steps: string[];
   tags: string[];
   sourceUrl: string | null;
+  images: string[]; // Speicherpfade der Originalfotos oder PDF-Seiten
   favorite: boolean;
   createdBy: string | null;
 };
@@ -117,6 +118,9 @@ export type Meal = {
   note: string | null;
 };
 
+/** Ausdrückliche Angabe, ob jemand an einem Tag zum Abendessen da ist; ohne Eintrag gilt „da“ */
+export type Attendance = { day: string; personId: string; present: boolean };
+
 export type AiInfo = { enabled: boolean; usedUsd: number; limitUsd: number };
 
 export type AppState = {
@@ -127,6 +131,7 @@ export type AppState = {
   lists: { categories: string[]; areas: string[] };
   recipes: Recipe[];
   meals: Meal[];
+  attendance: Attendance[];
   ai: AiInfo;
 };
 
@@ -152,6 +157,7 @@ export type Mutation =
   | { op: "recipe.delete"; id: string }
   | { op: "meal.set"; day: string; recipeId: string | null; title: string; cook: string | null; note: string | null }
   | { op: "meal.clear"; day: string }
+  | { op: "meal.attend"; day: string; personId: string; present: boolean | null }
   | ({ op: "event.create" } & EventFields)
   | ({ op: "event.update"; id: string } & EventFields)
   | { op: "event.move"; id: string; startsAt: string; endsAt: string }

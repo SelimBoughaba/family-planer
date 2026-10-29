@@ -5,6 +5,7 @@ import { nextInRotation } from "@/lib/types";
 import type { TaskFields, AppState, CalEvent, EventFields, EventRecurrence, Item, Meal, Mutation, Person, Recipe, RecipeFields, Recurrence, Task } from "@/lib/types";
 import { aiInfo } from "./ai";
 import { getLists } from "./lists";
+import { removeFiles } from "./storage";
 import { personColors } from "@/lib/types";
 
 type Row = Record<string, unknown>;
@@ -62,6 +63,7 @@ const toRecipe = (r: Row): Recipe => ({
   steps: (r.steps as string[]) ?? [],
   tags: (r.tags as string[]) ?? [],
   sourceUrl: (r.source_url as string) ?? null,
+  images: (r.images as string[]) ?? [],
   favorite: !!r.favorite,
   createdBy: (r.created_by as string) ?? null,
 });
@@ -85,7 +87,7 @@ const toItem = (r: Row): Item => ({
 
 export async function loadState(from: Date, to: Date): Promise<AppState> {
   const sql = db();
-  const [people, events, tasks, items, recipes, meals] = await Promise.all([
+  const [people, events, tasks, items, recipes, meals, attendance] = await Promise.all([
     sql`select * from people order by sort, name`,
     sql`select * from events
       where (recurrence is null and ends_at > ${from} and starts_at < ${to})
@@ -95,6 +97,7 @@ export async function loadState(from: Date, to: Date): Promise<AppState> {
     sql`select * from shopping_items where done = false or done_at > now() - interval '1 day' order by created_at desc`,
     sql`select * from recipes order by favorite desc, lower(title)`,
     sql`select id, day::text as day, recipe_id, title, cook, note from meal_plan where day between (now() - interval '14 days')::date and (now() + interval '60 days')::date order by day`,
+    sql`select day::text as day, person_id, present from meal_attendance where day >= (now() - interval '7 days')::date`,
   ]);
   return {
     people: people.map(toPerson),
@@ -104,6 +107,7 @@ export async function loadState(from: Date, to: Date): Promise<AppState> {
     lists: await getLists(),
     recipes: recipes.map(toRecipe),
     meals: meals.map(toMeal),
+    attendance: attendance.map((r) => ({ day: String(r.day).slice(0, 10), personId: r.person_id as string, present: !!r.present })),
     ai: await aiInfo(),
   };
 }
@@ -169,6 +173,8 @@ function recipeFields(m: RecipeFields) {
     steps,
     tags,
     sourceUrl: url && /^https?:\/\//.test(url) ? url : null,
+    // nur Pfade, die unser Upload vergibt
+    images: (Array.isArray(m.images) ? m.images : []).filter((x) => typeof x === "string" && /^recipes\/[0-9a-f-]{36}\.(?:jpg|png|webp|pdf)$/.test(x)).slice(0, 5),
   };
 }
 
@@ -313,14 +319,14 @@ export async function mutate(m: Mutation, by: string | null): Promise<string> {
       const f = recipeFields(m);
       // ID darf vom Gerät kommen, damit es das Rezept sofort einplanen kann
       const id = uuid(m.id, true) ?? randomUUID();
-      await sql`insert into recipes (id, title, description, servings, minutes, ingredients, steps, tags, source_url, created_by)
-        values (${id}, ${f.title}, ${f.description}, ${f.servings}, ${f.minutes}, ${sql.json(f.ingredients)}, ${sql.json(f.steps)}, ${sql.array(f.tags)}::text[], ${f.sourceUrl}, ${actor})`;
+      await sql`insert into recipes (id, title, description, servings, minutes, ingredients, steps, tags, source_url, images, created_by)
+        values (${id}, ${f.title}, ${f.description}, ${f.servings}, ${f.minutes}, ${sql.json(f.ingredients)}, ${sql.json(f.steps)}, ${sql.array(f.tags)}::text[], ${f.sourceUrl}, ${sql.array(f.images)}::text[], ${actor})`;
       return "recipes";
     }
     case "recipe.update": {
       const f = recipeFields(m);
       await sql`update recipes set title = ${f.title}, description = ${f.description}, servings = ${f.servings}, minutes = ${f.minutes},
-        ingredients = ${sql.json(f.ingredients)}, steps = ${sql.json(f.steps)}, tags = ${sql.array(f.tags)}::text[], source_url = ${f.sourceUrl}, updated_at = now()
+        ingredients = ${sql.json(f.ingredients)}, steps = ${sql.json(f.steps)}, tags = ${sql.array(f.tags)}::text[], source_url = ${f.sourceUrl}, images = ${sql.array(f.images)}::text[], updated_at = now()
         where id = ${uuid(m.id)!}`;
       await sql`update meal_plan set title = ${f.title} where recipe_id = ${m.id}`;
       return "recipes";
@@ -328,15 +334,27 @@ export async function mutate(m: Mutation, by: string | null): Promise<string> {
     case "recipe.favorite":
       await sql`update recipes set favorite = ${!!m.favorite} where id = ${uuid(m.id)!}`;
       return "recipes";
-    case "recipe.delete":
-      await sql`delete from recipes where id = ${uuid(m.id)!}`;
+    case "recipe.delete": {
+      const [gone] = await sql`delete from recipes where id = ${uuid(m.id)!} returning images`;
+      // Originalfotos mit aufräumen, Fehler dabei sind egal
+      if (gone?.images?.length) await removeFiles(gone.images as string[]).catch(() => {});
       return "recipes";
+    }
     case "meal.set": {
       const day = dateStr(m.day)!;
       const title = str(m.title, 140)!;
       await sql`insert into meal_plan (day, recipe_id, title, cook, note, created_by)
         values (${day}, ${uuid(m.recipeId, true)}, ${title}, ${uuid(m.cook, true)}, ${str(m.note, 200, true)}, ${actor})
         on conflict (day) do update set recipe_id = excluded.recipe_id, title = excluded.title, cook = excluded.cook, note = excluded.note`;
+      return "meals";
+    }
+    case "meal.attend": {
+      const day = dateStr(m.day)!;
+      const person = uuid(m.personId)!;
+      if (m.present === null) await sql`delete from meal_attendance where day = ${day} and person_id = ${person}`;
+      else
+        await sql`insert into meal_attendance (day, person_id, present) values (${day}, ${person}, ${!!m.present})
+          on conflict (day, person_id) do update set present = excluded.present, updated_at = now()`;
       return "meals";
     }
     case "meal.clear":

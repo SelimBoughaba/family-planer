@@ -8,7 +8,7 @@ const MIN = 60000;
 const DAY = 1440 * MIN;
 const CATCH_UP = 10 * MIN; // verspätete Läufe holen bis zu 10 Minuten nach
 
-type EventRow = {
+export type EventRow = {
   id: string;
   title: string;
   place: string | null;
@@ -23,7 +23,7 @@ type EventRow = {
 };
 
 /** Vorkommen einer Serie in Berliner Ortszeit, die zwischen from und to beginnen */
-function starts(e: EventRow, from: number, to: number): Date[] {
+export function starts(e: EventRow, from: number, to: number): Date[] {
   const base = new Date(e.starts_at);
   if (!e.recurrence) return +base >= from && +base < to ? [base] : [];
   const w = wall(base);

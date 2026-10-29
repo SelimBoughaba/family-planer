@@ -174,3 +174,14 @@ alter table ai_usage enable row level security;
 
 -- Etappe 6: Aufgaben mit Dienstplan (Reihenfolge der Personen, die sich abwechseln)
 alter table tasks add column if not exists rotation uuid[] not null default '{}';
+
+-- Etappe 8: Wer isst mit (nur ausdrückliche Angaben; ohne Eintrag gilt „da“), Originalfotos von Rezepten
+create table if not exists meal_attendance (
+  day date not null,
+  person_id uuid not null references people(id) on delete cascade,
+  present boolean not null,
+  updated_at timestamptz not null default now(),
+  primary key (day, person_id)
+);
+alter table meal_attendance enable row level security;
+alter table recipes add column if not exists images text[] not null default '{}';

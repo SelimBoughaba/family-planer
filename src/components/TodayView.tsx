@@ -7,6 +7,7 @@ import { addDays, occurrences, startOfDay, type Occurrence } from "@/lib/recurre
 import { recipeEmoji } from "@/lib/recipes";
 import { Avatar, AvatarStack, Card, PersonFilter, SectionTitle, useLongPress } from "./ui";
 import { TaskRow, useAssignDrop, useTaskMenus } from "./TaskRow";
+import { AttendanceRow, MaybeHint, eatersLabel, usePresence } from "./food/Attendance";
 import { IconPin, IconPlus } from "./icons";
 
 const time = (d: Date) => d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
@@ -99,6 +100,7 @@ export function TodayView({
   const selStart = strip[sel];
   const selEnd = addDays(selStart, 1);
   const selDay = localDay(selStart);
+  const presence = usePresence(selDay);
   const todays = occ.filter((o) => o.start < selEnd && o.end > selStart && (sel > 0 || +o.start < dayStart + 86400000));
 
   // Heute: fällige und überfällige, dazu heute Erledigtes; „Irgendwann“ steht im Aufgaben-Tab. Andere Tage: was dann fällig ist
@@ -335,6 +337,15 @@ export function TodayView({
                   </span>
                 </span>
               </button>
+              <div className="border-t px-4 pt-3 pb-3.5" style={{ borderColor: "var(--separator)" }}>
+                <div className="flex items-center justify-between gap-3">
+                  <AttendanceRow day={selDay} size={30} />
+                  <span className="footnote shrink-0 font-semibold" style={{ color: "var(--label-2)" }}>
+                    {eatersLabel(presence)}
+                  </span>
+                </div>
+                <MaybeHint day={selDay} />
+              </div>
             </Card>
           </>
         );

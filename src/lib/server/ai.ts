@@ -45,11 +45,17 @@ export async function aiInfo(): Promise<AiInfo> {
 
 type Tool = { name: string; description: string; input_schema: Record<string, unknown> };
 
+/** Inhalt einer Nachricht: Text oder Bausteine mit Bildern und PDFs */
+export type ContentBlock =
+  | { type: "text"; text: string }
+  | { type: "image"; source: { type: "base64"; media_type: "image/jpeg" | "image/png" | "image/webp"; data: string } }
+  | { type: "document"; source: { type: "base64"; media_type: "application/pdf"; data: string } };
+
 /**
  * Ruft Claude mit genau einem Werkzeug auf und gibt dessen Eingabe als strukturiertes Ergebnis zurück.
  * So kommt immer gültiges JSON zurück statt freiem Text.
  */
-export async function callTool<T>(kind: string, system: string, user: string, tool: Tool, maxTokens = 1200): Promise<T> {
+export async function callTool<T>(kind: string, system: string, user: string | ContentBlock[], tool: Tool, maxTokens = 1200, timeoutMs = 45000): Promise<T> {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) throw new AiUnavailable("Die KI ist noch nicht eingerichtet.");
   const [usage, limit] = await Promise.all([monthUsage(), aiLimit()]);
@@ -69,7 +75,7 @@ export async function callTool<T>(kind: string, system: string, user: string, to
         tool_choice: { type: "tool", name: tool.name },
         messages: [{ role: "user", content: user }],
       }),
-      signal: AbortSignal.timeout(45000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (err) {
     await logError("ai", err, kind);

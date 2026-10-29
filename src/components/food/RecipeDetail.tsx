@@ -5,6 +5,8 @@ import { useFamily } from "@/lib/client/family";
 import { recipeEmoji, scaleAmount } from "@/lib/recipes";
 import { guessCategory } from "@/lib/shopping";
 import { localDay, type Recipe } from "@/lib/types";
+import { eaters, presenceFor } from "@/lib/attendance";
+import { RecipeImages } from "./RecipeImages";
 import { addDays, startOfDay } from "@/lib/recurrence";
 import { Card, ContextMenu, Sheet } from "../ui";
 import { IconCheck, IconClock, IconTrash } from "../icons";
@@ -25,15 +27,17 @@ export function useAddToShopping() {
   };
 }
 
-export function RecipeDetail({ recipe, onClose, onEdit }: { recipe: Recipe | null; onClose: () => void; onEdit: (r: Recipe) => void }) {
+export function RecipeDetail({ recipe, onClose, onEdit, forDay = null }: { recipe: Recipe | null; onClose: () => void; onEdit: (r: Recipe) => void; forDay?: string | null }) {
   if (!recipe) return null;
-  return <Detail key={recipe.id} recipe={recipe} onClose={onClose} onEdit={onEdit} />;
+  return <Detail key={`${recipe.id}-${forDay}`} recipe={recipe} onClose={onClose} onEdit={onEdit} forDay={forDay} />;
 }
 
-function Detail({ recipe, onClose, onEdit }: { recipe: Recipe; onClose: () => void; onEdit: (r: Recipe) => void }) {
+function Detail({ recipe, onClose, onEdit, forDay }: { recipe: Recipe; onClose: () => void; onEdit: (r: Recipe) => void; forDay: string | null }) {
   const { state, run } = useFamily();
   const addToShopping = useAddToShopping();
-  const [servings, setServings] = useState(recipe.servings);
+  // aus dem Wochenplan geöffnet: so viele Portionen, wie an dem Tag mitessen
+  const [eatersCount] = useState(() => (forDay ? eaters(presenceFor(forDay, state?.people ?? [], state?.attendance ?? [], state?.events ?? [])) : null));
+  const [servings, setServings] = useState(eatersCount ?? recipe.servings);
   const [skip, setSkip] = useState<Set<number>>(new Set());
   const [added, setAdded] = useState<string | null>(null);
   const [plan, setPlan] = useState(false);
@@ -97,6 +101,8 @@ function Detail({ recipe, onClose, onEdit }: { recipe: Recipe; onClose: () => vo
         </button>
       </div>
 
+      {recipe.images.length > 0 && <RecipeImages paths={recipe.images} />}
+
       <div className="mt-6 flex items-end justify-between">
         <h3 className="headline">Zutaten</h3>
         <span className="flex items-center gap-3">
@@ -109,6 +115,11 @@ function Detail({ recipe, onClose, onEdit }: { recipe: Recipe; onClose: () => vo
           </button>
         </span>
       </div>
+      {eatersCount !== null && servings === eatersCount && (
+        <p className="footnote mt-1.5 text-right" style={{ color: "var(--label-2)" }}>
+          So viele essen {forDay === localDay() ? "heute" : "an dem Tag"} mit
+        </p>
+      )}
       <Card className="mt-3 overflow-hidden">
         {scaled.length === 0 && (
           <p className="subhead px-4 py-3" style={{ color: "var(--label-2)" }}>

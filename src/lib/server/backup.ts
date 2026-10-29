@@ -2,7 +2,7 @@ import "server-only";
 import { db } from "./db";
 import { wall } from "./berlin";
 
-export const BACKUP_VERSION = 2;
+export const BACKUP_VERSION = 3;
 const KEEP_AUTO = 14;
 
 export type Snapshot = {
@@ -16,6 +16,7 @@ export type Snapshot = {
     shopping_items: Record<string, unknown>[];
     recipes?: Record<string, unknown>[];
     meal_plan?: Record<string, unknown>[];
+    meal_attendance?: Record<string, unknown>[];
     lists: unknown;
   };
 };
@@ -45,9 +46,10 @@ export async function snapshot(): Promise<Snapshot> {
   const lists = await step("Listen", () => sql`select value from app_meta where key = 'lists'`);
   const recipes = await step(
     "Rezepte",
-    () => sql`select id, title, description, servings, minutes, ingredients, steps, tags, source_url, favorite, created_by, created_at, updated_at from recipes`,
+    () => sql`select id, title, description, servings, minutes, ingredients, steps, tags, source_url, images, favorite, created_by, created_at, updated_at from recipes`,
   );
   const meals = await step("Wochenplan", () => sql`select id, day::text as day, recipe_id, title, cook, note, created_by, created_at from meal_plan`);
+  const attendance = await step("Wer isst mit", () => sql`select day::text as day, person_id, present from meal_attendance where day >= current_date - 30`);
   return {
     app: "familienplaner",
     version: BACKUP_VERSION,
@@ -59,6 +61,7 @@ export async function snapshot(): Promise<Snapshot> {
       shopping_items: [...items],
       recipes: [...recipes],
       meal_plan: [...meals],
+      meal_attendance: [...attendance],
       lists: lists[0]?.value ?? null,
     },
   };
@@ -126,6 +129,7 @@ export async function restore(data: unknown) {
   await sql.begin(async (tx) => {
     if (hasFood) {
       await tx`delete from meal_plan`;
+      await tx`delete from meal_attendance`;
       await tx`delete from recipes`;
     }
     await tx`delete from events`;
@@ -155,15 +159,19 @@ export async function restore(data: unknown) {
           ${!!i.done}, ${(i.done_at as string) ?? null}, ${(i.created_at as string) ?? new Date().toISOString()})`;
     }
     for (const r of d.tables.recipes ?? []) {
-      await tx`insert into recipes (id, title, description, servings, minutes, ingredients, steps, tags, source_url, favorite, created_by, created_at, updated_at)
+      await tx`insert into recipes (id, title, description, servings, minutes, ingredients, steps, tags, source_url, images, favorite, created_by, created_at, updated_at)
         values (${r.id as string}, ${r.title as string}, ${(r.description as string) ?? null}, ${(r.servings as number) ?? 4}, ${(r.minutes as number) ?? null},
-          ${tx.json((r.ingredients ?? []) as never)}, ${tx.json((r.steps ?? []) as never)}, ${tx.array((r.tags as string[]) ?? [])}::text[], ${(r.source_url as string) ?? null}, ${!!r.favorite},
+          ${tx.json((r.ingredients ?? []) as never)}, ${tx.json((r.steps ?? []) as never)}, ${tx.array((r.tags as string[]) ?? [])}::text[], ${(r.source_url as string) ?? null}, ${tx.array((r.images as string[]) ?? [])}::text[], ${!!r.favorite},
           ${ids.includes(r.created_by as string) ? (r.created_by as string) : null}, ${(r.created_at as string) ?? new Date().toISOString()}, now())`;
     }
     for (const m of d.tables.meal_plan ?? []) {
       await tx`insert into meal_plan (id, day, recipe_id, title, cook, note, created_by, created_at)
         values (${m.id as string}, ${m.day as string}, ${recipeIds.includes(m.recipe_id as string) ? (m.recipe_id as string) : null}, ${m.title as string},
           ${ids.includes(m.cook as string) ? (m.cook as string) : null}, ${(m.note as string) ?? null}, ${ids.includes(m.created_by as string) ? (m.created_by as string) : null}, ${(m.created_at as string) ?? new Date().toISOString()})`;
+    }
+    for (const a of d.tables.meal_attendance ?? []) {
+      if (!ids.includes(a.person_id as string)) continue;
+      await tx`insert into meal_attendance (day, person_id, present) values (${a.day as string}, ${a.person_id as string}, ${!!a.present}) on conflict do nothing`;
     }
     if (d.tables.lists) {
       await tx`insert into app_meta (key, value) values ('lists', ${tx.json(d.tables.lists as never)}) on conflict (key) do update set value = excluded.value, updated_at = now()`;

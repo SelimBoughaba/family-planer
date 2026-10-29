@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { prepareFile, uploadFile } from "@/lib/client/upload";
+import { RecipeImages } from "./RecipeImages";
 import { useFamily } from "@/lib/client/family";
 import { parseIngredient } from "@/lib/recipes";
 import type { Recipe, RecipeFields } from "@/lib/types";
@@ -22,6 +24,7 @@ function fromTarget(t: EditorTarget) {
     steps: stepsText(r.steps),
     tags: (r.tags ?? []).join(", "),
     sourceUrl: r.sourceUrl ?? "",
+    images: r.images ?? [],
   };
 }
 
@@ -37,7 +40,8 @@ function Editor({ target, onClose, onSaved }: { target: EditorTarget; onClose: (
   const [importUrl, setImportUrl] = useState("");
   const [pasteText, setPasteText] = useState("");
   const [showPaste, setShowPaste] = useState(false);
-  const [busy, setBusy] = useState<null | "save" | "import">(null);
+  const [busy, setBusy] = useState<null | "save" | "import" | "scan">(null);
+  const [scanStep, setScanStep] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }));
   const ai = state?.ai.enabled;
@@ -61,6 +65,7 @@ function Editor({ target, onClose, onSaved }: { target: EditorTarget; onClose: (
       .map((t) => t.trim())
       .filter(Boolean),
     sourceUrl: f.sourceUrl.trim() || null,
+    images: f.images,
   });
 
   const save = async () => {
@@ -92,6 +97,32 @@ function Editor({ target, onClose, onSaved }: { target: EditorTarget; onClose: (
     setF(fromTarget({ mode: "new", initial: r.recipe }));
     setShowPaste(false);
     setMsg(r.via === "structured" ? "Übernommen. Bitte kurz prüfen und sichern." : "Von der KI ausgelesen. Bitte Mengen prüfen und sichern.");
+  };
+
+  // Fotos oder PDF hochladen und von der KI auslesen lassen
+  const scan = async (files: FileList | null) => {
+    const list = Array.from(files ?? []).slice(0, 5);
+    if (!list.length) return;
+    setBusy("scan");
+    setMsg(null);
+    try {
+      const paths: string[] = [];
+      for (let i = 0; i < list.length; i++) {
+        setScanStep(list.length > 1 ? `Lädt hoch, ${i + 1} von ${list.length}` : "Lädt hoch");
+        paths.push(await uploadFile(await prepareFile(list[i]), "recipe"));
+      }
+      setScanStep("KI liest das Rezept");
+      const res = await fetch("/api/recipes/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paths }) });
+      const r = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(r.message ?? "Das Rezept konnte nicht gelesen werden.");
+      setF(fromTarget({ mode: "new", initial: r.recipe }));
+      setMsg("Ausgelesen. Bitte Mengen und Schritte prüfen, dann sichern. Das Original bleibt beim Rezept.");
+    } catch (err) {
+      setMsg((err as Error).message);
+    } finally {
+      setBusy(null);
+      setScanStep(null);
+    }
   };
 
   return (
@@ -134,6 +165,23 @@ function Editor({ target, onClose, onSaved }: { target: EditorTarget; onClose: (
             </button>
           </form>
           {ai && (
+            <div className="mt-3 flex gap-2">
+              <label className="press subhead flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-[12px] py-2 font-semibold" style={{ background: "var(--glass-strong)", color: "var(--tint)" }}>
+                📷 Foto machen
+                <input type="file" accept="image/*" capture="environment" className="sr-only" disabled={!!busy} onChange={(e) => void scan(e.target.files)} />
+              </label>
+              <label className="press subhead flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-[12px] py-2 font-semibold" style={{ background: "var(--glass-strong)", color: "var(--tint)" }}>
+                📄 Foto oder PDF
+                <input type="file" accept="image/*,application/pdf" multiple className="sr-only" disabled={!!busy} onChange={(e) => void scan(e.target.files)} aria-label="Fotos oder PDF auswählen" />
+              </label>
+            </div>
+          )}
+          {scanStep && (
+            <p className="footnote mt-2 flex items-center gap-2" style={{ color: "var(--tint)" }} role="status">
+              <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden /> {scanStep}
+            </p>
+          )}
+          {ai && (
             <button onClick={() => setShowPaste((v) => !v)} className="footnote mt-2 font-semibold" style={{ color: "var(--tint)" }}>
               {showPaste ? "Doch nicht" : "Oder Rezepttext einfügen"}
             </button>
@@ -174,6 +222,7 @@ function Editor({ target, onClose, onSaved }: { target: EditorTarget; onClose: (
         maxLength={140}
         aria-label="Name des Gerichts"
       />
+      {f.images.length > 0 && <RecipeImages paths={f.images} onRemove={(p) => set("images", f.images.filter((x) => x !== p))} />}
       <input
         value={f.description}
         onChange={(e) => set("description", e.target.value)}

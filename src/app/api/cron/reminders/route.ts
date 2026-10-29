@@ -4,6 +4,7 @@ import { runReminders } from "@/lib/server/reminders";
 import { maybeAutoBackup } from "@/lib/server/backup";
 import { logError } from "@/lib/server/log";
 import { healStuckQueries } from "@/lib/server/heal";
+import { dinnerHeadsUp } from "@/lib/server/dinner";
 
 export const maxDuration = 55;
 
@@ -20,14 +21,19 @@ async function handle(req: NextRequest) {
   // Testuhr nur, wenn ausdrücklich lokal freigeschaltet
   const at = process.env.ALLOW_TEST_CLOCK === "1" ? Date.parse(req.nextUrl.searchParams.get("now") ?? "") : NaN;
   try {
-    const result = await runReminders(isNaN(at) ? Date.now() : at);
+    const now = isNaN(at) ? Date.now() : at;
+    const result = await runReminders(now);
+    const dinner = await dinnerHeadsUp(now).catch(async (err) => {
+      await logError("dinner", err);
+      return 0;
+    });
     const backup = await maybeAutoBackup().catch(async (err) => {
       await logError("backup", err);
       return null;
     });
     // alle zehn Minuten verwaiste Datenbank-Befehle abräumen
     const healed = new Date().getUTCMinutes() % 10 === 0 ? await healStuckQueries().catch(() => 0) : 0;
-    return NextResponse.json({ ok: true, ...result, backup, healed });
+    return NextResponse.json({ ok: true, ...result, dinner, backup, healed });
   } catch (err) {
     await logError("reminders", err);
     return NextResponse.json({ ok: false }, { status: 500 });

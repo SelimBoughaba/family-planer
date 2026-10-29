@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { useFamily } from "@/lib/client/family";
-import { recipeEmoji } from "@/lib/recipes";
+import { recipeEmoji, scaleAmount } from "@/lib/recipes";
+import { eaters, presenceFor } from "@/lib/attendance";
+import { AttendanceRow, AttendanceSheet } from "./Attendance";
 import { addDays, startOfDay, startOfWeek } from "@/lib/recurrence";
 import { localDay, type Recipe, type RecipeFields } from "@/lib/types";
 import { Card } from "../ui";
@@ -18,7 +20,8 @@ export function FoodView({ initialDay }: { initialDay?: string | null }) {
   const [mode, setMode] = useState<Mode>("woche");
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [mealDay, setMealDay] = useState<string | null>(initialDay ?? null);
-  const [detail, setDetail] = useState<Recipe | null>(null);
+  const [detail, setDetail] = useState<{ recipe: Recipe; day: string | null } | null>(null);
+  const [attendDay, setAttendDay] = useState<string | null>(null);
   const [editor, setEditor] = useState<EditorTarget | null>(null);
   const [q, setQ] = useState("");
   const [note, setNote] = useState<string | null>(null);
@@ -29,14 +32,18 @@ export function FoodView({ initialDay }: { initialDay?: string | null }) {
   const recipes = state?.recipes ?? [];
   const byId = (id: string | null) => recipes.find((r) => r.id === id) ?? null;
   // aktuelle Fassung des geöffneten Rezepts nach Änderungen
-  const liveDetail = detail ? (recipes.find((r) => r.id === detail.id) ?? null) : null;
+  const liveDetail = detail ? (recipes.find((r) => r.id === detail.recipe.id) ?? null) : null;
 
   const shopWeek = async () => {
-    const list = days
-      .map((d) => state?.meals.find((m) => m.day === localDay(d)))
-      .map((m) => byId(m?.recipeId ?? null))
-      .filter((r): r is Recipe => !!r)
-      .flatMap((r) => r.ingredients);
+    // Mengen pro Tag auf die Zahl der Mitesser umrechnen
+    const list = days.flatMap((d) => {
+      const day = localDay(d);
+      const r = byId(state?.meals.find((m) => m.day === day)?.recipeId ?? null);
+      if (!r) return [];
+      const n = eaters(presenceFor(day, state?.people ?? [], state?.attendance ?? [], state?.events ?? []));
+      const factor = n / (r.servings || 1);
+      return r.ingredients.map((i) => ({ ...i, amount: scaleAmount(i.amount, factor) }));
+    });
     if (!list.length) return setNote("Für diese Woche sind keine Rezepte mit Zutaten eingeplant.");
     // gleiche Zutat aus mehreren Rezepten nur einmal
     const seen = new Set<string>();
@@ -72,7 +79,13 @@ export function FoodView({ initialDay }: { initialDay?: string | null }) {
       <div className="relative flex rounded-[10px] p-[2px]" style={{ background: "color-mix(in oklab, var(--label) 8%, transparent)" }}>
         <span
           className="absolute top-[2px] bottom-[2px] rounded-[8px]"
-          style={{ left: mode === "woche" ? 2 : "calc(50% + 0px)", width: "calc(50% - 2px)", background: "var(--glass-strong)", boxShadow: "0 3px 8px rgba(0,0,0,.12)", transition: "left 300ms cubic-bezier(0.25, 1.1, 0.4, 1)" }}
+          style={{
+            left: mode === "woche" ? 2 : "calc(50% + 0px)",
+            width: "calc(50% - 2px)",
+            background: "var(--glass-strong)",
+            boxShadow: "0 3px 8px rgba(0,0,0,.12)",
+            transition: "left 300ms cubic-bezier(0.25, 1.1, 0.4, 1)",
+          }}
           aria-hidden
         />
         {(["woche", "rezepte"] as const).map((m) => (
@@ -106,7 +119,7 @@ export function FoodView({ initialDay }: { initialDay?: string | null }) {
               return (
                 <button
                   key={day}
-                  onClick={() => (r ? setDetail(r) : setMealDay(day))}
+                  onClick={() => (r ? setDetail({ recipe: r, day }) : setMealDay(day))}
                   className="flex w-full items-center gap-3 px-4 py-3 text-left"
                   style={{ borderTop: k ? "0.5px solid var(--separator)" : "none", opacity: past ? 0.5 : 1 }}
                 >
@@ -128,6 +141,23 @@ export function FoodView({ initialDay }: { initialDay?: string | null }) {
                         <span className="footnote block truncate" style={{ color: "var(--label-2)" }}>
                           {[person(meal.cook) ? `kocht ${person(meal.cook)!.name}` : "noch niemand kocht", r?.minutes ? `${r.minutes} Min.` : null].filter(Boolean).join(", ")}
                         </span>
+                        {!past && (
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setAttendDay(day);
+                            }}
+                            className="mt-1 inline-flex rounded-full px-1.5 py-1"
+                            style={{ background: "color-mix(in oklab, var(--label) 5%, transparent)" }}
+                            aria-label="Wer isst mit"
+                          >
+                            <span className="pointer-events-none flex [&>div]:gap-[3px]">
+                              <AttendanceRow day={day} size={14} interactive={false} />
+                            </span>
+                          </span>
+                        )}
                       </span>
                       <span
                         role="button"
@@ -143,9 +173,28 @@ export function FoodView({ initialDay }: { initialDay?: string | null }) {
                       </span>
                     </>
                   ) : (
-                    <span className="subhead flex-1" style={{ color: "var(--label-3)" }}>
-                      {past ? "Nichts eingetragen" : "Essen planen"}
-                    </span>
+                    <>
+                      <span className="subhead flex-1" style={{ color: "var(--label-3)" }}>
+                        {past ? "Nichts eingetragen" : "Essen planen"}
+                      </span>
+                      {!past && (
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setAttendDay(day);
+                          }}
+                          className="inline-flex shrink-0 rounded-full px-1.5 py-1"
+                          style={{ background: "color-mix(in oklab, var(--label) 5%, transparent)" }}
+                          aria-label="Wer isst mit"
+                        >
+                          <span className="pointer-events-none flex [&>div]:gap-[3px]">
+                            <AttendanceRow day={day} size={14} interactive={false} />
+                          </span>
+                        </span>
+                      )}
+                    </>
                   )}
                 </button>
               );
@@ -167,22 +216,36 @@ export function FoodView({ initialDay }: { initialDay?: string | null }) {
         </>
       ) : (
         <>
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Suchen nach Name, Zutat oder Schlagwort" className="body glass mt-5 w-full rounded-[14px] px-3 py-2.5" aria-label="Rezepte suchen" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Suchen nach Name, Zutat oder Schlagwort"
+            className="body glass mt-5 w-full rounded-[14px] px-3 py-2.5"
+            aria-label="Rezepte suchen"
+          />
           {recipes.length === 0 ? (
             <Card className="mt-4 p-5 text-center">
               <p className="headline">Noch keine Rezepte</p>
               <p className="subhead mt-1" style={{ color: "var(--label-2)" }}>
                 Füge ein Lieblingsrezept hinzu oder hol eins per Link von einer Rezeptseite.
               </p>
-              <button onClick={() => setEditor({ mode: "new" })} className="press subhead mt-4 rounded-full px-4 py-2 font-semibold text-white" style={{ background: "var(--tint)" }}>
+              <button
+                onClick={() => setEditor({ mode: "new" })}
+                className="press subhead mt-4 rounded-full px-4 py-2 font-semibold text-white"
+                style={{ background: "var(--tint)" }}
+              >
                 Rezept hinzufügen
               </button>
             </Card>
           ) : (
             <div className="mt-4 grid grid-cols-2 gap-3">
               {filtered.map((r) => (
-                <button key={r.id} onClick={() => setDetail(r)} className="press glass flex flex-col items-start rounded-[20px] p-3 text-left">
-                  <span className="flex h-12 w-12 items-center justify-center rounded-[14px] text-2xl" style={{ background: "color-mix(in oklab, var(--tint) 10%, transparent)" }} aria-hidden>
+                <button key={r.id} onClick={() => setDetail({ recipe: r, day: null })} className="press glass flex flex-col items-start rounded-[20px] p-3 text-left">
+                  <span
+                    className="flex h-12 w-12 items-center justify-center rounded-[14px] text-2xl"
+                    style={{ background: "color-mix(in oklab, var(--tint) 10%, transparent)" }}
+                    aria-hidden
+                  >
                     {recipeEmoji(r.title, r.tags)}
                   </span>
                   <span className="subhead mt-2.5 line-clamp-2 font-semibold">{r.title}</span>
@@ -210,8 +273,10 @@ export function FoodView({ initialDay }: { initialDay?: string | null }) {
           setEditor({ mode: "new", initial, planDay: day });
         }}
       />
+      <AttendanceSheet day={attendDay} onClose={() => setAttendDay(null)} />
       <RecipeDetail
         recipe={liveDetail}
+        forDay={detail?.day ?? null}
         onClose={() => setDetail(null)}
         onEdit={(r) => {
           setDetail(null);

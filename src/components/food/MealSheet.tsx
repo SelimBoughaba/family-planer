@@ -6,6 +6,8 @@ import { recipeEmoji } from "@/lib/recipes";
 import type { RecipeFields } from "@/lib/types";
 import { Avatar, Chips, FieldLabel, Sheet } from "../ui";
 import { IconClock } from "../icons";
+import { AttendanceRow, MaybeHint } from "./Attendance";
+import { MealWheel } from "./MealWheel";
 
 type Suggestion = { title: string; why: string; minutes: number | null; recipeId: string | null };
 
@@ -28,7 +30,7 @@ export function MealSheet({ day, onClose, onNewRecipe }: { day: string | null; o
 function Inner({ day, onClose, onNewRecipe }: { day: string; onClose: () => void; onNewRecipe: (initial: Partial<RecipeFields>, day: string) => void }) {
   const { state, run, me } = useFamily();
   const current = state?.meals.find((m) => m.day === day) ?? null;
-  const [mode, setMode] = useState<"rezept" | "frei" | "ki">("rezept");
+  const [mode, setMode] = useState<"rezept" | "rad" | "frei" | "ki">("rezept");
   const [q, setQ] = useState("");
   const [free, setFree] = useState(current && !current.recipeId ? current.title : "");
   const [cook, setCook] = useState<string | null>(current?.cook ?? me?.id ?? null);
@@ -76,11 +78,15 @@ function Inner({ day, onClose, onNewRecipe }: { day: string; onClose: () => void
         ))}
       </div>
 
+      <FieldLabel>Wer isst mit?</FieldLabel>
+      <AttendanceRow day={day} size={38} names />
+      <MaybeHint day={day} />
+
       <div className="mt-5">
         <Chips
           value={mode}
           onChange={setMode}
-          options={[{ id: "rezept", label: "Aus Rezepten" }, { id: "frei", label: "Freier Text" }, ...(ai?.enabled ? [{ id: "ki" as const, label: "Vorschlag" }] : [])]}
+          options={[{ id: "rezept", label: "Aus Rezepten" }, { id: "rad", label: "🎡 Glücksrad" }, { id: "frei", label: "Freier Text" }, ...(ai?.enabled ? [{ id: "ki" as const, label: "Vorschlag" }] : [])]}
         />
       </div>
 
@@ -119,6 +125,8 @@ function Inner({ day, onClose, onNewRecipe }: { day: string; onClose: () => void
           </div>
         </>
       )}
+
+      {mode === "rad" && <MealWheel day={day} onPick={(r) => void choose(r.title, r.id)} />}
 
       {mode === "frei" && (
         <form

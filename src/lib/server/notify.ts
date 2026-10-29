@@ -1,6 +1,6 @@
 import "server-only";
 import { db } from "./db";
-import { formatBerlin } from "./berlin";
+import { dayString, formatBerlin, wall } from "./berlin";
 import { sendToPeople } from "./push";
 import { nextInRotation, type Mutation } from "@/lib/types";
 
@@ -34,6 +34,21 @@ export async function planNotifications(m: Mutation, actor: string | null): Prom
       : formatBerlin(start, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
     return async () => {
       await sendToPeople(added, { title: "Neuer Termin", body: `${name(actor)} hat dich eingetragen: ${m.title}, ${when}`, url: "/" });
+    };
+  }
+
+  // Wer isst mit: nach 16 Uhr erfährt der Koch Änderungen für heute
+  if (m.op === "meal.attend" && m.present !== null) {
+    const now = Date.now();
+    if (m.day !== dayString(now) || wall(now).h < 16) return null;
+    const [meal] = await sql`select cook from meal_plan where day = ${m.day}`;
+    const cook = (meal?.cook as string) ?? null;
+    if (!cook || cook === actor || cook === m.personId) return null;
+    const [before] = await sql`select present from meal_attendance where day = ${m.day} and person_id = ${m.personId}`;
+    if (before && !!before.present === m.present) return null;
+    const who = name(m.personId);
+    return async () => {
+      await sendToPeople([cook], { title: "Essen heute", body: m.present ? `${who} isst heute doch mit` : `${who} isst heute nicht mit`, url: "/", tag: `dinner-change:${m.day}:${m.personId}` });
     };
   }
 
