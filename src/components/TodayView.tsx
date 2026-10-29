@@ -1,13 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useFamily } from "@/lib/client/family";
-import { localDay, recurrenceLabel, type Task } from "@/lib/types";
+import { localDay, type Task } from "@/lib/types";
 import { addDays, occurrences, startOfDay, type Occurrence } from "@/lib/recurrence";
 import { recipeEmoji } from "@/lib/recipes";
-import { Avatar, AvatarStack, Card, ContextMenu, PersonFilter, SectionTitle, type MenuAction } from "./ui";
-import { SwipeRow } from "./SwipeRow";
-import { IconCheck, IconClock, IconPin, IconPlus, IconRepeat, IconTrash, IconPerson } from "./icons";
+import { Avatar, AvatarStack, Card, PersonFilter, SectionTitle } from "./ui";
+import { TaskRow, useTaskMenus } from "./TaskRow";
+import { IconPin, IconPlus } from "./icons";
 
 const time = (d: Date) => d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
 
@@ -71,6 +71,7 @@ export function TodayView({
   onProfile,
   onOpenEvent,
   onOpenFood,
+  onEditTask,
 }: {
   now: Date;
   filter: string | null;
@@ -79,10 +80,10 @@ export function TodayView({
   onProfile: () => void;
   onOpenEvent: (o: Occurrence) => void;
   onOpenFood: () => void;
+  onEditTask: (t: Task) => void;
 }) {
-  const { state, run, person, color, me } = useFamily();
-  const [menu, setMenu] = useState<Task | null>(null);
-  const [assign, setAssign] = useState<Task | null>(null);
+  const { state, person, color, me } = useFamily();
+  const { openMenu, menus } = useTaskMenus(onEditTask);
   const today = localDay(now);
 
   const dayStart = +startOfDay(now);
@@ -90,24 +91,14 @@ export function TodayView({
   const todays = occ.filter((o) => +o.start < dayStart + 86400000);
   const next = occ.find((o) => o.end > now && !(o.event.allDay && o.start <= now));
 
-  const tasks = (state?.tasks ?? []).filter(
-    (t) => (!filter || t.personId === filter) && (t.done ? t.doneAt && localDay(new Date(t.doneAt)) === today : !t.due || t.due <= today),
-  );
+  // Heute: fällige und überfällige, dazu heute Erledigtes; „Irgendwann“ steht im Aufgaben-Tab
+  const tasks = (state?.tasks ?? [])
+    .filter((t) => (!filter || t.personId === filter) && (t.done ? t.doneAt && localDay(new Date(t.doneAt)) === today : !!t.due && t.due <= today))
+    .sort((a, b) => Number(a.done) - Number(b.done) || (a.due ?? "").localeCompare(b.due ?? ""));
   const open = tasks.filter((t) => !t.done);
-
-  const toggle = (t: Task) => run({ op: "task.toggle", id: t.id, done: !t.done, today });
-  const postpone = (t: Task) => run({ op: "task.postpone", id: t.id, today });
-  const remove = (t: Task) => run({ op: "task.delete", id: t.id });
 
   const dateLabel = now.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" });
   const nowIndex = todays.findIndex((o) => o.start > now);
-
-  const taskActions = (t: Task): MenuAction[] => [
-    { label: t.done ? "Wieder öffnen" : "Erledigt", icon: <IconCheck size={18} />, onSelect: () => toggle(t) },
-    ...(t.done ? [] : [{ label: "Auf morgen", icon: <IconClock size={18} />, onSelect: () => postpone(t) }]),
-    { label: "Jemand anderem geben", icon: <IconPerson size={18} />, onSelect: () => setTimeout(() => setAssign(t), 50) },
-    { label: "Löschen", icon: <IconTrash size={18} />, destructive: true, onSelect: () => remove(t) },
-  ];
 
   return (
     <div className="mx-auto max-w-md px-4 safe-top safe-bottom">
@@ -225,46 +216,13 @@ export function TodayView({
         </Card>
       ) : (
         <Card className="overflow-hidden">
-          {tasks.map((t, i) => {
-            const c = color(t.personId);
-            return (
-              <SwipeRow
-                key={t.id}
-                leading={{ label: t.done ? "Öffnen" : "Erledigt", color: "var(--success)", icon: <IconCheck size={18} />, onTrigger: () => toggle(t) }}
-                trailing={t.done ? undefined : { label: "Morgen", color: "#FF9F0A", icon: <IconClock size={18} />, onTrigger: () => postpone(t) }}
-                onLongPress={() => setMenu(t)}
-              >
-                <div className="flex items-center gap-3 px-4 py-3" style={{ borderTop: i ? "0.5px solid var(--separator)" : "none" }}>
-                  <button
-                    onClick={() => toggle(t)}
-                    className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full"
-                    style={{ border: t.done ? "none" : `1.6px solid ${c}`, background: t.done ? c : "transparent", color: "white" }}
-                    aria-label={t.done ? "Als offen markieren" : "Als erledigt markieren"}
-                  >
-                    {t.done && <IconCheck size={14} className="check-pop" />}
-                  </button>
-                  <div className="min-w-0 flex-1">
-                    <p className="body truncate" style={{ textDecoration: t.done ? "line-through" : "none", color: t.done ? "var(--label-3)" : "var(--label)" }}>
-                      {t.title}
-                    </p>
-                    <p className="footnote flex items-center gap-1.5" style={{ color: t.due && t.due < today && !t.done ? "var(--danger)" : "var(--label-2)" }}>
-                      {t.due && t.due < today && !t.done ? "Überfällig" : t.area}
-                      {t.recurring && (
-                        <span className="flex items-center gap-1" style={{ color: "var(--label-2)" }}>
-                          <IconRepeat /> {recurrenceLabel[t.recurring]}
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                  <Avatar person={person(t.personId)} size={24} />
-                </div>
-              </SwipeRow>
-            );
-          })}
+          {tasks.map((t, i) => (
+            <TaskRow key={t.id} task={t} first={i === 0} today={today} onEdit={onEditTask} onMenu={openMenu} />
+          ))}
         </Card>
       )}
       <p className="caption mt-2 px-1" style={{ color: "var(--label-3)" }}>
-        Nach rechts wischen erledigt, nach links verschiebt auf morgen, lange drücken zeigt mehr.
+        Nach rechts wischen erledigt, nach links verschiebt auf morgen, antippen bearbeitet, lange drücken zeigt mehr.
       </p>
 
       {(() => {
@@ -298,42 +256,7 @@ export function TodayView({
         );
       })()}
 
-      <ContextMenu
-        open={!!menu}
-        onClose={() => setMenu(null)}
-        actions={menu ? taskActions(menu) : []}
-        preview={
-          menu && (
-            <div className="flex items-center gap-3">
-              <Avatar person={person(menu.personId)} size={36} />
-              <div className="min-w-0">
-                <p className="headline">{menu.title}</p>
-                <p className="footnote" style={{ color: "var(--label-2)" }}>
-                  {menu.area}
-                  {person(menu.personId) ? `, zuständig: ${person(menu.personId)!.name}` : ", noch niemand zuständig"}
-                </p>
-              </div>
-            </div>
-          )
-        }
-      />
-      <ContextMenu
-        open={!!assign}
-        onClose={() => setAssign(null)}
-        preview={assign && <p className="headline">Wer übernimmt „{assign.title}“?</p>}
-        actions={
-          assign
-            ? [
-                ...(state?.people ?? []).map((p) => ({
-                  label: p.name,
-                  icon: <Avatar person={p} size={22} />,
-                  onSelect: () => run({ op: "task.assign", id: assign.id, personId: p.id }),
-                })),
-                { label: "Niemand", onSelect: () => run({ op: "task.assign", id: assign.id, personId: null }) },
-              ]
-            : []
-        }
-      />
+      {menus}
     </div>
   );
 }

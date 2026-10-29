@@ -11,7 +11,10 @@
 
 - Etappe 5: Essen (Rezepte mit Portionsrechner, Import per Link über strukturierte Daten, KI-Rückfall und Text einfügen, Wochenplan mit Koch, Zutaten auf die Einkaufsliste ohne Doppelte, KI-Vorschläge und Rezept ausarbeiten, Monatslimit im Owner-Bereich)
 
+- Etappe 6: Aufgaben-Tab (nach Zeit, Bereich und Person, Bearbeiten per Antippen, Dienstplan reihum mit Mitteilung „Du bist dran“, Übersicht der letzten 7 Tage)
+- Stabilität: harte Zeitgrenzen für Datenbankabfragen, Pool-Neuaufbau, Rollen-Timeouts in der Datenbank
+
 ## Als Nächstes
-- Aufgaben-Tab: alle Aufgaben nach Bereich und Person, Dienstplan reihum
+- Familientest auf echten Geräten (Gesten, Push, Live-Abgleich zwischen zwei Handys)
 
 ## Vorgemerkt

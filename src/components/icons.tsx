@@ -106,3 +106,9 @@ export const IconBell = ({ size = 20, className, strokeWidth = 1.8 }: P) => (
     <path d="M10 20.5a2 2 0 0 0 4 0" />
   </svg>
 );
+
+export const IconPencil = ({ size = 20, className, strokeWidth = 1.8 }: P) => (
+  <svg {...base(size, className)} strokeWidth={strokeWidth}>
+    <path d="M14.5 5.5l4 4M4 20l1-4.5L15.8 4.7a1.8 1.8 0 0 1 2.5 0l1 1a1.8 1.8 0 0 1 0 2.5L8.5 19 4 20z" />
+  </svg>
+);

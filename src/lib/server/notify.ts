@@ -2,7 +2,7 @@ import "server-only";
 import { db } from "./db";
 import { formatBerlin } from "./berlin";
 import { sendToPeople } from "./push";
-import type { Mutation } from "@/lib/types";
+import { nextInRotation, type Mutation } from "@/lib/types";
 
 type Plan = () => Promise<void>;
 
@@ -37,14 +37,26 @@ export async function planNotifications(m: Mutation, actor: string | null): Prom
     };
   }
 
-  if (m.op === "task.create" || m.op === "task.assign") {
-    const target = m.personId;
+  // Dienstplan: Wer eine Runde abhakt, gibt an die nächste Person weiter
+  if (m.op === "task.toggle" && m.done) {
+    const [t] = await sql`select title, person_id, recurring, rotation, done from tasks where id = ${m.id}`;
+    if (!t || t.done || !t.recurring) return null;
+    const next = nextInRotation((t.rotation as string[]) ?? [], (t.person_id as string) ?? null);
+    if (!next || next === t.person_id || next === actor || !wants(next, "assigned")) return null;
+    return async () => {
+      await sendToPeople([next], { title: "Du bist dran", body: `${name(actor)} hat „${t.title}“ erledigt, die nächste Runde ist deine`, url: "/" });
+    };
+  }
+
+  if (m.op === "task.create" || m.op === "task.assign" || m.op === "task.update") {
+    let target = m.personId;
+    if (m.op !== "task.assign" && (m.rotation?.length ?? 0) >= 2 && m.recurring && (!target || !m.rotation.includes(target))) target = m.rotation[0];
     if (!target || target === actor || !wants(target, "assigned")) return null;
-    let title = m.op === "task.create" ? m.title : "";
-    if (m.op === "task.assign") {
+    let title = m.op === "task.assign" ? "" : m.title;
+    if (m.op === "task.assign" || m.op === "task.update") {
       const [row] = await sql`select title, person_id from tasks where id = ${m.id}`;
       if (!row || row.person_id === target) return null;
-      title = row.title as string;
+      if (m.op === "task.assign") title = row.title as string;
     }
     return async () => {
       await sendToPeople([target], { title: "Neue Aufgabe", body: `${name(actor)} hat dir „${title}“ gegeben`, url: "/" });

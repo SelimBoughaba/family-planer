@@ -171,3 +171,6 @@ create table if not exists ai_usage (
 );
 create index if not exists ai_usage_time_idx on ai_usage (created_at);
 alter table ai_usage enable row level security;
+
+-- Etappe 6: Aufgaben mit Dienstplan (Reihenfolge der Personen, die sich abwechseln)
+alter table tasks add column if not exists rotation uuid[] not null default '{}';

@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useFamily } from "@/lib/client/family";
-import { localDay, recurrenceLabel, type Recurrence } from "@/lib/types";
+import { localDay, recurrenceLabel, type Recurrence, type Task } from "@/lib/types";
 import { Avatar } from "./ui";
+import { IconTrash } from "./icons";
 
 type Kind = "task" | "event";
 
@@ -61,67 +62,90 @@ const Label = ({ children }: { children: string }) => (
 
 
 
-export function NewEntrySheet({ open, onClose, onEvent }: { open: boolean; onClose: () => void; onEvent: (title: string) => void }) {
+type When = "today" | "tomorrow" | "none" | "date";
+
+function tomorrowDay() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return localDay(d);
+}
+
+/** Neue Aufgabe anlegen oder bestehende bearbeiten (mit task) */
+export function NewEntrySheet({ open, onClose, onEvent, task }: { open: boolean; onClose: () => void; onEvent?: (title: string) => void; task?: Task | null }) {
+  if (!open) return null;
+  return <TaskForm key={task?.id ?? "new"} onClose={onClose} onEvent={onEvent} task={task ?? null} />;
+}
+
+function TaskForm({ onClose, onEvent, task }: { onClose: () => void; onEvent?: (title: string) => void; task: Task | null }) {
   const { state, me, run } = useFamily();
   const kind: Kind = "task";
-  const [title, setTitle] = useState("");
-  const [who, setWho] = useState<string[]>([]);
-  // Aufgabe
-  const [area, setArea] = useState("Haushalt");
-  const [when, setWhen] = useState<"today" | "tomorrow" | "none" | "date">("today");
-  const [date, setDate] = useState(localDay());
-  const [rec, setRec] = useState<"none" | Recurrence>("none");
-  const [remind, setRemind] = useState(false);
-  const [remindTime, setRemindTime] = useState("08:00");
+  const editing = !!task;
+  const [title, setTitle] = useState(task?.title ?? "");
+  const [who, setWho] = useState<string | null>(task ? task.personId : (me?.id ?? null));
+  const [area, setArea] = useState(task?.area ?? "Haushalt");
+  const [when, setWhen] = useState<When>(() => {
+    if (!task) return "today";
+    if (!task.due) return "none";
+    if (task.due === localDay()) return "today";
+    if (task.due === tomorrowDay()) return "tomorrow";
+    return "date";
+  });
+  const [date, setDate] = useState(task?.due ?? localDay());
+  const [rec, setRec] = useState<"none" | Recurrence>(task?.recurring ?? "none");
+  const [remind, setRemind] = useState(!!task?.remindTime);
+  const [remindTime, setRemindTime] = useState(task?.remindTime ?? "08:00");
+  const [rotating, setRotating] = useState((task?.rotation.length ?? 0) >= 2);
+  const [rotation, setRotation] = useState<string[]>(task?.rotation ?? []);
   const [busy, setBusy] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (editing) return;
     const id = setTimeout(() => inputRef.current?.focus(), 250);
     return () => clearTimeout(id);
-  }, [open]);
-
-  if (!open) return null;
+  }, [editing]);
 
   const people = state?.people ?? [];
-  const chosen = who.length ? who : me ? [me.id] : [];
+  const name = (id: string | null) => people.find((p) => p.id === id)?.name ?? "";
+  const plan = rec !== "none" && rotating;
+  // im Dienstplan ist die gewählte Person nur gültig, wenn sie mitmacht
+  const current = plan ? (who && rotation.includes(who) ? who : (rotation[0] ?? null)) : who;
 
-  const reset = () => {
-    setTitle("");
-    setWho([]);
-    setWhen("today");
-    setRec("none");
-    setRemind(false);
-    setDate(localDay());
+  const tapPerson = (id: string) => {
+    if (!plan) return setWho((w) => (w === id ? null : id));
+    setRotation((r) => (r.includes(id) ? r.filter((x) => x !== id) : [...r, id]));
   };
 
   const save = async () => {
     if (!title.trim() || busy) return;
+    if (plan && rotation.length < 2) return;
     setBusy(true);
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const due = when === "today" ? localDay() : when === "tomorrow" ? localDay(tomorrow) : when === "date" ? date : null;
-    const ok = await run({
-      op: "task.create",
+    const due = when === "today" ? localDay() : when === "tomorrow" ? tomorrowDay() : when === "date" ? date : null;
+    const fields = {
       title: title.trim(),
       area,
-      personId: chosen[0] ?? null,
+      personId: current,
       due: rec !== "none" && !due ? localDay() : due,
       recurring: rec === "none" ? null : rec,
       remindTime: remind && (due || rec !== "none") ? remindTime : null,
-    });
+      rotation: plan ? rotation : [],
+    };
+    const ok = await run(task ? { op: "task.update", id: task.id, ...fields } : { op: "task.create", ...fields });
     setBusy(false);
-    if (ok) {
-      reset();
-      onClose();
-    }
+    if (ok) onClose();
   };
 
-  const toggleWho = (id: string) => setWho([id]);
+  const remove = async () => {
+    if (!task) return;
+    if (!confirmDelete) return setConfirmDelete(true);
+    if (await run({ op: "task.delete", id: task.id })) onClose();
+  };
+
+  const canSave = !!title.trim() && !(plan && rotation.length < 2);
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center" role="dialog" aria-modal aria-label="Neuer Eintrag">
+    <div className="fixed inset-0 z-40 flex items-end justify-center" role="dialog" aria-modal aria-label={editing ? "Aufgabe bearbeiten" : "Neuer Eintrag"}>
       <button className="fade-in absolute inset-0" style={{ background: "rgba(0,0,0,.25)" }} onClick={onClose} aria-label="Abbrechen" />
       <form
         onSubmit={(e) => {
@@ -136,29 +160,30 @@ export function NewEntrySheet({ open, onClose, onEvent }: { open: boolean; onClo
           <button type="button" onClick={onClose} className="body" style={{ color: "var(--tint)" }}>
             Abbrechen
           </button>
-          <span className="headline">Neue Aufgabe</span>
-          <button type="submit" disabled={!title.trim() || busy} className="body font-semibold" style={{ color: title.trim() ? "var(--tint)" : "var(--label-3)" }}>
-            Hinzufügen
+          <span className="headline">{editing ? "Aufgabe" : "Neue Aufgabe"}</span>
+          <button type="submit" disabled={!canSave || busy} className="body font-semibold" style={{ color: canSave ? "var(--tint)" : "var(--label-3)" }}>
+            {editing ? "Fertig" : "Hinzufügen"}
           </button>
         </div>
 
-        <div className="mt-3">
-          <Segmented
-            value={kind}
-            onChange={(k) => {
-              if (k === "event") {
-                const t = title;
-                reset();
-                onClose();
-                onEvent(t);
-              }
-            }}
-            options={[
-              { id: "task", label: "Aufgabe" },
-              { id: "event", label: "Termin" },
-            ]}
-          />
-        </div>
+        {!editing && onEvent && (
+          <div className="mt-3">
+            <Segmented
+              value={kind}
+              onChange={(k) => {
+                if (k === "event") {
+                  const t = title;
+                  onClose();
+                  onEvent(t);
+                }
+              }}
+              options={[
+                { id: "task", label: "Aufgabe" },
+                { id: "event", label: "Termin" },
+              ]}
+            />
+          </div>
+        )}
 
         <input
           ref={inputRef}
@@ -170,72 +195,126 @@ export function NewEntrySheet({ open, onClose, onEvent }: { open: boolean; onClo
           aria-label="Titel"
         />
 
-        <Label>Wer kümmert sich?</Label>
+        <Label>Wann?</Label>
+        <Chips
+          value={when}
+          onChange={setWhen}
+          options={[
+            { id: "today", label: "Heute" },
+            { id: "tomorrow", label: "Morgen" },
+            { id: "date", label: "Datum" },
+            { id: "none", label: "Irgendwann" },
+          ]}
+        />
+        {when === "date" && <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="body glass mt-3 w-full rounded-[12px] px-3 py-2" aria-label="Datum" />}
+
+        <Label>Wiederholen</Label>
+        <Chips
+          value={rec}
+          onChange={setRec}
+          options={[{ id: "none" as const, label: "Nie" }, ...(Object.keys(recurrenceLabel) as Recurrence[]).map((r) => ({ id: r, label: recurrenceLabel[r] }))]}
+        />
+
+        <div className="mt-5 mb-2 flex items-center justify-between">
+          <p className="footnote font-semibold" style={{ color: "var(--label-2)" }}>
+            {plan ? "Wer wechselt sich ab?" : "Wer kümmert sich?"}
+          </p>
+          {rec !== "none" && (
+            <button
+              type="button"
+              role="switch"
+              aria-checked={rotating}
+              onClick={() => {
+                // neuer Dienst: dran ist, wer in der Reihe vorne steht
+                if (!rotating && !editing) setWho(null);
+                setRotating(!rotating);
+              }}
+              className="flex items-center gap-2"
+            >
+              <span className="footnote font-medium">Reihum</span>
+              <Switch on={rotating} />
+            </button>
+          )}
+        </div>
         <div className="flex gap-3">
           {people.map((p) => {
-            const on = chosen.includes(p.id);
+            const pos = rotation.indexOf(p.id);
+            const on = plan ? pos >= 0 : who === p.id;
             return (
-              <button key={p.id} type="button" onClick={() => toggleWho(p.id)} className="press flex flex-col items-center gap-1" aria-pressed={on} style={{ opacity: on ? 1 : 0.4, transition: "opacity 160ms ease" }}>
+              <button key={p.id} type="button" onClick={() => tapPerson(p.id)} className="press relative flex flex-col items-center gap-1" aria-pressed={on} style={{ opacity: on ? 1 : 0.4, transition: "opacity 160ms ease" }}>
                 <Avatar person={p} size={40} />
+                {plan && pos >= 0 && (
+                  <span className="caption tabular absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 font-bold text-white" style={{ background: "var(--tint)" }}>
+                    {pos + 1}
+                  </span>
+                )}
                 <span className="caption">{p.name}</span>
               </button>
             );
           })}
         </div>
-
-          <>
-            <Label>Wann?</Label>
-            <Chips
-              value={when}
-              onChange={setWhen}
-              options={[
-                { id: "today", label: "Heute" },
-                { id: "tomorrow", label: "Morgen" },
-                { id: "date", label: "Datum" },
-                { id: "none", label: "Irgendwann" },
-              ]}
-            />
-            {when === "date" && <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="body glass mt-3 w-full rounded-[12px] px-3 py-2" aria-label="Datum" />}
-            <Label>Bereich</Label>
-            <Chips value={area} onChange={setArea} options={(state?.lists.areas ?? []).map((a) => ({ id: a, label: a }))} />
-            <Label>Wiederholen</Label>
-            <Chips
-              value={rec}
-              onChange={setRec}
-              options={[{ id: "none" as const, label: "Nie" }, ...(Object.keys(recurrenceLabel) as Recurrence[]).map((r) => ({ id: r, label: recurrenceLabel[r] }))]}
-            />
-            <Label>Erinnerung</Label>
-            {when === "none" && rec === "none" ? (
+        {plan && (
+          <div className="mt-3">
+            {rotation.length < 2 ? (
               <p className="footnote" style={{ color: "var(--label-3)" }}>
-                Für eine Erinnerung braucht die Aufgabe einen Tag.
+                Tippe mindestens zwei Personen in der Reihenfolge an, in der sie sich abwechseln.
               </p>
             ) : (
-              <div className="flex items-center justify-between gap-3">
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={remind}
-                  onClick={() => setRemind((r) => !r)}
-                  className="flex flex-1 items-center justify-between"
-                >
-                  <span className="body">Erinnern um</span>
-                  <span
-                    className="relative h-[31px] w-[51px] rounded-full"
-                    style={{ background: remind ? "var(--success)" : "color-mix(in oklab, var(--label) 14%, transparent)", transition: "background 200ms ease" }}
-                  >
-                    <span
-                      className="absolute top-[2px] h-[27px] w-[27px] rounded-full bg-white"
-                      style={{ left: remind ? 22 : 2, boxShadow: "0 3px 8px rgba(0,0,0,.15)", transition: "left 220ms cubic-bezier(0.3, 1.3, 0.5, 1)" }}
-                    />
-                  </span>
-                </button>
-                {remind && (
-                  <input type="time" value={remindTime} onChange={(e) => e.target.value && setRemindTime(e.target.value)} step={300} className="body glass tabular rounded-[12px] px-3 py-1.5" aria-label="Uhrzeit der Erinnerung" />
-                )}
-              </div>
+              <>
+                <p className="footnote" style={{ color: "var(--label-2)" }}>
+                  {rotation.map(name).join(" → ")}, dann wieder von vorn. Wer abhakt, gibt an die nächste Person weiter.
+                </p>
+                <p className="footnote mt-3 mb-2 font-semibold" style={{ color: "var(--label-2)" }}>
+                  Jetzt dran
+                </p>
+                <Chips value={current ?? ""} onChange={setWho} options={rotation.map((id) => ({ id, label: name(id) }))} />
+              </>
             )}
-          </>
+          </div>
+        )}
+
+        <Label>Bereich</Label>
+        <Chips value={area} onChange={setArea} options={[...new Set([...(state?.lists.areas ?? []), area])].map((a) => ({ id: a, label: a }))} />
+
+        <Label>Erinnerung</Label>
+        {when === "none" && rec === "none" ? (
+          <p className="footnote" style={{ color: "var(--label-3)" }}>
+            Für eine Erinnerung braucht die Aufgabe einen Tag.
+          </p>
+        ) : (
+          <div className="flex items-center justify-between gap-3">
+            <button type="button" role="switch" aria-checked={remind} onClick={() => setRemind((r) => !r)} className="flex flex-1 items-center justify-between">
+              <span className="body">Erinnern um</span>
+              <Switch on={remind} />
+            </button>
+            {remind && (
+              <input type="time" value={remindTime} onChange={(e) => e.target.value && setRemindTime(e.target.value)} step={300} className="body glass tabular rounded-[12px] px-3 py-1.5" aria-label="Uhrzeit der Erinnerung" />
+            )}
+          </div>
+        )}
+
+        {editing && (
+          <button
+            type="button"
+            onClick={() => void remove()}
+            className="press body mt-8 flex w-full items-center justify-center gap-2 rounded-[14px] py-3 font-semibold"
+            style={{ background: "color-mix(in oklab, var(--danger) 12%, transparent)", color: "var(--danger)" }}
+          >
+            <IconTrash size={18} /> {confirmDelete ? "Wirklich löschen?" : "Aufgabe löschen"}
+          </button>
+        )}
       </form>
     </div>
+  );
+}
+
+function Switch({ on }: { on: boolean }) {
+  return (
+    <span className="relative h-[31px] w-[51px] shrink-0 rounded-full" style={{ background: on ? "var(--success)" : "color-mix(in oklab, var(--label) 14%, transparent)", transition: "background 200ms ease" }}>
+      <span
+        className="absolute top-[2px] h-[27px] w-[27px] rounded-full bg-white"
+        style={{ left: on ? 22 : 2, boxShadow: "0 3px 8px rgba(0,0,0,.15)", transition: "left 220ms cubic-bezier(0.3, 1.3, 0.5, 1)" }}
+      />
+    </span>
   );
 }

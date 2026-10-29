@@ -2,25 +2,20 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { FamilyProvider, useFamily } from "@/lib/client/family";
-import { Ambient, Avatar, Card, ContextMenu, TabBar, useNow, type Tab } from "./ui";
+import { Ambient, Avatar, ContextMenu, TabBar, useNow, type Tab } from "./ui";
 import { TodayView } from "./TodayView";
 import { ShoppingView } from "./ShoppingView";
 import { NewEntrySheet } from "./NewEntrySheet";
 import { CalendarView } from "./CalendarView";
 import { FoodView } from "./food/FoodView";
+import { TasksView } from "./TasksView";
+import type { Task } from "@/lib/types";
 import { EventEditor, type EditorTarget } from "./EventEditor";
 import { SubscribeSheet } from "./SubscribeSheet";
 import { NotifySheet } from "./NotifySheet";
 import { registerWorker, syncPushOwner } from "@/lib/client/push";
 import { ColorPicker, PersonPicker } from "./Onboarding";
 import { IconBell, IconCalendar, IconPerson } from "./icons";
-
-const upcoming: Record<"aufgaben", { title: string; text: string }> = {
-  aufgaben: {
-    title: "Aufgaben",
-    text: "Alle Aufgaben nach Bereichen und Personen, mit Dienstplan, der Hausarbeiten automatisch reihum verteilt. Heute siehst du bereits die fälligen.",
-  },
-};
 
 export function AppShell() {
   return (
@@ -56,6 +51,7 @@ function Main() {
   const [editor, setEditor] = useState<EditorTarget | null>(null);
   const [subscribe, setSubscribe] = useState(false);
   const [notify, setNotify] = useState(false);
+  const [taskEdit, setTaskEdit] = useState<Task | null>(null);
   const now = useNow();
 
   useEffect(() => {
@@ -131,6 +127,7 @@ function Main() {
           onProfile={() => setProfileOpen(true)}
           onOpenEvent={(occ) => setEditor({ mode: "edit", occ })}
           onOpenFood={() => setTab("essen")}
+          onEditTask={setTaskEdit}
         />
       )}
       {tab === "kalender" && (
@@ -144,17 +141,7 @@ function Main() {
       )}
       {tab === "einkauf" && <ShoppingView />}
       {tab === "essen" && <FoodView />}
-      {tab === "aufgaben" && (
-        <div className="mx-auto max-w-md px-4 safe-top safe-bottom">
-          <h1 className="large-title mb-4">{upcoming[tab].title}</h1>
-          <Card className="p-5">
-            <p className="headline">Kommt in der nächsten Etappe</p>
-            <p className="subhead mt-1.5" style={{ color: "var(--label-2)" }}>
-              {upcoming[tab].text}
-            </p>
-          </Card>
-        </div>
-      )}
+      {tab === "aufgaben" && <TasksView filter={filter} setFilter={setFilter} onNew={() => setNewOpen(true)} onEdit={setTaskEdit} />}
 
       <TabBar tab={tab} onChange={setTab} badge={{ einkauf: openItems }} />
       <NewEntrySheet
@@ -166,6 +153,7 @@ function Main() {
           setEditor({ mode: "new", start: s, title });
         }}
       />
+      <NewEntrySheet open={!!taskEdit} task={taskEdit} onClose={() => setTaskEdit(null)} />
       <EventEditor target={editor} onClose={() => setEditor(null)} />
       <SubscribeSheet open={subscribe} onClose={() => setSubscribe(false)} />
       <NotifySheet open={notify} onClose={() => setNotify(false)} />

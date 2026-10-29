@@ -25,7 +25,7 @@ export async function snapshot(): Promise<Snapshot> {
   const [people, events, tasks, items, lists, recipes, meals] = await Promise.all([
     sql`select id, name, color, sort, notify_prefs, created_at from people order by sort`,
     sql`select id, title, place, notes, starts_at, ends_at, all_day, people, recurrence, recurrence_until::text as recurrence_until, exdates, reminders, created_by, created_at, updated_at from events`,
-    sql`select id, title, area, person_id, due::text as due, recurring, remind_time::text as remind_time, done, done_at, created_by, created_at from tasks`,
+    sql`select id, title, area, person_id, due::text as due, recurring, remind_time::text as remind_time, rotation, done, done_at, created_by, created_at from tasks`,
     sql`select id, name, amount, category, added_by, done, done_at, created_at from shopping_items`,
     sql`select value from app_meta where key = 'lists'`,
     sql`select id, title, description, servings, minutes, ingredients, steps, tags, source_url, favorite, created_by, created_at, updated_at from recipes`,
@@ -113,9 +113,9 @@ export async function restore(data: unknown) {
           ${ids.includes(e.created_by as string) ? (e.created_by as string) : null}, ${(e.created_at as string) ?? new Date().toISOString()}, now())`;
     }
     for (const t of d.tables.tasks) {
-      await tx`insert into tasks (id, title, area, person_id, due, recurring, remind_time, done, done_at, created_by, created_at)
+      await tx`insert into tasks (id, title, area, person_id, due, recurring, remind_time, rotation, done, done_at, created_by, created_at)
         values (${t.id as string}, ${t.title as string}, ${(t.area as string) ?? "Haushalt"}, ${ids.includes(t.person_id as string) ? (t.person_id as string) : null}, ${(t.due as string) ?? null},
-          ${(t.recurring as string) ?? null}, ${(t.remind_time as string) ?? null}, ${!!t.done}, ${(t.done_at as string) ?? null}, ${ids.includes(t.created_by as string) ? (t.created_by as string) : null}, ${(t.created_at as string) ?? new Date().toISOString()})`;
+          ${(t.recurring as string) ?? null}, ${(t.remind_time as string) ?? null}, ${tx.array(((t.rotation as string[]) ?? []).filter((x) => ids.includes(x)))}::uuid[], ${!!t.done}, ${(t.done_at as string) ?? null}, ${ids.includes(t.created_by as string) ? (t.created_by as string) : null}, ${(t.created_at as string) ?? new Date().toISOString()})`;
     }
     for (const i of d.tables.shopping_items) {
       await tx`insert into shopping_items (id, name, amount, category, added_by, done, done_at, created_at)

@@ -61,7 +61,26 @@ export type Task = {
   done: boolean;
   doneAt: string | null;
   remindTime: string | null; // HH:MM am Fälligkeitstag
+  rotation: string[]; // Dienstplan: Personen, die sich reihum abwechseln
 };
+
+/** Felder, die beim Anlegen und Bearbeiten einer Aufgabe gesendet werden */
+export type TaskFields = {
+  title: string;
+  area: string;
+  personId: string | null;
+  due: string | null;
+  recurring: Recurrence | null;
+  remindTime: string | null;
+  rotation: string[];
+};
+
+/** Wer ist nach dieser Person im Dienstplan dran? */
+export function nextInRotation(rotation: string[], current: string | null) {
+  if (rotation.length < 2) return current;
+  const i = current ? rotation.indexOf(current) : -1;
+  return rotation[(i + 1) % rotation.length];
+}
 
 export type Item = {
   id: string;
@@ -114,7 +133,8 @@ export type AppState = {
 export type Mutation =
   | { op: "person.setColor"; id: string; color: string }
   | { op: "person.setNotify"; id: string; prefs: NotifyPrefs }
-  | { op: "task.create"; title: string; area: string; personId: string | null; due: string | null; recurring: Recurrence | null; remindTime: string | null }
+  | ({ op: "task.create" } & TaskFields)
+  | ({ op: "task.update"; id: string } & TaskFields)
   | { op: "task.toggle"; id: string; done: boolean; today: string }
   | { op: "task.postpone"; id: string; today: string }
   | { op: "task.assign"; id: string; personId: string | null }

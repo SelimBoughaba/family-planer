@@ -1,7 +1,8 @@
 import "server-only";
 import { randomBytes, randomUUID } from "node:crypto";
 import { db } from "./db";
-import type { AppState, CalEvent, EventFields, EventRecurrence, Item, Meal, Mutation, Person, Recipe, RecipeFields, Recurrence, Task } from "@/lib/types";
+import { nextInRotation } from "@/lib/types";
+import type { TaskFields, AppState, CalEvent, EventFields, EventRecurrence, Item, Meal, Mutation, Person, Recipe, RecipeFields, Recurrence, Task } from "@/lib/types";
 import { aiInfo } from "./ai";
 import { getLists } from "./lists";
 import { personColors } from "@/lib/types";
@@ -49,6 +50,7 @@ const toTask = (r: Row): Task => ({
   done: r.done as boolean,
   doneAt: iso(r.done_at),
   remindTime: r.remind_time ? String(r.remind_time).slice(0, 5) : null,
+  rotation: (r.rotation as string[]) ?? [],
 });
 const toRecipe = (r: Row): Recipe => ({
   id: r.id as string,
@@ -89,7 +91,7 @@ export async function loadState(from: Date, to: Date): Promise<AppState> {
       where (recurrence is null and ends_at > ${from} and starts_at < ${to})
          or (recurrence is not null and starts_at < ${to} and (recurrence_until is null or recurrence_until >= ${from}::date - 1))
       order by starts_at`,
-    sql`select * from tasks where done = false or done_at > now() - interval '2 days' order by done, due nulls first, created_at`,
+    sql`select * from tasks where done = false or done_at > now() - interval '7 days' order by done, due nulls first, created_at`,
     sql`select * from shopping_items where done = false or done_at > now() - interval '1 day' order by created_at desc`,
     sql`select * from recipes order by favorite desc, lower(title)`,
     sql`select id, day::text as day, recipe_id, title, cook, note from meal_plan where day between (now() - interval '14 days')::date and (now() + interval '60 days')::date order by day`,
@@ -170,6 +172,21 @@ function recipeFields(m: RecipeFields) {
   };
 }
 
+async function taskFields(m: TaskFields) {
+  const recurring = m.recurring && recurrences.includes(m.recurring) ? m.recurring : null;
+  const due = dateStr(m.due, true) ?? (recurring ? new Date().toISOString().slice(0, 10) : null);
+  const remindTime = due && typeof m.remindTime === "string" && /^\d{2}:\d{2}$/.test(m.remindTime) ? m.remindTime : null;
+  const area = str(m.area, 40, true) ?? "Haushalt";
+  // Dienstplan nur bei wiederkehrenden Aufgaben und mit mindestens zwei vorhandenen Personen
+  const known = new Set((await db()`select id from people`).map((r) => r.id as string));
+  const rotation = recurring && Array.isArray(m.rotation) ? [...new Set(m.rotation.map((x) => uuid(x)!))].filter((x) => known.has(x)).slice(0, 10) : [];
+  const valid = rotation.length >= 2 ? rotation : [];
+  let personId = uuid(m.personId, true);
+  if (personId && !known.has(personId)) personId = null;
+  if (valid.length && (!personId || !valid.includes(personId))) personId = valid[0];
+  return { title: str(m.title, 140)!, area, personId, due, recurring, remindTime, rotation: valid };
+}
+
 const eventRecurrences: EventRecurrence[] = ["daily", "weekly", "biweekly", "monthly", "yearly"];
 
 function eventFields(m: EventFields) {
@@ -211,11 +228,15 @@ export async function mutate(m: Mutation, by: string | null): Promise<string> {
       return "people";
     }
     case "task.create": {
-      const rec = m.recurring && recurrences.includes(m.recurring) ? m.recurring : null;
-      const due = dateStr(m.due, true);
-      const remind = due && typeof m.remindTime === "string" && /^\d{2}:\d{2}$/.test(m.remindTime) ? m.remindTime : null;
-      await sql`insert into tasks (title, area, person_id, due, recurring, remind_time, created_by)
-        values (${str(m.title, 140)!}, ${str(m.area, 40) ?? "Haushalt"}, ${uuid(m.personId, true)}, ${due}, ${rec}, ${remind}, ${actor})`;
+      const f = await taskFields(m);
+      await sql`insert into tasks (title, area, person_id, due, recurring, remind_time, rotation, created_by)
+        values (${f.title}, ${f.area}, ${f.personId}, ${f.due}, ${f.recurring}, ${f.remindTime}, ${sql.array(f.rotation)}::uuid[], ${actor})`;
+      return "tasks";
+    }
+    case "task.update": {
+      const f = await taskFields(m);
+      await sql`update tasks set title = ${f.title}, area = ${f.area}, person_id = ${f.personId}, due = ${f.due}, recurring = ${f.recurring},
+        remind_time = ${f.remindTime}, rotation = ${sql.array(f.rotation)}::uuid[] where id = ${uuid(m.id)!}`;
       return "tasks";
     }
     case "task.toggle": {
@@ -225,11 +246,13 @@ export async function mutate(m: Mutation, by: string | null): Promise<string> {
       if (!t) return "tasks";
       if (m.done) {
         await sql`update tasks set done = true, done_at = now() where id = ${id}`;
-        // wiederkehrend: nächste Runde direkt anlegen
+        // wiederkehrend: nächste Runde direkt anlegen, im Dienstplan ist dann die nächste Person dran
         if (t.recurring && !t.done) {
           const base = day(t.due) && day(t.due)! > today ? day(t.due)! : today;
-          await sql`insert into tasks (title, area, person_id, due, recurring, remind_time, created_by)
-            values (${t.title}, ${t.area}, ${t.person_id}, ${nextDue(base, t.recurring as Recurrence)}, ${t.recurring}, ${t.remind_time}, ${t.created_by})`;
+          const rotation = (t.rotation as string[]) ?? [];
+          const next = nextInRotation(rotation, (t.person_id as string) ?? null);
+          await sql`insert into tasks (title, area, person_id, due, recurring, remind_time, rotation, created_by)
+            values (${t.title}, ${t.area}, ${next}, ${nextDue(base, t.recurring as Recurrence)}, ${t.recurring}, ${t.remind_time}, ${sql.array(rotation)}::uuid[], ${t.created_by})`;
         }
       } else {
         await sql`update tasks set done = false, done_at = null where id = ${id}`;

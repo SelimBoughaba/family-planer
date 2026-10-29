@@ -48,8 +48,13 @@ function optimistic(s: AppState, m: Mutation, me: string | null): AppState {
     case "person.setNotify":
       return { ...s, people: s.people.map((p) => (p.id === m.id ? { ...p, notifyPrefs: m.prefs } : p)) };
     case "task.create": {
-      const t: Task = { id: tmp, title: m.title, area: m.area, personId: m.personId, due: m.due, recurring: m.recurring, done: false, doneAt: null, remindTime: m.remindTime };
+      const personId = m.rotation.length >= 2 && (!m.personId || !m.rotation.includes(m.personId)) ? m.rotation[0] : m.personId;
+      const t: Task = { id: tmp, title: m.title, area: m.area, personId, due: m.due, recurring: m.recurring, done: false, doneAt: null, remindTime: m.remindTime, rotation: m.rotation };
       return { ...s, tasks: [...s.tasks, t] };
+    }
+    case "task.update": {
+      const personId = m.rotation.length >= 2 && (!m.personId || !m.rotation.includes(m.personId)) ? m.rotation[0] : m.personId;
+      return { ...s, tasks: s.tasks.map((t) => (t.id === m.id ? { ...t, title: m.title, area: m.area, personId, due: m.due, recurring: m.recurring, remindTime: m.remindTime, rotation: m.rotation } : t)) };
     }
     case "task.toggle":
       return { ...s, tasks: s.tasks.map((t) => (t.id === m.id ? { ...t, done: m.done, doneAt: m.done ? new Date().toISOString() : null } : t)) };
