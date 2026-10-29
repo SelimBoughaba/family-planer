@@ -9,9 +9,9 @@
 
 - Owner-Bereich unter /owner: eigenes Passwort, Status, Personen, Geräte, Abo-Links, alle abmelden, Listen, Aufräumen, Sicherungen (täglich automatisch, manuell, Datei), Wiederherstellen, Fehlerprotokoll
 
+- Etappe 5: Essen (Rezepte mit Portionsrechner, Import per Link über strukturierte Daten, KI-Rückfall und Text einfügen, Wochenplan mit Koch, Zutaten auf die Einkaufsliste ohne Doppelte, KI-Vorschläge und Rezept ausarbeiten, Monatslimit im Owner-Bereich)
+
 ## Als Nächstes
-- Etappe 5: Essen (Rezepte, Wochenplan, Zutaten auf die Liste, KI-Vorschläge mit Monatslimit)
 - Aufgaben-Tab: alle Aufgaben nach Bereich und Person, Dienstplan reihum
 
 ## Vorgemerkt
-- KI-Monatslimit als Einstellung im Owner-Bereich, sobald Essen mit KI-Vorschlägen kommt

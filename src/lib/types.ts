@@ -73,12 +73,42 @@ export type Item = {
   createdAt: string;
 };
 
+export type Recipe = {
+  id: string;
+  title: string;
+  description: string | null;
+  servings: number;
+  minutes: number | null;
+  ingredients: { amount: string | null; name: string }[];
+  steps: string[];
+  tags: string[];
+  sourceUrl: string | null;
+  favorite: boolean;
+  createdBy: string | null;
+};
+
+export type RecipeFields = Omit<Recipe, "id" | "createdBy" | "favorite">;
+
+export type Meal = {
+  id: string;
+  day: string; // YYYY-MM-DD
+  recipeId: string | null;
+  title: string;
+  cook: string | null;
+  note: string | null;
+};
+
+export type AiInfo = { enabled: boolean; usedUsd: number; limitUsd: number };
+
 export type AppState = {
   people: Person[];
   events: CalEvent[];
   tasks: Task[];
   items: Item[];
   lists: { categories: string[]; areas: string[] };
+  recipes: Recipe[];
+  meals: Meal[];
+  ai: AiInfo;
 };
 
 export type Mutation =
@@ -94,6 +124,13 @@ export type Mutation =
   | { op: "item.move"; id: string; category: string }
   | { op: "item.delete"; id: string }
   | { op: "item.clearDone" }
+  | { op: "item.createMany"; items: { name: string; amount: string | null; category: string }[] }
+  | ({ op: "recipe.create"; id?: string } & RecipeFields)
+  | ({ op: "recipe.update"; id: string } & RecipeFields)
+  | { op: "recipe.favorite"; id: string; favorite: boolean }
+  | { op: "recipe.delete"; id: string }
+  | { op: "meal.set"; day: string; recipeId: string | null; title: string; cook: string | null; note: string | null }
+  | { op: "meal.clear"; day: string }
   | ({ op: "event.create" } & EventFields)
   | ({ op: "event.update"; id: string } & EventFields)
   | { op: "event.move"; id: string; startsAt: string; endsAt: string }

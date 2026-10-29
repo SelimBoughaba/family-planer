@@ -7,6 +7,7 @@ import { TodayView } from "./TodayView";
 import { ShoppingView } from "./ShoppingView";
 import { NewEntrySheet } from "./NewEntrySheet";
 import { CalendarView } from "./CalendarView";
+import { FoodView } from "./food/FoodView";
 import { EventEditor, type EditorTarget } from "./EventEditor";
 import { SubscribeSheet } from "./SubscribeSheet";
 import { NotifySheet } from "./NotifySheet";
@@ -14,11 +15,7 @@ import { registerWorker, syncPushOwner } from "@/lib/client/push";
 import { ColorPicker, PersonPicker } from "./Onboarding";
 import { IconBell, IconCalendar, IconPerson } from "./icons";
 
-const upcoming: Record<"essen" | "aufgaben", { title: string; text: string }> = {
-  essen: {
-    title: "Essen",
-    text: "Rezepte sammeln, die Woche planen und Vorschläge aus euren eigenen Rezepten oder per KI bekommen.",
-  },
+const upcoming: Record<"aufgaben", { title: string; text: string }> = {
   aufgaben: {
     title: "Aufgaben",
     text: "Alle Aufgaben nach Bereichen und Personen, mit Dienstplan, der Hausarbeiten automatisch reihum verteilt. Heute siehst du bereits die fälligen.",
@@ -133,6 +130,7 @@ function Main() {
           onNew={() => setNewOpen(true)}
           onProfile={() => setProfileOpen(true)}
           onOpenEvent={(occ) => setEditor({ mode: "edit", occ })}
+          onOpenFood={() => setTab("essen")}
         />
       )}
       {tab === "kalender" && (
@@ -145,7 +143,8 @@ function Main() {
         />
       )}
       {tab === "einkauf" && <ShoppingView />}
-      {(tab === "essen" || tab === "aufgaben") && (
+      {tab === "essen" && <FoodView />}
+      {tab === "aufgaben" && (
         <div className="mx-auto max-w-md px-4 safe-top safe-bottom">
           <h1 className="large-title mb-4">{upcoming[tab].title}</h1>
           <Card className="p-5">

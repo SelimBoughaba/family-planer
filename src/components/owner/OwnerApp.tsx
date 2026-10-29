@@ -26,6 +26,7 @@ type Status = {
   errors: ErrorEntry[];
   failedLogins: { ip: string; kind: string; at: string }[];
   lists: { categories: string[]; areas: string[] };
+  ai: { configured: boolean; model: string; limitUsd: number; month: { usd: number; calls: number; input: number; output: number } };
 };
 
 const fmt = (iso: string | null | undefined, withTime = true) =>
@@ -391,6 +392,8 @@ function StatusTab({ s, act, setConfirm }: TabProps) {
           </Row>
         ))}
       </Section>
+
+      <AiSection s={s} act={act} />
 
       <Section title="Anmeldungen" hint="Meldet alle Geräte der Familie ab. Jeder muss danach das Familienpasswort neu eingeben. Dieses Gerät bleibt angemeldet.">
         <Row>
@@ -824,5 +827,50 @@ function LogTab({ s, act, setConfirm }: TabProps) {
         </div>
       )}
     </>
+  );
+}
+
+function AiSection({ s, act }: Omit<TabProps, "setConfirm">) {
+  const [limit, setLimit] = useState(String(s.ai.limitUsd).replace(".", ","));
+  const used = s.ai.month.usd;
+  const pct = s.ai.limitUsd > 0 ? Math.min(100, (used / s.ai.limitUsd) * 100) : 100;
+  return (
+    <Section
+      title="KI für Rezepte und Vorschläge"
+      hint={s.ai.configured ? `Modell ${s.ai.model}. Ist das Limit erreicht, sind die KI-Knöpfe bis zum Monatsende aus; alles andere funktioniert weiter.` : "Für KI-Funktionen wird in Vercel ein ANTHROPIC_API_KEY hinterlegt. Ohne Schlüssel funktionieren Rezepte, Import über strukturierte Daten und der Wochenplan trotzdem."}
+    >
+      <Row>
+        <Dot ok={s.ai.configured} />
+        <span className="body flex-1">Schlüssel</span>
+        <span className="subhead" style={{ color: "var(--label-2)" }}>
+          {s.ai.configured ? "eingerichtet" : "fehlt"}
+        </span>
+      </Row>
+      <Row>
+        <div className="min-w-0 flex-1">
+          <p className="body">Diesen Monat</p>
+          <p className="footnote tabular" style={{ color: "var(--label-2)" }}>
+            {s.ai.month.calls} Anfragen, {(s.ai.month.input + s.ai.month.output).toLocaleString("de-DE")} Tokens
+          </p>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full" style={{ background: "var(--separator)" }}>
+            <div className="h-full rounded-full" style={{ width: `${pct}%`, background: pct >= 100 ? "var(--danger)" : "var(--tint)" }} />
+          </div>
+        </div>
+        <span className="subhead tabular" style={{ color: "var(--label-2)" }}>
+          {used.toLocaleString("de-DE", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+        </span>
+      </Row>
+      <form
+        className="flex items-center gap-3 px-4 py-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void act({ op: "ai.setLimit", usd: Number(limit.replace(",", ".")) }, "Limit gespeichert.");
+        }}
+      >
+        <span className="body flex-1">Monatslimit in US-Dollar</span>
+        <input value={limit} onChange={(e) => setLimit(e.target.value)} inputMode="decimal" className="body glass tabular w-20 rounded-[10px] px-2.5 py-1.5 text-right" aria-label="Monatslimit in US-Dollar" />
+        <ActionButton onClick={() => {}}>Sichern</ActionButton>
+      </form>
+    </Section>
   );
 }

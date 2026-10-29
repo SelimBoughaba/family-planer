@@ -240,3 +240,84 @@ export function useNow(intervalMs = 30000) {
   }, [intervalMs]);
   return now;
 }
+
+/** Aufschiebbares Blatt von unten, wie in iOS */
+export function Sheet({
+  open,
+  onClose,
+  title,
+  leading,
+  trailing,
+  children,
+  z = 40,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  leading?: ReactNode;
+  trailing?: ReactNode;
+  children: ReactNode;
+  z?: number;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 flex items-end justify-center" style={{ zIndex: z }} role="dialog" aria-modal aria-label={title}>
+      <button className="fade-in absolute inset-0" style={{ background: "rgba(0,0,0,.25)" }} onClick={onClose} aria-label="Schließen" />
+      <div
+        className="sheet-in glass glass-strong relative max-h-[94dvh] w-full max-w-md overflow-y-auto rounded-t-[30px] px-4 pt-2"
+        style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 24px)" }}
+      >
+        <span className="mx-auto mb-2 block h-[5px] w-9 rounded-full" style={{ background: "var(--label-3)" }} aria-hidden />
+        <div className="flex items-center justify-between gap-2 py-1">
+          <div className="flex w-24 justify-start">
+            {leading ?? (
+              <button onClick={onClose} className="body" style={{ color: "var(--tint)" }}>
+                Schließen
+              </button>
+            )}
+          </div>
+          <span className="headline truncate text-center">{title}</span>
+          <div className="flex w-24 justify-end">{trailing}</div>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+export function Chips<T extends string>({ value, options, onChange }: { value: T; options: { id: T; label: string }[]; onChange: (v: T) => void }) {
+  return (
+    <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
+      {options.map((o) => (
+        <button
+          key={o.id}
+          type="button"
+          onClick={() => onChange(o.id)}
+          className="press subhead shrink-0 rounded-full px-3.5 py-1.5 font-medium"
+          style={{
+            background: o.id === value ? "var(--tint)" : "color-mix(in oklab, var(--label) 7%, transparent)",
+            color: o.id === value ? "white" : "var(--label)",
+            transition: "background 160ms ease",
+          }}
+          aria-pressed={o.id === value}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function FieldLabel({ children }: { children: ReactNode }) {
+  return (
+    <p className="footnote mt-5 mb-2 font-semibold" style={{ color: "var(--label-2)" }}>
+      {children}
+    </p>
+  );
+}

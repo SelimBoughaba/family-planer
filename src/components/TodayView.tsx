@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useFamily } from "@/lib/client/family";
 import { localDay, recurrenceLabel, type Task } from "@/lib/types";
 import { addDays, occurrences, startOfDay, type Occurrence } from "@/lib/recurrence";
+import { recipeEmoji } from "@/lib/recipes";
 import { Avatar, AvatarStack, Card, ContextMenu, PersonFilter, SectionTitle, type MenuAction } from "./ui";
 import { SwipeRow } from "./SwipeRow";
 import { IconCheck, IconClock, IconPin, IconPlus, IconRepeat, IconTrash, IconPerson } from "./icons";
@@ -69,6 +70,7 @@ export function TodayView({
   onNew,
   onProfile,
   onOpenEvent,
+  onOpenFood,
 }: {
   now: Date;
   filter: string | null;
@@ -76,6 +78,7 @@ export function TodayView({
   onNew: () => void;
   onProfile: () => void;
   onOpenEvent: (o: Occurrence) => void;
+  onOpenFood: () => void;
 }) {
   const { state, run, person, color, me } = useFamily();
   const [menu, setMenu] = useState<Task | null>(null);
@@ -263,6 +266,37 @@ export function TodayView({
       <p className="caption mt-2 px-1" style={{ color: "var(--label-3)" }}>
         Nach rechts wischen erledigt, nach links verschiebt auf morgen, lange drücken zeigt mehr.
       </p>
+
+      {(() => {
+        const meal = state?.meals.find((m) => m.day === today);
+        const recipe = meal?.recipeId ? state?.recipes.find((r) => r.id === meal.recipeId) : null;
+        return (
+          <>
+            <SectionTitle>Heute gibt es</SectionTitle>
+            <Card className="p-0">
+              <button onClick={onOpenFood} className="flex w-full items-center gap-4 p-4 text-left">
+                <span
+                  className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[16px] text-3xl"
+                  style={{ background: "linear-gradient(150deg, #FFE08A, #FFB347)" }}
+                  aria-hidden
+                >
+                  {meal ? recipeEmoji(meal.title, recipe?.tags) : "🤔"}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="headline block truncate">{meal ? meal.title : "Noch nichts geplant"}</span>
+                  <span className="subhead block" style={{ color: "var(--label-2)" }}>
+                    {meal
+                      ? [recipe?.minutes ? `${recipe.minutes} Min.` : null, person(meal.cook) ? `kocht ${person(meal.cook)!.name}` : null].filter(Boolean).join(", ") || "Im Wochenplan ansehen"
+                      : state?.ai.enabled
+                        ? "Tippen für Vorschläge"
+                        : "Tippen zum Planen"}
+                  </span>
+                </span>
+              </button>
+            </Card>
+          </>
+        );
+      })()}
 
       <ContextMenu
         open={!!menu}

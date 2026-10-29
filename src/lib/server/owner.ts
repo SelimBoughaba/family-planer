@@ -4,6 +4,7 @@ import { getLists, setLists } from "./lists";
 import { bumpSessionEpoch, ownerConfigured, passwordConfigured, sessionEpoch } from "./session";
 import { pushConfigured, sendToPeople } from "./push";
 import { restore, saveBackup } from "./backup";
+import { AI_MODEL, aiLimit, monthUsage, setAiLimit } from "./ai";
 
 const isId = (v: unknown): v is string => typeof v === "string" && /^[0-9a-f-]{36}$/i.test(v);
 
@@ -63,6 +64,7 @@ export async function ownerStatus() {
     errors,
     failedLogins: failed.map((f) => ({ ip: maskIp(String(f.ip)), kind: f.kind, at: f.created_at })),
     lists: await getLists(),
+    ai: { configured: !!process.env.ANTHROPIC_API_KEY, model: AI_MODEL, limitUsd: await aiLimit(), month: await monthUsage() },
   };
 }
 
@@ -84,7 +86,8 @@ export type OwnerAction =
   | { op: "cleanup.logins" }
   | { op: "backup.create" }
   | { op: "backup.delete"; id: string }
-  | { op: "backup.restore"; id: string };
+  | { op: "backup.restore"; id: string }
+  | { op: "ai.setLimit"; usd: number };
 
 export class OwnerInputError extends Error {}
 
@@ -197,6 +200,11 @@ export async function ownerAction(a: OwnerAction): Promise<Record<string, unknow
       } catch (err) {
         throw new OwnerInputError((err as Error).message);
       }
+    }
+    case "ai.setLimit": {
+      const v = Number(a.usd);
+      if (!isFinite(v) || v < 0 || v > 20) throw new OwnerInputError("Das Limit muss zwischen 0 und 20 Dollar liegen.");
+      return { limitUsd: await setAiLimit(v) };
     }
     default:
       throw new OwnerInputError("Unbekannte Aktion.");

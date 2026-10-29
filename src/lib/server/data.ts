@@ -1,7 +1,8 @@
 import "server-only";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { db } from "./db";
-import type { AppState, CalEvent, EventFields, EventRecurrence, Item, Mutation, Person, Recurrence, Task } from "@/lib/types";
+import type { AppState, CalEvent, EventFields, EventRecurrence, Item, Meal, Mutation, Person, Recipe, RecipeFields, Recurrence, Task } from "@/lib/types";
+import { aiInfo } from "./ai";
 import { getLists } from "./lists";
 import { personColors } from "@/lib/types";
 
@@ -49,6 +50,27 @@ const toTask = (r: Row): Task => ({
   doneAt: iso(r.done_at),
   remindTime: r.remind_time ? String(r.remind_time).slice(0, 5) : null,
 });
+const toRecipe = (r: Row): Recipe => ({
+  id: r.id as string,
+  title: r.title as string,
+  description: (r.description as string) ?? null,
+  servings: (r.servings as number) ?? 4,
+  minutes: (r.minutes as number) ?? null,
+  ingredients: (r.ingredients as Recipe["ingredients"]) ?? [],
+  steps: (r.steps as string[]) ?? [],
+  tags: (r.tags as string[]) ?? [],
+  sourceUrl: (r.source_url as string) ?? null,
+  favorite: !!r.favorite,
+  createdBy: (r.created_by as string) ?? null,
+});
+const toMeal = (r: Row): Meal => ({
+  id: r.id as string,
+  day: String(r.day).slice(0, 10),
+  recipeId: (r.recipe_id as string) ?? null,
+  title: r.title as string,
+  cook: (r.cook as string) ?? null,
+  note: (r.note as string) ?? null,
+});
 const toItem = (r: Row): Item => ({
   id: r.id as string,
   name: r.name as string,
@@ -61,7 +83,7 @@ const toItem = (r: Row): Item => ({
 
 export async function loadState(from: Date, to: Date): Promise<AppState> {
   const sql = db();
-  const [people, events, tasks, items] = await Promise.all([
+  const [people, events, tasks, items, recipes, meals] = await Promise.all([
     sql`select * from people order by sort, name`,
     sql`select * from events
       where (recurrence is null and ends_at > ${from} and starts_at < ${to})
@@ -69,6 +91,8 @@ export async function loadState(from: Date, to: Date): Promise<AppState> {
       order by starts_at`,
     sql`select * from tasks where done = false or done_at > now() - interval '2 days' order by done, due nulls first, created_at`,
     sql`select * from shopping_items where done = false or done_at > now() - interval '1 day' order by created_at desc`,
+    sql`select * from recipes order by favorite desc, lower(title)`,
+    sql`select id, day::text as day, recipe_id, title, cook, note from meal_plan where day between (now() - interval '14 days')::date and (now() + interval '60 days')::date order by day`,
   ]);
   return {
     people: people.map(toPerson),
@@ -76,6 +100,9 @@ export async function loadState(from: Date, to: Date): Promise<AppState> {
     tasks: tasks.map(toTask),
     items: items.map(toItem),
     lists: await getLists(),
+    recipes: recipes.map(toRecipe),
+    meals: meals.map(toMeal),
+    ai: await aiInfo(),
   };
 }
 
@@ -120,6 +147,28 @@ function nextDue(from: string, r: Recurrence) {
 }
 
 export { InvalidInput };
+
+function recipeFields(m: RecipeFields) {
+  const ingredients = (Array.isArray(m.ingredients) ? m.ingredients : [])
+    .slice(0, 80)
+    .map((i) => ({ amount: str(i?.amount, 40, true), name: str(i?.name, 120, true) }))
+    .filter((i): i is { amount: string | null; name: string } => !!i.name);
+  const steps = (Array.isArray(m.steps) ? m.steps : []).slice(0, 60).map((x) => str(x, 2000, true)).filter((x): x is string => !!x);
+  const tags = (Array.isArray(m.tags) ? m.tags : []).slice(0, 12).map((x) => str(x, 30, true)).filter((x): x is string => !!x);
+  const servings = Number.isInteger(m.servings) && m.servings > 0 && m.servings <= 50 ? m.servings : 4;
+  const minutes = Number.isInteger(m.minutes) && (m.minutes as number) > 0 && (m.minutes as number) < 2000 ? (m.minutes as number) : null;
+  const url = str(m.sourceUrl, 500, true);
+  return {
+    title: str(m.title, 140)!,
+    description: str(m.description, 600, true),
+    servings,
+    minutes,
+    ingredients,
+    steps,
+    tags,
+    sourceUrl: url && /^https?:\/\//.test(url) ? url : null,
+  };
+}
 
 const eventRecurrences: EventRecurrence[] = ["daily", "weekly", "biweekly", "monthly", "yearly"];
 
@@ -218,6 +267,55 @@ export async function mutate(m: Mutation, by: string | null): Promise<string> {
     case "item.delete":
       await sql`delete from shopping_items where id = ${uuid(m.id)!}`;
       return "items";
+    case "item.createMany": {
+      const { categories } = await getLists();
+      const list = Array.isArray(m.items) ? m.items.slice(0, 60) : [];
+      // was schon offen auf der Liste steht, nicht doppelt eintragen
+      const open = new Set((await sql`select lower(name) as n from shopping_items where done = false`).map((r) => r.n as string));
+      let added = 0;
+      for (const it of list) {
+        const name = str(it.name, 80)!;
+        if (open.has(name.toLowerCase())) continue;
+        const cat = categories.includes(it.category) ? it.category : categories.includes("Vorrat") ? "Vorrat" : categories[categories.length - 1];
+        await sql`insert into shopping_items (name, amount, category, added_by) values (${name}, ${str(it.amount, 30, true)}, ${cat}, ${actor})`;
+        open.add(name.toLowerCase());
+        added++;
+      }
+      return added ? "items" : "none";
+    }
+    case "recipe.create": {
+      const f = recipeFields(m);
+      // ID darf vom Gerät kommen, damit es das Rezept sofort einplanen kann
+      const id = uuid(m.id, true) ?? randomUUID();
+      await sql`insert into recipes (id, title, description, servings, minutes, ingredients, steps, tags, source_url, created_by)
+        values (${id}, ${f.title}, ${f.description}, ${f.servings}, ${f.minutes}, ${sql.json(f.ingredients)}, ${sql.json(f.steps)}, ${sql.array(f.tags)}::text[], ${f.sourceUrl}, ${actor})`;
+      return "recipes";
+    }
+    case "recipe.update": {
+      const f = recipeFields(m);
+      await sql`update recipes set title = ${f.title}, description = ${f.description}, servings = ${f.servings}, minutes = ${f.minutes},
+        ingredients = ${sql.json(f.ingredients)}, steps = ${sql.json(f.steps)}, tags = ${sql.array(f.tags)}::text[], source_url = ${f.sourceUrl}, updated_at = now()
+        where id = ${uuid(m.id)!}`;
+      await sql`update meal_plan set title = ${f.title} where recipe_id = ${m.id}`;
+      return "recipes";
+    }
+    case "recipe.favorite":
+      await sql`update recipes set favorite = ${!!m.favorite} where id = ${uuid(m.id)!}`;
+      return "recipes";
+    case "recipe.delete":
+      await sql`delete from recipes where id = ${uuid(m.id)!}`;
+      return "recipes";
+    case "meal.set": {
+      const day = dateStr(m.day)!;
+      const title = str(m.title, 140)!;
+      await sql`insert into meal_plan (day, recipe_id, title, cook, note, created_by)
+        values (${day}, ${uuid(m.recipeId, true)}, ${title}, ${uuid(m.cook, true)}, ${str(m.note, 200, true)}, ${actor})
+        on conflict (day) do update set recipe_id = excluded.recipe_id, title = excluded.title, cook = excluded.cook, note = excluded.note`;
+      return "meals";
+    }
+    case "meal.clear":
+      await sql`delete from meal_plan where day = ${dateStr(m.day)!}`;
+      return "meals";
     case "item.clearDone":
       await sql`delete from shopping_items where done = true`;
       return "items";

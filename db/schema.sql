@@ -130,3 +130,44 @@ create table if not exists backups (
 );
 create index if not exists backups_time_idx on backups (created_at desc);
 alter table backups enable row level security;
+
+-- Etappe 5: Essen
+create table if not exists recipes (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  description text,
+  servings int not null default 4,
+  minutes int,
+  ingredients jsonb not null default '[]', -- [{ "amount": "200 g", "name": "Mehl" }]
+  steps jsonb not null default '[]',       -- ["Schritt 1", ...]
+  tags text[] not null default '{}',
+  source_url text,
+  favorite boolean not null default false,
+  created_by uuid references people(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table recipes enable row level security;
+
+create table if not exists meal_plan (
+  id uuid primary key default gen_random_uuid(),
+  day date not null unique,
+  recipe_id uuid references recipes(id) on delete set null,
+  title text not null,
+  cook uuid references people(id) on delete set null,
+  note text,
+  created_by uuid references people(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+alter table meal_plan enable row level security;
+
+create table if not exists ai_usage (
+  id bigint generated always as identity primary key,
+  kind text not null,
+  input_tokens int not null,
+  output_tokens int not null,
+  cost_usd numeric(10, 6) not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists ai_usage_time_idx on ai_usage (created_at);
+alter table ai_usage enable row level security;

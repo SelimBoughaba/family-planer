@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "./db";
 
-export const BACKUP_VERSION = 1;
+export const BACKUP_VERSION = 2;
 const KEEP_AUTO = 14;
 
 export type Snapshot = {
@@ -13,6 +13,8 @@ export type Snapshot = {
     events: Record<string, unknown>[];
     tasks: Record<string, unknown>[];
     shopping_items: Record<string, unknown>[];
+    recipes?: Record<string, unknown>[];
+    meal_plan?: Record<string, unknown>[];
     lists: unknown;
   };
 };
@@ -20,18 +22,20 @@ export type Snapshot = {
 /** Alle Familiendaten ohne Geheimnisse (keine Abo-Schlüssel, keine Geräte, keine Anmeldeversuche) */
 export async function snapshot(): Promise<Snapshot> {
   const sql = db();
-  const [people, events, tasks, items, lists] = await Promise.all([
+  const [people, events, tasks, items, lists, recipes, meals] = await Promise.all([
     sql`select id, name, color, sort, notify_prefs, created_at from people order by sort`,
     sql`select id, title, place, notes, starts_at, ends_at, all_day, people, recurrence, recurrence_until::text as recurrence_until, exdates, reminders, created_by, created_at, updated_at from events`,
     sql`select id, title, area, person_id, due::text as due, recurring, remind_time::text as remind_time, done, done_at, created_by, created_at from tasks`,
     sql`select id, name, amount, category, added_by, done, done_at, created_at from shopping_items`,
     sql`select value from app_meta where key = 'lists'`,
+    sql`select id, title, description, servings, minutes, ingredients, steps, tags, source_url, favorite, created_by, created_at, updated_at from recipes`,
+    sql`select id, day::text as day, recipe_id, title, cook, note, created_by, created_at from meal_plan`,
   ]);
   return {
     app: "familienplaner",
     version: BACKUP_VERSION,
     createdAt: new Date().toISOString(),
-    tables: { people: [...people], events: [...events], tasks: [...tasks], shopping_items: [...items], lists: lists[0]?.value ?? null },
+    tables: { people: [...people], events: [...events], tasks: [...tasks], shopping_items: [...items], recipes: [...recipes], meal_plan: [...meals], lists: lists[0]?.value ?? null },
   };
 }
 
@@ -74,7 +78,14 @@ export async function restore(data: unknown) {
   const before = await saveBackup("before-restore");
   const sql = db();
   const ids = d.tables.people.map((p) => String(p.id));
+  const recipeIds = (d.tables.recipes ?? []).map((r) => String(r.id));
+  // ältere Sicherungen ohne Rezepte lassen vorhandene Rezepte unangetastet
+  const hasFood = Array.isArray(d.tables.recipes);
   await sql.begin(async (tx) => {
+    if (hasFood) {
+      await tx`delete from meal_plan`;
+      await tx`delete from recipes`;
+    }
     await tx`delete from events`;
     await tx`delete from tasks`;
     await tx`delete from shopping_items`;
@@ -101,9 +112,23 @@ export async function restore(data: unknown) {
         values (${i.id as string}, ${i.name as string}, ${(i.amount as string) ?? null}, ${(i.category as string) ?? "Vorrat"}, ${ids.includes(i.added_by as string) ? (i.added_by as string) : null},
           ${!!i.done}, ${(i.done_at as string) ?? null}, ${(i.created_at as string) ?? new Date().toISOString()})`;
     }
+    for (const r of d.tables.recipes ?? []) {
+      await tx`insert into recipes (id, title, description, servings, minutes, ingredients, steps, tags, source_url, favorite, created_by, created_at, updated_at)
+        values (${r.id as string}, ${r.title as string}, ${(r.description as string) ?? null}, ${(r.servings as number) ?? 4}, ${(r.minutes as number) ?? null},
+          ${tx.json((r.ingredients ?? []) as never)}, ${tx.json((r.steps ?? []) as never)}, ${tx.array((r.tags as string[]) ?? [])}::text[], ${(r.source_url as string) ?? null}, ${!!r.favorite},
+          ${ids.includes(r.created_by as string) ? (r.created_by as string) : null}, ${(r.created_at as string) ?? new Date().toISOString()}, now())`;
+    }
+    for (const m of d.tables.meal_plan ?? []) {
+      await tx`insert into meal_plan (id, day, recipe_id, title, cook, note, created_by, created_at)
+        values (${m.id as string}, ${m.day as string}, ${recipeIds.includes(m.recipe_id as string) ? (m.recipe_id as string) : null}, ${m.title as string},
+          ${ids.includes(m.cook as string) ? (m.cook as string) : null}, ${(m.note as string) ?? null}, ${ids.includes(m.created_by as string) ? (m.created_by as string) : null}, ${(m.created_at as string) ?? new Date().toISOString()})`;
+    }
     if (d.tables.lists) {
       await tx`insert into app_meta (key, value) values ('lists', ${tx.json(d.tables.lists as never)}) on conflict (key) do update set value = excluded.value, updated_at = now()`;
     }
   });
-  return { before, counts: { people: d.tables.people.length, events: d.tables.events.length, tasks: d.tables.tasks.length, items: d.tables.shopping_items.length } };
+  return {
+    before,
+    counts: { people: d.tables.people.length, events: d.tables.events.length, tasks: d.tables.tasks.length, items: d.tables.shopping_items.length, recipes: d.tables.recipes?.length ?? 0 },
+  };
 }

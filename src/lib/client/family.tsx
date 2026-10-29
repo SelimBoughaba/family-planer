@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createClient } from "@supabase/supabase-js";
-import type { AppState, Item, Mutation, Person, Task, CalEvent } from "@/lib/types";
+import type { AppState, Item, Mutation, Person, Task, CalEvent, Recipe, Meal } from "@/lib/types";
 import { FALLBACK_COLOR, localDay } from "@/lib/types";
 
 const SYNC_TOPIC = "familienplaner-sync";
@@ -74,6 +74,32 @@ function optimistic(s: AppState, m: Mutation, me: string | null): AppState {
       return { ...s, items: s.items.filter((i) => i.id !== m.id) };
     case "item.clearDone":
       return { ...s, items: s.items.filter((i) => !i.done) };
+    case "item.createMany": {
+      const open = new Set(s.items.filter((i) => !i.done).map((i) => i.name.toLowerCase()));
+      const add: Item[] = [];
+      for (const it of m.items) {
+        if (open.has(it.name.toLowerCase())) continue;
+        open.add(it.name.toLowerCase());
+        add.push({ id: `tmp-${Math.random().toString(36).slice(2)}`, name: it.name, amount: it.amount, category: it.category, addedBy: me, done: false, createdAt: new Date().toISOString() });
+      }
+      return { ...s, items: [...add, ...s.items] };
+    }
+    case "recipe.create": {
+      const r: Recipe = { id: m.id ?? tmp, title: m.title, description: m.description, servings: m.servings, minutes: m.minutes, ingredients: m.ingredients, steps: m.steps, tags: m.tags, sourceUrl: m.sourceUrl, favorite: false, createdBy: me };
+      return { ...s, recipes: [...s.recipes, r] };
+    }
+    case "recipe.update":
+      return { ...s, recipes: s.recipes.map((r) => (r.id === m.id ? { ...r, title: m.title, description: m.description, servings: m.servings, minutes: m.minutes, ingredients: m.ingredients, steps: m.steps, tags: m.tags, sourceUrl: m.sourceUrl } : r)) };
+    case "recipe.favorite":
+      return { ...s, recipes: s.recipes.map((r) => (r.id === m.id ? { ...r, favorite: m.favorite } : r)) };
+    case "recipe.delete":
+      return { ...s, recipes: s.recipes.filter((r) => r.id !== m.id), meals: s.meals.map((x) => (x.recipeId === m.id ? { ...x, recipeId: null } : x)) };
+    case "meal.set": {
+      const meal: Meal = { id: tmp, day: m.day, recipeId: m.recipeId, title: m.title, cook: m.cook, note: m.note };
+      return { ...s, meals: [...s.meals.filter((x) => x.day !== m.day), meal].sort((a, b) => a.day.localeCompare(b.day)) };
+    }
+    case "meal.clear":
+      return { ...s, meals: s.meals.filter((x) => x.day !== m.day) };
     case "event.create": {
       const e: CalEvent = { id: tmp, title: m.title, place: m.place, notes: null, startsAt: m.startsAt, endsAt: m.endsAt, allDay: m.allDay, people: m.people, createdBy: me, recurrence: m.recurrence, recurrenceUntil: m.recurrenceUntil, exdates: [], reminders: m.reminders };
       return { ...s, events: [...s.events, e] };
