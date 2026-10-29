@@ -43,16 +43,26 @@ export async function saveBackup(kind: "auto" | "manual" | "before-restore") {
   const data = await snapshot();
   const size = Buffer.byteLength(JSON.stringify(data));
   const sql = db();
-  const [row] = await sql`insert into backups (kind, data, size_bytes) values (${kind}, ${sql.json(data as never)}, ${size}) returning id, created_at`;
-  // automatische Sicherungen begrenzen, manuelle bleiben bis zum Löschen
-  await sql`delete from backups where kind = 'auto' and id not in (select id from backups where kind = 'auto' order by created_at desc limit ${KEEP_AUTO})`;
-  await sql`delete from backups where kind = 'before-restore' and created_at < now() - interval '30 days'`;
+  // harte Zeitgrenze: eine Sicherung darf nie Sperren dauerhaft festhalten
+  const row = await sql.begin(async (tx) => {
+    await tx`set local statement_timeout = '15s'`;
+    await tx`set local lock_timeout = '5s'`;
+    // als Text übergeben und in der Datenbank umwandeln, damit die Daten nicht als Parameter-Objekt durch den Pooler müssen
+    const [r] = await tx`insert into backups (kind, data, size_bytes) values (${kind}, ${JSON.stringify(data)}::text::jsonb, ${size}) returning id, created_at`;
+    // automatische Sicherungen begrenzen, manuelle bleiben bis zum Löschen
+    await tx`delete from backups where kind = 'auto' and id not in (select id from backups where kind = 'auto' order by created_at desc limit ${KEEP_AUTO})`;
+    await tx`delete from backups where kind = 'before-restore' and created_at < now() - interval '30 days'`;
+    return r;
+  });
   return { id: row.id as string, createdAt: row.created_at as string, size };
 }
 
 /** Einmal pro Tag, vom Zeitplaner angestoßen */
 export async function maybeAutoBackup() {
   const sql = db();
+  // nur zwischen 2 und 5 Uhr Berliner Zeit, damit es tagsüber nie mit Änderungen kollidiert
+  const hour = Number(new Date().toLocaleString("de-DE", { timeZone: "Europe/Berlin", hour: "2-digit", hourCycle: "h23" }));
+  if (hour < 2 || hour >= 5) return null;
   const [last] = await sql`select created_at from backups where kind = 'auto' order by created_at desc limit 1`;
   if (last && Date.now() - +new Date(last.created_at as string) < 23.5 * 3600000) return null;
   return saveBackup("auto");

@@ -50,13 +50,18 @@ async function upToDate() {
 }
 
 async function applySchema() {
-  // hängengebliebene, eigene Transaktionen beenden, sie würden die Änderungen blockieren
-  const killed = await sql`
-    select pg_terminate_backend(pid) as ok from pg_stat_activity
-    where usename = current_user and pid <> pg_backend_pid()
-      and state in ('idle in transaction', 'idle in transaction (aborted)')
-      and xact_start < now() - interval '2 minutes'`;
-  if (killed.length) console.log(`[migrate] ${killed.length} hängende Verbindung(en) beendet.`);
+  // hängende Abfragen der App beenden: hier dauert legitim keine Abfrage länger als Sekunden
+  const stuck = await sql`
+    select pid, state, wait_event_type, wait_event, pg_blocking_pids(pid) as blocked_by, now() - xact_start as age, left(query, 80) as query
+    from pg_stat_activity
+    where usename = current_user and pid <> pg_backend_pid() and backend_type = 'client backend'
+      and coalesce(application_name, '') not like 'pg_net%' and coalesce(application_name, '') not like 'pg_cron%'
+      and state in ('active', 'idle in transaction', 'idle in transaction (aborted)')
+      and xact_start < now() - interval '90 seconds'`;
+  for (const r of stuck) {
+    console.log(`[migrate] beende hängende Abfrage pid ${r.pid} (${r.state}, wartet auf ${r.wait_event_type ?? "-"}/${r.wait_event ?? "-"}, blockiert von ${JSON.stringify(r.blocked_by)}, seit ${r.age}): ${r.query}`);
+    await sql`select pg_terminate_backend(${r.pid})`;
+  }
 
   for (let attempt = 1; attempt <= 4; attempt++) {
     try {
@@ -82,11 +87,12 @@ async function applySchema() {
 async function explainLocks() {
   try {
     const rows = await sql`
-      select pid, usename, application_name, state, now() - xact_start as age, left(query, 120) as query
+      select pid, usename, application_name, state, wait_event_type, wait_event, pg_blocking_pids(pid) as blocked_by, now() - xact_start as age, left(query, 120) as query
       from pg_stat_activity
       where pid <> pg_backend_pid() and xact_start is not null and datname = current_database()
       order by xact_start limit 8`;
-    for (const r of rows) console.error(`[migrate] offen: pid ${r.pid} ${r.usename} ${r.application_name || "-"} ${r.state} seit ${r.age}: ${r.query}`);
+    for (const r of rows)
+      console.error(`[migrate] offen: pid ${r.pid} ${r.usename} ${r.application_name || "-"} ${r.state} wartet ${r.wait_event_type ?? "-"}/${r.wait_event ?? "-"} blockiert von ${JSON.stringify(r.blocked_by)} seit ${r.age}: ${r.query}`);
   } catch {}
 }
 
