@@ -11,12 +11,14 @@ function key() {
   return createHmac("sha256", secret).update("familienplaner-session-v1").digest();
 }
 
+const password = () => process.env.FAMILY_PASSWORD ?? "";
+
 /**
- * Die PIN fließt in die Signatur ein: Wird die PIN geändert,
+ * Das Passwort fließt in die Signatur ein: Wird es geändert,
  * sind alle bestehenden Anmeldungen automatisch ungültig.
  */
-function pinFingerprint() {
-  return createHash("sha256").update(process.env.FAMILY_PIN ?? "").digest("hex").slice(0, 16);
+function passwordFingerprint() {
+  return createHash("sha256").update(password()).digest("hex").slice(0, 16);
 }
 
 function sign(payload: string) {
@@ -25,7 +27,7 @@ function sign(payload: string) {
 
 export function createSession() {
   const exp = Math.floor(Date.now() / 1000) + SESSION_MAX_AGE;
-  const payload = `v1.${exp}.${pinFingerprint()}`;
+  const payload = `v1.${exp}.${passwordFingerprint()}`;
   return `${payload}.${sign(payload)}`;
 }
 
@@ -35,7 +37,7 @@ export function verifySession(token: string | undefined | null): boolean {
   if (parts.length !== 4 || parts[0] !== "v1") return false;
   const [v, exp, fp, sig] = parts;
   if (Number(exp) * 1000 < Date.now()) return false;
-  if (fp !== pinFingerprint()) return false;
+  if (fp !== passwordFingerprint()) return false;
   let expected: string;
   try {
     expected = sign(`${v}.${exp}.${fp}`);
@@ -47,13 +49,12 @@ export function verifySession(token: string | undefined | null): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-export function pinConfigured() {
-  return /^\d{6}$/.test(process.env.FAMILY_PIN ?? "");
+export function passwordConfigured() {
+  return password().length >= 8;
 }
 
-export function checkPin(input: string) {
-  const pin = process.env.FAMILY_PIN ?? "";
+export function checkPassword(input: string) {
   const a = createHash("sha256").update(input).digest();
-  const b = createHash("sha256").update(pin).digest();
-  return pinConfigured() && timingSafeEqual(a, b);
+  const b = createHash("sha256").update(password()).digest();
+  return passwordConfigured() && timingSafeEqual(a, b);
 }

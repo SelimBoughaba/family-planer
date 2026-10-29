@@ -50,7 +50,7 @@ create table if not exists shopping_items (
   created_at timestamptz not null default now()
 );
 
--- Fehlversuche beim PIN-Login, für die Sperre
+-- Fehlversuche beim Login, für die Sperre
 create table if not exists login_attempts (
   id bigint generated always as identity primary key,
   ip text not null,
