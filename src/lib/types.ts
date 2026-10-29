@@ -17,6 +17,31 @@ export type CalEvent = {
   allDay: boolean;
   people: string[];
   createdBy: string | null;
+  recurrence: EventRecurrence | null;
+  recurrenceUntil: string | null; // YYYY-MM-DD, einschließlich
+  exdates: string[]; // ISO-Beginn ausgelassener Vorkommen
+};
+
+export type EventRecurrence = "daily" | "weekly" | "biweekly" | "monthly" | "yearly";
+
+export const eventRecurrenceLabel: Record<EventRecurrence, string> = {
+  daily: "Täglich",
+  weekly: "Jede Woche",
+  biweekly: "Alle 2 Wochen",
+  monthly: "Jeden Monat",
+  yearly: "Jedes Jahr",
+};
+
+/** Felder, die beim Anlegen und Bearbeiten eines Termins gesendet werden */
+export type EventFields = {
+  title: string;
+  place: string | null;
+  startsAt: string;
+  endsAt: string;
+  allDay: boolean;
+  people: string[];
+  recurrence: EventRecurrence | null;
+  recurrenceUntil: string | null;
 };
 
 export type Recurrence = "daily" | "weekly" | "biweekly" | "monthly";
@@ -61,8 +86,11 @@ export type Mutation =
   | { op: "item.move"; id: string; category: string }
   | { op: "item.delete"; id: string }
   | { op: "item.clearDone" }
-  | { op: "event.create"; title: string; place: string | null; startsAt: string; endsAt: string; allDay: boolean; people: string[] }
-  | { op: "event.delete"; id: string };
+  | ({ op: "event.create" } & EventFields)
+  | ({ op: "event.update"; id: string } & EventFields)
+  | { op: "event.move"; id: string; startsAt: string; endsAt: string }
+  | ({ op: "event.detach"; id: string; occurrence: string } & EventFields)
+  | { op: "event.delete"; id: string; mode: "all" | "one" | "following"; occurrence?: string };
 
 export const recurrenceLabel: Record<Recurrence, string> = {
   daily: "Täglich",

@@ -17,6 +17,8 @@ type Ctx = {
   color: (id: string | null | undefined) => string;
   run: (m: Mutation) => Promise<boolean>;
   refresh: () => Promise<void>;
+  /** Kalender meldet, welcher Zeitraum gebraucht wird; lädt bei Bedarf nach */
+  ensureRange: (from: Date, to: Date) => void;
   syncing: boolean;
 };
 
@@ -28,13 +30,13 @@ export function useFamily() {
   return c;
 }
 
-function range() {
+function initialWindow() {
   const from = new Date();
   from.setHours(0, 0, 0, 0);
-  from.setDate(from.getDate() - 1);
+  from.setDate(from.getDate() - 42);
   const to = new Date(from);
-  to.setDate(to.getDate() + 16);
-  return { from: from.toISOString(), to: to.toISOString() };
+  to.setDate(to.getDate() + 42 + 120);
+  return { from, to };
 }
 
 /** Änderungen sofort lokal anzeigen, bevor der Server bestätigt */
@@ -71,10 +73,36 @@ function optimistic(s: AppState, m: Mutation, me: string | null): AppState {
     case "item.clearDone":
       return { ...s, items: s.items.filter((i) => !i.done) };
     case "event.create": {
-      const e: CalEvent = { id: tmp, title: m.title, place: m.place, notes: null, startsAt: m.startsAt, endsAt: m.endsAt, allDay: m.allDay, people: m.people, createdBy: me };
+      const e: CalEvent = { id: tmp, title: m.title, place: m.place, notes: null, startsAt: m.startsAt, endsAt: m.endsAt, allDay: m.allDay, people: m.people, createdBy: me, recurrence: m.recurrence, recurrenceUntil: m.recurrenceUntil, exdates: [] };
       return { ...s, events: [...s.events, e] };
     }
+    case "event.update":
+      return {
+        ...s,
+        events: s.events.map((e) =>
+          e.id === m.id ? { ...e, title: m.title, place: m.place, startsAt: m.startsAt, endsAt: m.endsAt, allDay: m.allDay, people: m.people, recurrence: m.recurrence, recurrenceUntil: m.recurrenceUntil, exdates: m.recurrence ? e.exdates : [] } : e,
+        ),
+      };
+    case "event.move":
+      return {
+        ...s,
+        events: s.events.map((e) => {
+          if (e.id !== m.id) return e;
+          const delta = +new Date(m.startsAt) - +new Date(e.startsAt);
+          return { ...e, startsAt: m.startsAt, endsAt: m.endsAt, exdates: e.exdates.map((x) => new Date(+new Date(x) + delta).toISOString()) };
+        }),
+      };
+    case "event.detach": {
+      const copy: CalEvent = { id: tmp, title: m.title, place: m.place, notes: null, startsAt: m.startsAt, endsAt: m.endsAt, allDay: m.allDay, people: m.people, createdBy: me, recurrence: null, recurrenceUntil: null, exdates: [] };
+      return { ...s, events: [...s.events.map((e) => (e.id === m.id ? { ...e, exdates: [...e.exdates, m.occurrence] } : e)), copy] };
+    }
     case "event.delete":
+      if (m.mode === "one" && m.occurrence) return { ...s, events: s.events.map((e) => (e.id === m.id ? { ...e, exdates: [...e.exdates, m.occurrence!] } : e)) };
+      if (m.mode === "following" && m.occurrence) {
+        const d = new Date(m.occurrence);
+        d.setDate(d.getDate() - 1);
+        return { ...s, events: s.events.map((e) => (e.id === m.id ? { ...e, recurrenceUntil: localDay(d) } : e)) };
+      }
       return { ...s, events: s.events.filter((e) => e.id !== m.id) };
   }
 }
@@ -91,11 +119,12 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
   });
   const [syncing, setSyncing] = useState(false);
   const pending = useRef(0);
+  const win = useRef(initialWindow());
 
   const refresh = useCallback(async () => {
-    const { from, to } = range();
+    const { from, to } = win.current;
     try {
-      const res = await fetch(`/api/state?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { cache: "no-store" });
+      const res = await fetch(`/api/state?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`, { cache: "no-store" });
       if (res.status === 401) {
         window.location.reload();
         return;
@@ -145,6 +174,20 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
     };
   }, [refresh]);
 
+  const ensureRange = useCallback(
+    (from: Date, to: Date) => {
+      const w = win.current;
+      if (from >= w.from && to <= w.to) return;
+      const nf = new Date(Math.min(+w.from, +from - 30 * 86400000));
+      const nt = new Date(Math.max(+w.to, +to + 60 * 86400000));
+      // Server erlaubt höchstens rund 13 Monate am Stück
+      const span = 395 * 86400000;
+      win.current = +nt - +nf > span ? (from < w.from ? { from: nf, to: new Date(+nf + span) } : { from: new Date(+nt - span), to: nt }) : { from: nf, to: nt };
+      void refresh();
+    },
+    [refresh],
+  );
+
   const people = state?.people;
   const person = useCallback((id: string | null | undefined) => people?.find((p) => p.id === id), [people]);
   const color = useCallback((id: string | null | undefined) => person(id)?.color ?? FALLBACK_COLOR, [person]);
@@ -193,6 +236,9 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
     [meId, refresh],
   );
 
-  const value = useMemo(() => ({ state, error, me, setMe, person, color, run, refresh, syncing }), [state, error, me, setMe, person, color, run, refresh, syncing]);
+  const value = useMemo(
+    () => ({ state, error, me, setMe, person, color, run, refresh, ensureRange, syncing }),
+    [state, error, me, setMe, person, color, run, refresh, ensureRange, syncing],
+  );
   return <FamilyCtx.Provider value={value}>{children}</FamilyCtx.Provider>;
 }

@@ -59,21 +59,11 @@ const Label = ({ children }: { children: string }) => (
   </p>
 );
 
-function addMinutes(hhmm: string, min: number) {
-  const [h, m] = hhmm.split(":").map(Number);
-  const t = (h * 60 + m + min + 24 * 60) % (24 * 60);
-  return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
-}
 
-function roundedNow() {
-  const d = new Date();
-  d.setMinutes(Math.ceil((d.getMinutes() + 1) / 15) * 15, 0, 0);
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
 
-export function NewEntrySheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function NewEntrySheet({ open, onClose, onEvent }: { open: boolean; onClose: () => void; onEvent: (title: string) => void }) {
   const { state, me, run } = useFamily();
-  const [kind, setKind] = useState<Kind>("task");
+  const kind: Kind = "task";
   const [title, setTitle] = useState("");
   const [who, setWho] = useState<string[]>([]);
   // Aufgabe
@@ -81,11 +71,6 @@ export function NewEntrySheet({ open, onClose }: { open: boolean; onClose: () =>
   const [when, setWhen] = useState<"today" | "tomorrow" | "none" | "date">("today");
   const [date, setDate] = useState(localDay());
   const [rec, setRec] = useState<"none" | Recurrence>("none");
-  // Termin
-  const [place, setPlace] = useState("");
-  const [allDay, setAllDay] = useState(false);
-  const [start, setStart] = useState(roundedNow);
-  const [duration, setDuration] = useState(60);
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -102,45 +87,26 @@ export function NewEntrySheet({ open, onClose }: { open: boolean; onClose: () =>
 
   const reset = () => {
     setTitle("");
-    setPlace("");
     setWho([]);
     setWhen("today");
     setRec("none");
     setDate(localDay());
-    setStart(roundedNow());
-    setDuration(60);
-    setAllDay(false);
   };
 
   const save = async () => {
     if (!title.trim() || busy) return;
     setBusy(true);
-    let ok: boolean;
-    if (kind === "task") {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const due = when === "today" ? localDay() : when === "tomorrow" ? localDay(tomorrow) : when === "date" ? date : null;
-      ok = await run({
-        op: "task.create",
-        title: title.trim(),
-        area,
-        personId: chosen[0] ?? null,
-        due: rec !== "none" && !due ? localDay() : due,
-        recurring: rec === "none" ? null : rec,
-      });
-    } else {
-      const s = allDay ? new Date(`${date}T00:00`) : new Date(`${date}T${start}`);
-      const e = allDay ? new Date(new Date(`${date}T00:00`).getTime() + 86400000) : new Date(s.getTime() + duration * 60000);
-      ok = await run({
-        op: "event.create",
-        title: title.trim(),
-        place: place.trim() || null,
-        startsAt: s.toISOString(),
-        endsAt: e.toISOString(),
-        allDay,
-        people: chosen,
-      });
-    }
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const due = when === "today" ? localDay() : when === "tomorrow" ? localDay(tomorrow) : when === "date" ? date : null;
+    const ok = await run({
+      op: "task.create",
+      title: title.trim(),
+      area,
+      personId: chosen[0] ?? null,
+      due: rec !== "none" && !due ? localDay() : due,
+      recurring: rec === "none" ? null : rec,
+    });
     setBusy(false);
     if (ok) {
       reset();
@@ -148,13 +114,7 @@ export function NewEntrySheet({ open, onClose }: { open: boolean; onClose: () =>
     }
   };
 
-  const toggleWho = (id: string) => {
-    if (kind === "task") return setWho([id]);
-    setWho((w) => {
-      const base = w.length ? w : chosen;
-      return base.includes(id) ? base.filter((x) => x !== id) : [...base, id];
-    });
-  };
+  const toggleWho = (id: string) => setWho([id]);
 
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center" role="dialog" aria-modal aria-label="Neuer Eintrag">
@@ -172,7 +132,7 @@ export function NewEntrySheet({ open, onClose }: { open: boolean; onClose: () =>
           <button type="button" onClick={onClose} className="body" style={{ color: "var(--tint)" }}>
             Abbrechen
           </button>
-          <span className="headline">{kind === "task" ? "Neue Aufgabe" : "Neuer Termin"}</span>
+          <span className="headline">Neue Aufgabe</span>
           <button type="submit" disabled={!title.trim() || busy} className="body font-semibold" style={{ color: title.trim() ? "var(--tint)" : "var(--label-3)" }}>
             Hinzufügen
           </button>
@@ -181,7 +141,14 @@ export function NewEntrySheet({ open, onClose }: { open: boolean; onClose: () =>
         <div className="mt-3">
           <Segmented
             value={kind}
-            onChange={setKind}
+            onChange={(k) => {
+              if (k === "event") {
+                const t = title;
+                reset();
+                onClose();
+                onEvent(t);
+              }
+            }}
             options={[
               { id: "task", label: "Aufgabe" },
               { id: "event", label: "Termin" },
@@ -193,23 +160,13 @@ export function NewEntrySheet({ open, onClose }: { open: boolean; onClose: () =>
           ref={inputRef}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder={kind === "task" ? "Was ist zu tun?" : "Was steht an?"}
+          placeholder="Was ist zu tun?"
           className="title-2 mt-5 w-full bg-transparent outline-none placeholder:text-[var(--label-3)]"
           maxLength={140}
           aria-label="Titel"
         />
-        {kind === "event" && (
-          <input
-            value={place}
-            onChange={(e) => setPlace(e.target.value)}
-            placeholder="Ort (optional)"
-            className="body mt-2 w-full bg-transparent outline-none placeholder:text-[var(--label-3)]"
-            maxLength={140}
-            aria-label="Ort"
-          />
-        )}
 
-        <Label>{kind === "task" ? "Wer kümmert sich?" : "Wer ist dabei?"}</Label>
+        <Label>Wer kümmert sich?</Label>
         <div className="flex gap-3">
           {people.map((p) => {
             const on = chosen.includes(p.id);
@@ -222,7 +179,6 @@ export function NewEntrySheet({ open, onClose }: { open: boolean; onClose: () =>
           })}
         </div>
 
-        {kind === "task" ? (
           <>
             <Label>Wann?</Label>
             <Chips
@@ -245,42 +201,6 @@ export function NewEntrySheet({ open, onClose }: { open: boolean; onClose: () =>
               options={[{ id: "none" as const, label: "Nie" }, ...(Object.keys(recurrenceLabel) as Recurrence[]).map((r) => ({ id: r, label: recurrenceLabel[r] }))]}
             />
           </>
-        ) : (
-          <>
-            <Label>Wann?</Label>
-            <div className="flex items-center gap-2">
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="body glass flex-1 rounded-[12px] px-3 py-2" aria-label="Datum" />
-              {!allDay && <input type="time" value={start} onChange={(e) => setStart(e.target.value)} step={300} className="body glass tabular rounded-[12px] px-3 py-2" aria-label="Beginn" />}
-            </div>
-            <label className="mt-3 flex items-center justify-between">
-              <span className="body">Ganztägig</span>
-              <input type="checkbox" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} className="peer sr-only" />
-              <span
-                className="relative h-[31px] w-[51px] rounded-full"
-                style={{ background: allDay ? "var(--success)" : "color-mix(in oklab, var(--label) 14%, transparent)", transition: "background 200ms ease" }}
-                aria-hidden
-              >
-                <span
-                  className="absolute top-[2px] h-[27px] w-[27px] rounded-full bg-white"
-                  style={{ left: allDay ? 22 : 2, boxShadow: "0 3px 8px rgba(0,0,0,.15)", transition: "left 220ms cubic-bezier(0.3, 1.3, 0.5, 1)" }}
-                />
-              </span>
-            </label>
-            {!allDay && (
-              <>
-                <Label>Dauer</Label>
-                <Chips
-                  value={String(duration)}
-                  onChange={(v) => setDuration(Number(v))}
-                  options={[30, 60, 90, 120, 180].map((m) => ({ id: String(m), label: m < 60 ? `${m} Min.` : `${m / 60} Std.`.replace(".5 Std.", ",5 Std.") }))}
-                />
-                <p className="footnote tabular mt-2" style={{ color: "var(--label-2)" }}>
-                  {start} bis {addMinutes(start, duration)} Uhr
-                </p>
-              </>
-            )}
-          </>
-        )}
       </form>
     </div>
   );

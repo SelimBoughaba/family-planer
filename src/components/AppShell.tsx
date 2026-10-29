@@ -6,14 +6,13 @@ import { Ambient, Avatar, Card, ContextMenu, TabBar, useNow, type Tab } from "./
 import { TodayView } from "./TodayView";
 import { ShoppingView } from "./ShoppingView";
 import { NewEntrySheet } from "./NewEntrySheet";
+import { CalendarView } from "./CalendarView";
+import { EventEditor, type EditorTarget } from "./EventEditor";
+import { SubscribeSheet } from "./SubscribeSheet";
 import { ColorPicker, PersonPicker } from "./Onboarding";
-import { IconPerson } from "./icons";
+import { IconCalendar, IconPerson } from "./icons";
 
-const upcoming: Record<"kalender" | "essen" | "aufgaben", { title: string; text: string }> = {
-  kalender: {
-    title: "Kalender",
-    text: "Tag, Woche, Monat und Jahr. Termine per Ziehen verschieben, Dauer mit dem Drehrad einstellen, Abo-Link für den Apple Kalender.",
-  },
+const upcoming: Record<"essen" | "aufgaben", { title: string; text: string }> = {
   essen: {
     title: "Essen",
     text: "Rezepte sammeln, die Woche planen und Vorschläge aus euren eigenen Rezepten oder per KI bekommen.",
@@ -55,6 +54,8 @@ function Main() {
   const [filter, setFilter] = useState<string | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [editor, setEditor] = useState<EditorTarget | null>(null);
+  const [subscribe, setSubscribe] = useState(false);
   const now = useNow();
 
   useEffect(() => {
@@ -89,9 +90,27 @@ function Main() {
         </div>
       )}
 
-      {tab === "heute" && <TodayView now={now} filter={filter} setFilter={setFilter} onNew={() => setNewOpen(true)} onProfile={() => setProfileOpen(true)} />}
+      {tab === "heute" && (
+        <TodayView
+          now={now}
+          filter={filter}
+          setFilter={setFilter}
+          onNew={() => setNewOpen(true)}
+          onProfile={() => setProfileOpen(true)}
+          onOpenEvent={(occ) => setEditor({ mode: "edit", occ })}
+        />
+      )}
+      {tab === "kalender" && (
+        <CalendarView
+          now={now}
+          filter={filter}
+          setFilter={setFilter}
+          onOpen={(occ) => setEditor({ mode: "edit", occ })}
+          onNew={(start, allDay) => setEditor({ mode: "new", start, allDay })}
+        />
+      )}
       {tab === "einkauf" && <ShoppingView />}
-      {(tab === "kalender" || tab === "essen" || tab === "aufgaben") && (
+      {(tab === "essen" || tab === "aufgaben") && (
         <div className="mx-auto max-w-md px-4 safe-top safe-bottom">
           <h1 className="large-title mb-4">{upcoming[tab].title}</h1>
           <Card className="p-5">
@@ -104,7 +123,17 @@ function Main() {
       )}
 
       <TabBar tab={tab} onChange={setTab} badge={{ einkauf: openItems }} />
-      <NewEntrySheet open={newOpen} onClose={() => setNewOpen(false)} />
+      <NewEntrySheet
+        open={newOpen}
+        onClose={() => setNewOpen(false)}
+        onEvent={(title) => {
+          const s = new Date();
+          s.setMinutes(Math.ceil((s.getMinutes() + 1) / 15) * 15, 0, 0);
+          setEditor({ mode: "new", start: s, title });
+        }}
+      />
+      <EventEditor target={editor} onClose={() => setEditor(null)} />
+      <SubscribeSheet open={subscribe} onClose={() => setSubscribe(false)} />
       <ContextMenu
         open={profileOpen}
         onClose={() => setProfileOpen(false)}
@@ -122,6 +151,7 @@ function Main() {
           )
         }
         actions={[
+          { label: "Im Apple Kalender anzeigen", icon: <IconCalendar size={18} />, onSelect: () => setTimeout(() => setSubscribe(true), 50) },
           { label: "Profil wechseln", icon: <IconPerson size={18} />, onSelect: () => setMe(null) },
           { label: "Auf diesem Gerät abmelden", destructive: true, onSelect: () => void logout() },
         ]}

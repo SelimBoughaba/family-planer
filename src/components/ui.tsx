@@ -133,7 +133,7 @@ export function TabBar({ tab, onChange, badge }: { tab: Tab; onChange: (t: Tab) 
   );
 }
 
-export function PersonFilter({ selected, onToggle }: { selected: string | null; onToggle: (id: string) => void }) {
+export function PersonFilter({ selected, onToggle, compact }: { selected: string | null; onToggle: (id: string) => void; compact?: boolean }) {
   const { state } = useFamily();
   return (
     <div className="no-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4 pb-1">
@@ -151,11 +151,13 @@ export function PersonFilter({ selected, onToggle }: { selected: string | null; 
               className="rounded-full p-[2.5px]"
               style={{ boxShadow: selected === p.id ? `0 0 0 2px ${p.color ?? FALLBACK_COLOR}` : "none", transition: "box-shadow 200ms ease" }}
             >
-              <Avatar person={p} size={44} />
+              <Avatar person={p} size={compact ? 32 : 44} />
             </span>
-            <span className="caption" style={{ color: "var(--label-2)" }}>
-              {p.name}
-            </span>
+            {!compact && (
+              <span className="caption" style={{ color: "var(--label-2)" }}>
+                {p.name}
+              </span>
+            )}
           </button>
         );
       })}

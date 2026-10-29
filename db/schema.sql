@@ -68,3 +68,11 @@ alter table login_attempts enable row level security;
 insert into people (name, sort) values
   ('Selim', 1), ('Yasmina', 2), ('Samira', 3), ('Samir', 4), ('Denise', 5)
 on conflict (name) do nothing;
+
+-- Etappe 3: Wiederholungen und Kalender-Abo
+alter table events add column if not exists recurrence text;
+alter table events add column if not exists recurrence_until date;
+alter table events add column if not exists exdates timestamptz[] not null default '{}';
+create index if not exists events_series_idx on events (recurrence) where recurrence is not null;
+
+alter table people add column if not exists calendar_token text unique;

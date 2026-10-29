@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useFamily } from "@/lib/client/family";
-import { localDay, recurrenceLabel, type CalEvent, type Task } from "@/lib/types";
+import { localDay, recurrenceLabel, type Task } from "@/lib/types";
+import { addDays, occurrences, startOfDay, type Occurrence } from "@/lib/recurrence";
 import { Avatar, AvatarStack, Card, ContextMenu, PersonFilter, SectionTitle, type MenuAction } from "./ui";
 import { SwipeRow } from "./SwipeRow";
 import { IconCheck, IconClock, IconPin, IconPlus, IconRepeat, IconTrash, IconPerson } from "./icons";
@@ -60,13 +61,6 @@ function CountdownRing({ now, start, color }: { now: Date; start: Date; color: s
   );
 }
 
-function isToday(e: CalEvent, now: Date) {
-  const s = new Date(now);
-  s.setHours(0, 0, 0, 0);
-  const t = new Date(s);
-  t.setDate(t.getDate() + 1);
-  return new Date(e.startsAt) < t && new Date(e.endsAt) > s;
-}
 
 export function TodayView({
   now,
@@ -74,27 +68,24 @@ export function TodayView({
   setFilter,
   onNew,
   onProfile,
+  onOpenEvent,
 }: {
   now: Date;
   filter: string | null;
   setFilter: (id: string | null) => void;
   onNew: () => void;
   onProfile: () => void;
+  onOpenEvent: (o: Occurrence) => void;
 }) {
   const { state, run, person, color, me } = useFamily();
   const [menu, setMenu] = useState<Task | null>(null);
   const [assign, setAssign] = useState<Task | null>(null);
   const today = localDay(now);
 
-  const events = useMemo(
-    () =>
-      (state?.events ?? [])
-        .filter((e) => !filter || e.people.includes(filter))
-        .sort((a, b) => +new Date(a.startsAt) - +new Date(b.startsAt)),
-    [state?.events, filter],
-  );
-  const todays = events.filter((e) => isToday(e, now));
-  const next = events.find((e) => new Date(e.endsAt) > now);
+  const dayStart = +startOfDay(now);
+  const occ = useMemo(() => occurrences(state?.events ?? [], new Date(dayStart), addDays(new Date(dayStart), 14), filter), [state?.events, dayStart, filter]);
+  const todays = occ.filter((o) => +o.start < dayStart + 86400000);
+  const next = occ.find((o) => o.end > now && !(o.event.allDay && o.start <= now));
 
   const tasks = (state?.tasks ?? []).filter(
     (t) => (!filter || t.personId === filter) && (t.done ? t.doneAt && localDay(new Date(t.doneAt)) === today : !t.due || t.due <= today),
@@ -106,7 +97,7 @@ export function TodayView({
   const remove = (t: Task) => run({ op: "task.delete", id: t.id });
 
   const dateLabel = now.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" });
-  const nowIndex = todays.findIndex((e) => new Date(e.startsAt) > now);
+  const nowIndex = todays.findIndex((o) => o.start > now);
 
   const taskActions = (t: Task): MenuAction[] => [
     { label: t.done ? "Wieder öffnen" : "Erledigt", icon: <IconCheck size={18} />, onSelect: () => toggle(t) },
@@ -138,22 +129,22 @@ export function TodayView({
 
       {next ? (
         <Card className="mt-5 p-4">
-          <div className="flex items-center gap-4">
-            <CountdownRing now={now} start={new Date(next.startsAt)} color={color(next.people[0])} />
+          <button onClick={() => onOpenEvent(next)} className="flex w-full items-center gap-4 text-left">
+            <CountdownRing now={now} start={next.start} color={color(next.event.people[0])} />
             <div className="min-w-0 flex-1">
-              <p className="footnote font-semibold" style={{ color: color(next.people[0]) }}>
-                Als Nächstes, {untilLabel(now, new Date(next.startsAt))}
+              <p className="footnote font-semibold" style={{ color: color(next.event.people[0]) }}>
+                Als Nächstes, {untilLabel(now, next.start)}
               </p>
-              <p className="headline mt-0.5 truncate">{next.title}</p>
+              <p className="headline mt-0.5 truncate">{next.event.title}</p>
               <p className="subhead tabular mt-0.5" style={{ color: "var(--label-2)" }}>
-                {next.allDay ? "Ganztägig" : `${time(new Date(next.startsAt))} bis ${time(new Date(next.endsAt))}`}
+                {next.event.allDay ? "Ganztägig" : `${next.start.toLocaleDateString("de-DE") === now.toLocaleDateString("de-DE") ? "" : `${next.start.toLocaleDateString("de-DE", { weekday: "short" })}, `}${time(next.start)} bis ${time(next.end)}`}
               </p>
             </div>
-            <AvatarStack ids={next.people.slice(0, 3)} />
-          </div>
-          {next.place && (
+            <AvatarStack ids={next.event.people.slice(0, 3)} />
+          </button>
+          {next.event.place && (
             <p className="footnote mt-3 flex items-center gap-1.5 border-t pt-3" style={{ color: "var(--label-2)", borderColor: "var(--separator)" }}>
-              <IconPin /> {next.place}
+              <IconPin /> {next.event.place}
             </p>
           )}
         </Card>
@@ -170,10 +161,11 @@ export function TodayView({
         <>
           <SectionTitle>Tagesablauf</SectionTitle>
           <Card className="px-4 py-1">
-            {todays.map((e, i) => {
-              const past = new Date(e.endsAt) <= now;
+            {todays.map((o, i) => {
+              const e = o.event;
+              const past = o.end <= now;
               return (
-                <div key={e.id}>
+                <div key={o.key}>
                   {i === nowIndex && (
                     <div className="relative my-1 flex items-center" aria-label="Jetzt">
                       <span className="h-2 w-2 rounded-full" style={{ background: "var(--danger)" }} />
@@ -183,12 +175,13 @@ export function TodayView({
                       </span>
                     </div>
                   )}
-                  <div
-                    className="flex items-center gap-3 py-3"
+                  <button
+                    onClick={() => onOpenEvent(o)}
+                    className="flex w-full items-center gap-3 py-3 text-left"
                     style={{ opacity: past ? 0.42 : 1, borderTop: i && i !== nowIndex ? "0.5px solid var(--separator)" : "none" }}
                   >
                     <span className="subhead tabular w-12 shrink-0 font-medium" style={{ color: "var(--label-2)" }}>
-                      {e.allDay ? "Ganzt." : time(new Date(e.startsAt))}
+                      {e.allDay ? "Ganzt." : time(o.start)}
                     </span>
                     <span className="flex h-9 w-1 shrink-0 flex-col overflow-hidden rounded-full">
                       {(e.people.length ? e.people : [null]).map((id, k) => (
@@ -204,7 +197,7 @@ export function TodayView({
                       )}
                     </div>
                     <AvatarStack ids={e.people.slice(0, 3)} size={20} />
-                  </div>
+                  </button>
                 </div>
               );
             })}

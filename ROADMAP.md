@@ -3,9 +3,9 @@
 ## Erledigt
 - Etappe 1: Look-Prototyp (Liquid Glass, Gesten, Hell/Dunkel)
 - Etappe 2: Datenbank (Supabase Frankfurt), Familienpasswort, Profile mit Farbwahl, Heute und Einkauf mit echten Daten, Live-Synchronisierung
+- Etappe 3: Kalender (Tag, Woche, Monat, Ziehen zum Verschieben und Verlängern, Drehrad, Wiederholungen mit Ausnahmen, Bearbeiten/Löschen, Abo für Apple Kalender pro Person)
 
 ## Als Nächstes
-- Etappe 3: Kalender (Woche, Monat, Tag, Ziehen zum Verschieben, Drehrad, Wiederholungen, Bearbeiten, Abo-Link für Apple Kalender)
 - Etappe 4: Erinnerungen per Push, Zeitplaner (hält Supabase zugleich aktiv)
 - Etappe 5: Essen (Rezepte, Wochenplan, Zutaten auf die Liste, KI-Vorschläge mit Monatslimit)
 - Aufgaben-Tab: alle Aufgaben nach Bereich und Person, Dienstplan reihum
