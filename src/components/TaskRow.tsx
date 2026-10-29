@@ -55,7 +55,7 @@ export function TaskRow({
       trailing={t.done ? undefined : { label: "Morgen", color: "#FF9F0A", icon: <IconClock size={18} />, onTrigger: () => run({ op: "task.postpone", id: t.id, today }) }}
       onLongPress={() => onMenu(t)}
     >
-      <div className="flex items-center gap-3 px-4 py-3" style={{ borderTop: first ? "none" : "0.5px solid var(--separator)" }}>
+      <div data-task-id={t.id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: first ? "none" : "0.5px solid var(--separator)", transition: "background 150ms ease" }}>
         <button
           onClick={toggle}
           className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full"
@@ -150,4 +150,16 @@ export function useTaskMenus(onEdit: (t: Task) => void) {
   );
 
   return { openMenu: setMenu, menus };
+}
+
+/** Profilbild auf eine Aufgabe fallen lassen: diese Person ist zuständig */
+export function useAssignDrop() {
+  const { state, run } = useFamily();
+  return (personId: string, taskId: string) => {
+    const t = state?.tasks.find((x) => x.id === taskId);
+    if (!t || t.personId === personId) return;
+    // im Dienstplan nur Personen, die mitmachen
+    if (t.rotation.length >= 2 && !t.rotation.includes(personId)) return;
+    void run({ op: "task.assign", id: taskId, personId });
+  };
 }

@@ -282,6 +282,9 @@ export async function mutate(m: Mutation, by: string | null): Promise<string> {
     case "item.toggle":
       await sql`update shopping_items set done = ${!!m.done}, done_at = ${m.done ? sql`now()` : null} where id = ${uuid(m.id)!}`;
       return "items";
+    case "item.setAmount":
+      await sql`update shopping_items set amount = ${str(m.amount, 40, true)} where id = ${uuid(m.id)!}`;
+      return "items";
     case "item.move": {
       if (!(await getLists()).categories.includes(m.category)) throw new InvalidInput("Unbekannte Abteilung");
       await sql`update shopping_items set category = ${m.category} where id = ${uuid(m.id)!}`;

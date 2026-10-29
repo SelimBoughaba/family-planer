@@ -142,6 +142,7 @@ export type Mutation =
   | { op: "item.create"; name: string; amount: string | null; category: string }
   | { op: "item.toggle"; id: string; done: boolean }
   | { op: "item.move"; id: string; category: string }
+  | { op: "item.setAmount"; id: string; amount: string | null }
   | { op: "item.delete"; id: string }
   | { op: "item.clearDone" }
   | { op: "item.createMany"; items: { name: string; amount: string | null; category: string }[] }

@@ -4,14 +4,26 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useFamily } from "@/lib/client/family";
 import { addDays, sameDay, startOfDay, type Occurrence } from "@/lib/recurrence";
 
-export const HOUR = 52;
+const DEFAULT_HOUR = 52;
+const MIN_HOUR = 30;
+const MAX_HOUR = 150;
+const HOUR_KEY = "fp_hour";
+
+function storedHour() {
+  try {
+    const v = Number(localStorage.getItem(HOUR_KEY));
+    return v >= MIN_HOUR && v <= MAX_HOUR ? v : DEFAULT_HOUR;
+  } catch {
+    return DEFAULT_HOUR;
+  }
+}
 const SNAP = 15; // Minuten
 const LONG_PRESS = 320;
 
 type Placed = { occ: Occurrence; top: number; height: number; col: number; cols: number };
 
 /** Überlappende Termine nebeneinander anordnen */
-function layout(list: Occurrence[], day: Date): Placed[] {
+function layout(list: Occurrence[], day: Date, HOUR: number): Placed[] {
   const d0 = +startOfDay(day);
   const items = list
     .map((occ) => {
@@ -86,6 +98,13 @@ export function TimeGrid({
   const swipe = useRef<{ x: number; y: number; t: number } | null>(null);
   const suppressClick = useRef(false);
   const compact = days.length > 3;
+  // Stundenhöhe: mit zwei Fingern zoomen, pro Gerät gemerkt
+  const [HOUR, setHour] = useState(storedHour);
+  const hourRef = useRef(HOUR);
+  useEffect(() => {
+    hourRef.current = HOUR;
+  }, [HOUR]);
+  const pinch = useRef<{ dist: number; hour: number; minute: number; midY: number } | null>(null);
 
   // beim ersten Anzeigen zur aktuellen Uhrzeit bzw. 7 Uhr scrollen
   useLayoutEffect(() => {
@@ -107,9 +126,10 @@ export function TimeGrid({
         return layout(
           timed.filter((o) => o.end > s && o.start < e),
           d,
+          HOUR,
         );
       }),
-    [days, timed],
+    [days, timed, HOUR],
   );
 
   const colWidth = () => (cols.current ? cols.current.getBoundingClientRect().width / days.length : 50);
@@ -182,11 +202,52 @@ export function TimeGrid({
   useEffect(() => {
     const el = scroller.current;
     if (!el) return;
-    const block = (e: TouchEvent) => {
-      if (dragging.current) e.preventDefault();
+    const dist = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    const start = (e: TouchEvent) => {
+      if (e.touches.length !== 2 || dragging.current) return;
+      cancelPress();
+      const r = el.getBoundingClientRect();
+      const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - r.top;
+      // Minute unter den Fingern bleibt beim Zoomen an Ort und Stelle
+      pinch.current = { dist: dist(e.touches), hour: hourRef.current, minute: ((el.scrollTop + midY) / hourRef.current) * 60, midY };
     };
-    el.addEventListener("touchmove", block, { passive: false });
-    return () => el.removeEventListener("touchmove", block);
+    const move = (e: TouchEvent) => {
+      if (dragging.current) return e.preventDefault();
+      const p = pinch.current;
+      if (!p || e.touches.length !== 2) return;
+      e.preventDefault();
+      const next = Math.round(Math.min(MAX_HOUR, Math.max(MIN_HOUR, (p.hour * dist(e.touches)) / p.dist)));
+      if (next === hourRef.current) return;
+      hourRef.current = next;
+      setHour(next);
+      requestAnimationFrame(() => {
+        el.scrollTop = (p.minute / 60) * next - p.midY;
+      });
+    };
+    const end = (e: TouchEvent) => {
+      if (!pinch.current || e.touches.length >= 2) return;
+      pinch.current = null;
+      suppressClick.current = true;
+      try {
+        localStorage.setItem(HOUR_KEY, String(hourRef.current));
+      } catch {}
+    };
+    // Safari: eigenes Seiten-Zoomen beim Zwei-Finger-Griff verhindern
+    const gesture = (e: Event) => e.preventDefault();
+    el.addEventListener("touchstart", start, { passive: true });
+    el.addEventListener("touchmove", move, { passive: false });
+    el.addEventListener("touchend", end);
+    el.addEventListener("touchcancel", end);
+    el.addEventListener("gesturestart", gesture);
+    el.addEventListener("gesturechange", gesture);
+    return () => {
+      el.removeEventListener("touchstart", start);
+      el.removeEventListener("touchmove", move);
+      el.removeEventListener("touchend", end);
+      el.removeEventListener("touchcancel", end);
+      el.removeEventListener("gesturestart", gesture);
+      el.removeEventListener("gesturechange", gesture);
+    };
   }, []);
 
   useEffect(() => {
@@ -202,7 +263,7 @@ export function TimeGrid({
   const onGridUp = (e: React.PointerEvent) => {
     const s = swipe.current;
     swipe.current = null;
-    if (!s || drag) return;
+    if (!s || drag || pinch.current) return;
     const dx = e.clientX - s.x;
     const dy = e.clientY - s.y;
     if (Math.abs(dx) > 70 && Math.abs(dx) > 2 * Math.abs(dy) && Date.now() - s.t < 600) {

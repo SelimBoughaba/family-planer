@@ -31,11 +31,7 @@ export async function snapshot(): Promise<Snapshot> {
       throw new Error(`Sicherung, Schritt ${name}: ${(err as Error).message}`);
     }
   };
-  const people = await step(
-    "Personen",
-    () =>
-      sql`select id, name, color, sort, notify_prefs, created_at from people order by sort`,
-  );
+  const people = await step("Personen", () => sql`select id, name, color, sort, notify_prefs, created_at from people order by sort`);
   const events = await step(
     "Termine",
     () =>
@@ -43,28 +39,15 @@ export async function snapshot(): Promise<Snapshot> {
   );
   const tasks = await step(
     "Aufgaben",
-    () =>
-      sql`select id, title, area, person_id, due::text as due, recurring, remind_time::text as remind_time, rotation, done, done_at, created_by, created_at from tasks`,
+    () => sql`select id, title, area, person_id, due::text as due, recurring, remind_time::text as remind_time, rotation, done, done_at, created_by, created_at from tasks`,
   );
-  const items = await step(
-    "Einkauf",
-    () =>
-      sql`select id, name, amount, category, added_by, done, done_at, created_at from shopping_items`,
-  );
-  const lists = await step(
-    "Listen",
-    () => sql`select value from app_meta where key = 'lists'`,
-  );
+  const items = await step("Einkauf", () => sql`select id, name, amount, category, added_by, done, done_at, created_at from shopping_items`);
+  const lists = await step("Listen", () => sql`select value from app_meta where key = 'lists'`);
   const recipes = await step(
     "Rezepte",
-    () =>
-      sql`select id, title, description, servings, minutes, ingredients, steps, tags, source_url, favorite, created_by, created_at, updated_at from recipes`,
+    () => sql`select id, title, description, servings, minutes, ingredients, steps, tags, source_url, favorite, created_by, created_at, updated_at from recipes`,
   );
-  const meals = await step(
-    "Wochenplan",
-    () =>
-      sql`select id, day::text as day, recipe_id, title, cook, note, created_by, created_at from meal_plan`,
-  );
+  const meals = await step("Wochenplan", () => sql`select id, day::text as day, recipe_id, title, cook, note, created_by, created_at from meal_plan`);
   return {
     app: "familienplaner",
     version: BACKUP_VERSION,
@@ -91,8 +74,7 @@ export async function saveBackup(kind: "auto" | "manual" | "before-restore") {
       await tx`set local statement_timeout = '15s'`;
       await tx`set local lock_timeout = '5s'`;
       // als Text übergeben und in der Datenbank umwandeln, damit die Daten nicht als Parameter-Objekt durch den Pooler müssen
-      const [r] =
-        await tx`insert into backups (kind, data, size_bytes) values (${kind}, ${JSON.stringify(data)}::text::jsonb, ${size}) returning id, created_at`;
+      const [r] = await tx`insert into backups (kind, data, size_bytes) values (${kind}, ${JSON.stringify(data)}::text::jsonb, ${size}) returning id, created_at`;
       // automatische Sicherungen begrenzen, manuelle bleiben bis zum Löschen
       await tx`delete from backups where kind = 'auto' and id not in (select id from backups where kind = 'auto' order by created_at desc limit ${KEEP_AUTO})`;
       await tx`delete from backups where kind = 'before-restore' and created_at < now() - interval '30 days'`;
@@ -111,37 +93,21 @@ export async function maybeAutoBackup() {
   // Stunde über die Zeitzonen-Bausteine, nicht als Text: „15 Uhr“ ergäbe keine Zahl und hebelte das Fenster aus
   const hour = wall(Date.now()).h;
   if (!Number.isFinite(hour) || hour < 2 || hour >= 5) return null;
-  const [last] =
-    await sql`select created_at from backups where kind = 'auto' order by created_at desc limit 1`.catch(
-      (err: Error) => {
-        throw new Error(`Sicherung, Schritt letzte Sicherung: ${err.message}`);
-      },
-    );
-  if (
-    last &&
-    Date.now() - +new Date(last.created_at as string) < 23.5 * 3600000
-  )
-    return null;
+  const [last] = await sql`select created_at from backups where kind = 'auto' order by created_at desc limit 1`.catch((err: Error) => {
+    throw new Error(`Sicherung, Schritt letzte Sicherung: ${err.message}`);
+  });
+  if (last && Date.now() - +new Date(last.created_at as string) < 23.5 * 3600000) return null;
   return saveBackup("auto");
 }
 
 function validate(data: unknown): Snapshot {
   const d = data as Snapshot;
-  if (
-    !d ||
-    d.app !== "familienplaner" ||
-    typeof d.version !== "number" ||
-    !d.tables
-  )
-    throw new Error("Das ist keine Sicherung des Familienplaners.");
-  if (d.version > BACKUP_VERSION)
-    throw new Error("Die Sicherung stammt aus einer neueren Version.");
+  if (!d || d.app !== "familienplaner" || typeof d.version !== "number" || !d.tables) throw new Error("Das ist keine Sicherung des Familienplaners.");
+  if (d.version > BACKUP_VERSION) throw new Error("Die Sicherung stammt aus einer neueren Version.");
   for (const t of ["people", "events", "tasks", "shopping_items"] as const) {
-    if (!Array.isArray(d.tables[t]))
-      throw new Error(`In der Sicherung fehlt ${t}.`);
+    if (!Array.isArray(d.tables[t])) throw new Error(`In der Sicherung fehlt ${t}.`);
   }
-  if (!d.tables.people.length)
-    throw new Error("Die Sicherung enthält keine Personen.");
+  if (!d.tables.people.length) throw new Error("Die Sicherung enthält keine Personen.");
   return d;
 }
 

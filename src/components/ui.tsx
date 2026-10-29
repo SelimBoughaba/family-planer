@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Person } from "@/lib/types";
 import { FALLBACK_COLOR } from "@/lib/types";
 import { useFamily } from "@/lib/client/family";
@@ -129,8 +129,75 @@ export function TabBar({ tab, onChange, badge }: { tab: Tab; onChange: (t: Tab) 
   );
 }
 
-export function PersonFilter({ selected, onToggle, compact }: { selected: string | null; onToggle: (id: string) => void; compact?: boolean }) {
+export function PersonFilter({
+  selected,
+  onToggle,
+  compact,
+  onDrop,
+}: {
+  selected: string | null;
+  onToggle: (id: string) => void;
+  compact?: boolean;
+  /** Profilbild lange drücken und auf ein Element mit data-task-id ziehen */
+  onDrop?: (personId: string, taskId: string) => void;
+}) {
   const { state } = useFamily();
+  const [drag, setDrag] = useState<{ person: Person; x: number; y: number } | null>(null);
+  const press = useRef<{ id: number; x: number; y: number; timer: ReturnType<typeof setTimeout> } | null>(null);
+  const hover = useRef<HTMLElement | null>(null);
+  const suppress = useRef(false);
+
+  // während des Ziehens darf die Seite nicht scrollen
+  useEffect(() => {
+    if (!drag) return;
+    const block = (e: TouchEvent) => e.preventDefault();
+    document.addEventListener("touchmove", block, { passive: false });
+    return () => document.removeEventListener("touchmove", block);
+  }, [drag]);
+
+  const setHover = (el: HTMLElement | null) => {
+    if (hover.current === el) return;
+    hover.current?.classList.remove("drop-hover");
+    el?.classList.add("drop-hover");
+    hover.current = el;
+  };
+
+  const down = (p: Person) => (e: React.PointerEvent) => {
+    if (!onDrop) return;
+    const target = e.currentTarget as HTMLElement;
+    const id = e.pointerId;
+    const timer = setTimeout(() => {
+      try {
+        target.setPointerCapture(id);
+      } catch {}
+      suppress.current = true;
+      setDrag({ person: p, x: press.current?.x ?? e.clientX, y: press.current?.y ?? e.clientY });
+    }, 380);
+    press.current = { id, x: e.clientX, y: e.clientY, timer };
+  };
+  const move = (e: React.PointerEvent) => {
+    const pr = press.current;
+    if (pr && !drag && (Math.abs(e.clientX - pr.x) > 8 || Math.abs(e.clientY - pr.y) > 8)) {
+      clearTimeout(pr.timer);
+      press.current = null;
+      return;
+    }
+    if (pr) pr.x = e.clientX;
+    if (pr) pr.y = e.clientY;
+    if (!drag) return;
+    setDrag({ ...drag, x: e.clientX, y: e.clientY });
+    const el = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>("[data-task-id]") ?? null;
+    setHover(el);
+  };
+  const up = () => {
+    if (press.current) clearTimeout(press.current.timer);
+    press.current = null;
+    if (drag && hover.current && onDrop) onDrop(drag.person.id, hover.current.dataset.taskId!);
+    setHover(null);
+    setDrag(null);
+    setTimeout(() => (suppress.current = false), 60);
+  };
+
   return (
     <div className="no-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4 pb-1">
       {(state?.people ?? []).map((p) => {
@@ -138,14 +205,26 @@ export function PersonFilter({ selected, onToggle, compact }: { selected: string
         return (
           <button
             key={p.id}
-            onClick={() => onToggle(p.id)}
-            className="press flex flex-col items-center gap-1"
-            style={{ opacity: dim ? 0.35 : 1, transition: "opacity 200ms ease" }}
+            onClick={() => !suppress.current && onToggle(p.id)}
+            onPointerDown={down(p)}
+            onPointerMove={move}
+            onPointerUp={up}
+            onPointerCancel={up}
+            onContextMenu={(e) => onDrop && e.preventDefault()}
+            className="press flex flex-col items-center gap-1 select-none"
+            style={{
+              opacity: dim ? 0.35 : drag?.person.id === p.id ? 0.3 : 1,
+              transition: "opacity 200ms ease",
+              WebkitTouchCallout: "none",
+            }}
             aria-pressed={selected === p.id}
           >
             <span
               className="rounded-full p-[2.5px]"
-              style={{ boxShadow: selected === p.id ? `0 0 0 2px ${p.color ?? FALLBACK_COLOR}` : "none", transition: "box-shadow 200ms ease" }}
+              style={{
+                boxShadow: selected === p.id ? `0 0 0 2px ${p.color ?? FALLBACK_COLOR}` : "none",
+                transition: "box-shadow 200ms ease",
+              }}
             >
               <Avatar person={p} size={compact ? 32 : 44} />
             </span>
@@ -157,6 +236,11 @@ export function PersonFilter({ selected, onToggle, compact }: { selected: string
           </button>
         );
       })}
+      {drag && (
+        <div className="pointer-events-none fixed z-[60]" style={{ left: drag.x - 28, top: drag.y - 64, filter: "drop-shadow(0 10px 18px rgba(0,0,0,.35))", transform: "scale(1.15)" }} aria-hidden>
+          <Avatar person={drag.person} size={56} />
+        </div>
+      )}
     </div>
   );
 }
@@ -174,20 +258,15 @@ export function SectionTitle({ children, trailing }: { children: ReactNode; trai
   );
 }
 
-export type MenuAction = { label: string; icon?: ReactNode; destructive?: boolean; onSelect: () => void };
+export type MenuAction = {
+  label: string;
+  icon?: ReactNode;
+  destructive?: boolean;
+  onSelect: () => void;
+};
 
 /** Kontextmenü nach langem Drücken, mit Vorschau des Elements */
-export function ContextMenu({
-  open,
-  onClose,
-  preview,
-  actions,
-}: {
-  open: boolean;
-  onClose: () => void;
-  preview: ReactNode;
-  actions: MenuAction[];
-}) {
+export function ContextMenu({ open, onClose, preview, actions }: { open: boolean; onClose: () => void; preview: ReactNode; actions: MenuAction[] }) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -200,12 +279,19 @@ export function ContextMenu({
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 px-6" role="dialog" aria-modal>
       <button
         className="fade-in absolute inset-0 cursor-default"
-        style={{ background: "rgba(0,0,0,.18)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)" }}
+        style={{
+          background: "rgba(0,0,0,.18)",
+          backdropFilter: "blur(14px)",
+          WebkitBackdropFilter: "blur(14px)",
+        }}
         onClick={onClose}
         aria-label="Schließen"
       />
       <div className="sheet-in glass glass-strong relative w-full max-w-sm rounded-[22px] p-4">{preview}</div>
-      <div className="sheet-in glass glass-strong relative max-h-[55dvh] w-full max-w-[260px] self-start overflow-y-auto rounded-[18px] sm:self-center" style={{ animationDelay: "40ms" }}>
+      <div
+        className="sheet-in glass glass-strong relative max-h-[55dvh] w-full max-w-[260px] self-start overflow-y-auto rounded-[18px] sm:self-center"
+        style={{ animationDelay: "40ms" }}
+      >
         {actions.map((a, i) => (
           <button
             key={a.label}
@@ -220,7 +306,13 @@ export function ContextMenu({
             }}
           >
             {a.label}
-            <span style={{ color: a.destructive ? "var(--danger)" : "var(--label-2)" }}>{a.icon}</span>
+            <span
+              style={{
+                color: a.destructive ? "var(--danger)" : "var(--label-2)",
+              }}
+            >
+              {a.icon}
+            </span>
           </button>
         ))}
       </div>
@@ -316,4 +408,32 @@ export function FieldLabel({ children }: { children: ReactNode }) {
       {children}
     </p>
   );
+}
+
+/** Kurz tippen oder lange drücken auf demselben Knopf */
+export function useLongPress(onLong: () => void, onTap: () => void, ms = 420) {
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fired = useRef(false);
+  const clear = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+  };
+  return {
+    onPointerDown: () => {
+      fired.current = false;
+      clear();
+      timer.current = setTimeout(() => {
+        fired.current = true;
+        onLong();
+      }, ms);
+    },
+    onPointerUp: clear,
+    onPointerLeave: clear,
+    onPointerCancel: clear,
+    onContextMenu: (e: { preventDefault: () => void }) => e.preventDefault(),
+    onClick: () => {
+      if (fired.current) return;
+      onTap();
+    },
+  };
 }

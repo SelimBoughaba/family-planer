@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { useFamily } from "@/lib/client/family";
 import { localDay, recurrenceLabel, type Task } from "@/lib/types";
-import { Avatar, Card, PersonFilter, SectionTitle } from "./ui";
-import { TaskRow, dueLabel, useTaskMenus } from "./TaskRow";
+import { Avatar, Card, PersonFilter, SectionTitle, useLongPress } from "./ui";
+import { TaskRow, dueLabel, useAssignDrop, useTaskMenus } from "./TaskRow";
 import { IconPlus } from "./icons";
 
 type Mode = "zeit" | "bereich" | "dienstplan";
@@ -25,14 +25,18 @@ export function TasksView({
   filter,
   setFilter,
   onNew,
+  onQuick,
   onEdit,
 }: {
   filter: string | null;
   setFilter: (id: string | null) => void;
   onNew: () => void;
+  onQuick: () => void;
   onEdit: (t: Task) => void;
 }) {
   const { state, person, color } = useFamily();
+  const plusPress = useLongPress(onQuick, onNew);
+  const assignDrop = useAssignDrop();
   const [mode, setMode] = useState<Mode>("zeit");
   const [showDone, setShowDone] = useState(false);
   const { openMenu, menus } = useTaskMenus(onEdit);
@@ -54,7 +58,10 @@ export function TasksView({
       { title: "Überfällig", test: (t) => !!t.due && t.due < today },
       { title: "Heute", test: (t) => t.due === today },
       { title: "Morgen", test: (t) => t.due === tomorrow },
-      { title: "Nächste 7 Tage", test: (t) => !!t.due && t.due > tomorrow && t.due <= week },
+      {
+        title: "Nächste 7 Tage",
+        test: (t) => !!t.due && t.due > tomorrow && t.due <= week,
+      },
       { title: "Später", test: (t) => !!t.due && t.due > week },
       { title: "Irgendwann", test: (t) => !t.due },
     ];
@@ -65,7 +72,10 @@ export function TasksView({
   // erledigte Aufgaben der letzten sieben Tage pro Person, als kleine Balken
   const tally = (() => {
     const people = state?.people ?? [];
-    const counts = people.map((p) => ({ p, n: all.filter((t) => t.done && t.personId === p.id).length }));
+    const counts = people.map((p) => ({
+      p,
+      n: all.filter((t) => t.done && t.personId === p.id).length,
+    }));
     const max = Math.max(1, ...counts.map((c) => c.n));
     return { counts, max };
   })();
@@ -81,14 +91,24 @@ export function TasksView({
           </p>
           <h1 className="large-title">Aufgaben</h1>
         </div>
-        <button onClick={onNew} className="press glass flex h-11 w-11 items-center justify-center rounded-full" aria-label="Neue Aufgabe" style={{ color: "var(--tint)" }}>
+        <button
+          {...plusPress}
+          className="press glass flex h-11 w-11 items-center justify-center rounded-full select-none"
+          aria-label="Neue Aufgabe"
+          style={{ color: "var(--tint)" }}
+        >
           <IconPlus size={22} />
         </button>
       </header>
 
-      <PersonFilter selected={filter} onToggle={(id) => setFilter(filter === id ? null : id)} />
+      <PersonFilter selected={filter} onToggle={(id) => setFilter(filter === id ? null : id)} onDrop={assignDrop} />
 
-      <div className="relative mt-4 flex rounded-[10px] p-[2px]" style={{ background: "color-mix(in oklab, var(--label) 8%, transparent)" }}>
+      <div
+        className="relative mt-4 flex rounded-[10px] p-[2px]"
+        style={{
+          background: "color-mix(in oklab, var(--label) 8%, transparent)",
+        }}
+      >
         <span
           className="absolute top-[2px] bottom-[2px] rounded-[8px]"
           style={{
@@ -125,18 +145,34 @@ export function TasksView({
                 const k = t.rotation.indexOf(t.personId ?? "");
                 const order = t.rotation.map((_, i) => t.rotation[(Math.max(k, 0) + i) % t.rotation.length]);
                 return (
-                  <button key={t.id} onClick={() => onEdit(t)} onContextMenu={(e) => {
+                  <button
+                    key={t.id}
+                    onClick={() => onEdit(t)}
+                    onContextMenu={(e) => {
                       e.preventDefault();
                       openMenu(t);
-                    }} className="press glass rounded-[20px] p-4 text-left">
+                    }}
+                    className="press glass rounded-[20px] p-4 text-left"
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="headline truncate">{t.title}</p>
-                        <p className="footnote" style={{ color: t.due && t.due < today ? "var(--danger)" : "var(--label-2)" }}>
+                        <p
+                          className="footnote"
+                          style={{
+                            color: t.due && t.due < today ? "var(--danger)" : "var(--label-2)",
+                          }}
+                        >
                           {[dueLabel(t.due, today), t.recurring ? recurrenceLabel[t.recurring] : null, t.area].filter(Boolean).join(", ")}
                         </p>
                       </div>
-                      <span className="caption shrink-0 rounded-full px-2 py-0.5 font-semibold" style={{ background: `color-mix(in oklab, ${color(t.personId)} 18%, transparent)`, color: color(t.personId) }}>
+                      <span
+                        className="caption shrink-0 rounded-full px-2 py-0.5 font-semibold"
+                        style={{
+                          background: `color-mix(in oklab, ${color(t.personId)} 18%, transparent)`,
+                          color: color(t.personId),
+                        }}
+                      >
                         {person(t.personId)?.name ?? "?"} ist dran
                       </span>
                     </div>
@@ -146,7 +182,13 @@ export function TasksView({
                           {i > 0 && <span className="mt-[14px] h-px w-3" style={{ background: "var(--separator)" }} aria-hidden />}
                           <span className="flex w-[60px] flex-col items-center gap-1" style={{ opacity: i === 0 ? 1 : 0.6 }}>
                             <Avatar person={person(id)} size={i === 0 ? 30 : 26} />
-                            <span className="caption max-w-full truncate" style={{ color: i === 0 ? "var(--label)" : "var(--label-2)", fontWeight: i === 0 ? 600 : 400 }}>
+                            <span
+                              className="caption max-w-full truncate"
+                              style={{
+                                color: i === 0 ? "var(--label)" : "var(--label-2)",
+                                fontWeight: i === 0 ? 600 : 400,
+                              }}
+                            >
                               {person(id)?.name}
                             </span>
                           </span>
@@ -165,7 +207,15 @@ export function TasksView({
               {tally.counts.map(({ p, n }) => (
                 <div key={p.id} className="flex flex-1 flex-col items-center justify-end gap-1.5" style={{ height: "100%" }}>
                   <span className="caption tabular font-semibold">{n}</span>
-                  <span className="w-full max-w-[28px] rounded-[7px]" style={{ height: `${Math.max(6, (n / tally.max) * 56)}px`, background: color(p.id), opacity: n ? 1 : 0.25, transition: "height 400ms ease" }} />
+                  <span
+                    className="w-full max-w-[28px] rounded-[7px]"
+                    style={{
+                      height: `${Math.max(6, (n / tally.max) * 56)}px`,
+                      background: color(p.id),
+                      opacity: n ? 1 : 0.25,
+                      transition: "height 400ms ease",
+                    }}
+                  />
                 </div>
               ))}
             </div>
@@ -200,11 +250,26 @@ export function TasksView({
                   </span>
                 }
               >
-                <span style={{ color: g.title === "Überfällig" ? "var(--danger)" : undefined }}>{g.title}</span>
+                <span
+                  style={{
+                    color: g.title === "Überfällig" ? "var(--danger)" : undefined,
+                  }}
+                >
+                  {g.title}
+                </span>
               </SectionTitle>
               <Card className="overflow-hidden">
                 {g.items.map((t, i) => (
-                  <TaskRow key={t.id} task={t} first={i === 0} today={today} onEdit={onEdit} onMenu={openMenu} showDue={mode === "bereich" || g.title === "Nächste 7 Tage" || g.title === "Später"} showArea={mode !== "bereich"} />
+                  <TaskRow
+                    key={t.id}
+                    task={t}
+                    first={i === 0}
+                    today={today}
+                    onEdit={onEdit}
+                    onMenu={openMenu}
+                    showDue={mode === "bereich" || g.title === "Nächste 7 Tage" || g.title === "Später"}
+                    showArea={mode !== "bereich"}
+                  />
                 ))}
               </Card>
             </section>
@@ -228,7 +293,7 @@ export function TasksView({
             </>
           )}
           <p className="caption mt-2 px-1" style={{ color: "var(--label-3)" }}>
-            Nach rechts wischen erledigt, nach links verschiebt auf morgen, antippen bearbeitet, lange drücken zeigt mehr.
+            Nach rechts wischen erledigt, nach links verschiebt auf morgen, antippen bearbeitet, lange drücken zeigt mehr. Ein Profilbild oben lange drücken und auf eine Aufgabe ziehen gibt sie dieser Person.
           </p>
         </>
       )}

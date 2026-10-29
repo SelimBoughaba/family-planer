@@ -6,14 +6,16 @@ import { guessCategory, parseItem } from "@/lib/shopping";
 import type { Item } from "@/lib/types";
 import { Avatar, Card, ContextMenu } from "./ui";
 import { SwipeRow } from "./SwipeRow";
+import { AmountDial } from "./AmountDial";
 import { IconCheck, IconPlus, IconTrash, IconChevron } from "./icons";
 
-export function ShoppingView() {
+export function ShoppingView({ focus = false }: { focus?: boolean }) {
   const { state, run, person } = useFamily();
   const [draft, setDraft] = useState("");
   const [showDone, setShowDone] = useState(false);
   const [menu, setMenu] = useState<Item | null>(null);
   const [moveFor, setMoveFor] = useState<Item | null>(null);
+  const [dial, setDial] = useState<Item | null>(null);
 
   const items = state?.items ?? [];
   const categories = state?.lists.categories ?? [];
@@ -57,6 +59,7 @@ export function ShoppingView() {
           className="body min-w-0 flex-1 bg-transparent py-1.5 outline-none placeholder:text-[var(--label-3)]"
           enterKeyHint="send"
           autoComplete="off"
+          autoFocus={focus}
           aria-label="Artikel hinzufügen"
         />
         <button
@@ -96,12 +99,12 @@ export function ShoppingView() {
                       style={{ border: "1.6px solid var(--label-3)" }}
                       aria-label={`${it.name} abhaken`}
                     />
-                    <p className="body min-w-0 flex-1 truncate">{it.name}</p>
-                    {it.amount && (
-                      <span className="subhead tabular" style={{ color: "var(--label-2)" }}>
-                        {it.amount}
+                    <button onClick={() => setDial(it)} className="flex min-w-0 flex-1 items-center gap-3 text-left" aria-label={`Menge für ${it.name} ändern`}>
+                      <span className="body min-w-0 flex-1 truncate">{it.name}</span>
+                      <span className="subhead tabular rounded-full px-2 py-0.5" style={{ color: it.amount ? "var(--label-2)" : "var(--label-3)", background: "color-mix(in oklab, var(--label) 6%, transparent)" }}>
+                        {it.amount ?? "Menge"}
                       </span>
-                    )}
+                    </button>
                     <Avatar person={person(it.addedBy)} size={20} />
                   </div>
                 </SwipeRow>
@@ -166,6 +169,7 @@ export function ShoppingView() {
           menu
             ? [
                 { label: "Im Wagen", icon: <IconCheck size={18} />, onSelect: () => toggle(menu) },
+                { label: "Menge ändern", onSelect: () => setTimeout(() => setDial(menu), 50) },
                 { label: "Andere Abteilung", onSelect: () => setTimeout(() => setMoveFor(menu), 50) },
                 { label: "Löschen", icon: <IconTrash size={18} />, destructive: true, onSelect: () => remove(menu) },
               ]
@@ -189,6 +193,18 @@ export function ShoppingView() {
           )
         }
       />
+      {dial && (
+        <AmountDial
+          key={dial.id}
+          name={dial.name}
+          amount={dial.amount}
+          onClose={() => setDial(null)}
+          onSave={(amount) => {
+            void run({ op: "item.setAmount", id: dial.id, amount });
+            setDial(null);
+          }}
+        />
+      )}
       <ContextMenu
         open={!!moveFor}
         onClose={() => setMoveFor(null)}

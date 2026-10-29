@@ -15,7 +15,8 @@ import { SubscribeSheet } from "./SubscribeSheet";
 import { NotifySheet } from "./NotifySheet";
 import { registerWorker, syncPushOwner } from "@/lib/client/push";
 import { ColorPicker, PersonPicker } from "./Onboarding";
-import { IconBell, IconCalendar, IconPerson } from "./icons";
+import { IconBell, IconCalendar, IconCart, IconChecklist, IconFork, IconPerson } from "./icons";
+import { localDay } from "@/lib/types";
 
 export function AppShell() {
   return (
@@ -52,6 +53,15 @@ function Main() {
   const [subscribe, setSubscribe] = useState(false);
   const [notify, setNotify] = useState(false);
   const [taskEdit, setTaskEdit] = useState<Task | null>(null);
+  const [quickMenu, setQuickMenu] = useState(false);
+  const [shopFocus, setShopFocus] = useState(false);
+  const [foodDay, setFoodDay] = useState<string | null>(null);
+
+  const newEvent = () => {
+    const start = new Date();
+    start.setMinutes(Math.ceil((start.getMinutes() + 1) / 15) * 15, 0, 0);
+    setEditor({ mode: "new", start });
+  };
   const now = useNow();
 
   useEffect(() => {
@@ -72,7 +82,11 @@ function Main() {
     let sent = 0;
     const report = (message: string, detail: string) => {
       if (sent++ > 5) return;
-      void fetch("/api/log-error", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message, detail }) }).catch(() => {});
+      void fetch("/api/log-error", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message, detail }),
+      }).catch(() => {});
     };
     const onError = (e: ErrorEvent) => report(e.message, `${e.filename}:${e.lineno}`);
     const onRejection = (e: PromiseRejectionEvent) => report(String(e.reason?.message ?? e.reason), "unhandledrejection");
@@ -124,6 +138,7 @@ function Main() {
           filter={filter}
           setFilter={setFilter}
           onNew={() => setNewOpen(true)}
+          onQuick={() => setQuickMenu(true)}
           onProfile={() => setProfileOpen(true)}
           onOpenEvent={(occ) => setEditor({ mode: "edit", occ })}
           onOpenFood={() => setTab("essen")}
@@ -139,18 +154,69 @@ function Main() {
           onNew={(start, allDay) => setEditor({ mode: "new", start, allDay })}
         />
       )}
-      {tab === "einkauf" && <ShoppingView />}
-      {tab === "essen" && <FoodView />}
-      {tab === "aufgaben" && <TasksView filter={filter} setFilter={setFilter} onNew={() => setNewOpen(true)} onEdit={setTaskEdit} />}
+      {tab === "einkauf" && <ShoppingView focus={shopFocus} />}
+      {tab === "essen" && <FoodView key={foodDay ?? "plan"} initialDay={foodDay} />}
+      {tab === "aufgaben" && <TasksView filter={filter} setFilter={setFilter} onNew={() => setNewOpen(true)} onQuick={() => setQuickMenu(true)} onEdit={setTaskEdit} />}
 
-      <TabBar tab={tab} onChange={setTab} badge={{ einkauf: openItems }} />
+      <TabBar
+        tab={tab}
+        onChange={(t) => {
+          setShopFocus(false);
+          setFoodDay(null);
+          setTab(t);
+        }}
+        badge={{ einkauf: openItems }}
+      />
+      <ContextMenu
+        open={quickMenu}
+        onClose={() => setQuickMenu(false)}
+        preview={<p className="headline">Was möchtest du anlegen?</p>}
+        actions={[
+          {
+            label: "Termin",
+            icon: <IconCalendar size={18} />,
+            onSelect: () => setTimeout(newEvent, 50),
+          },
+          {
+            label: "Aufgabe",
+            icon: <IconChecklist size={18} />,
+            onSelect: () => setTimeout(() => setNewOpen(true), 50),
+          },
+          {
+            label: "Etwas einkaufen",
+            icon: <IconCart size={18} />,
+            onSelect: () => {
+              setShopFocus(true);
+              setTab("einkauf");
+            },
+          },
+          {
+            label: "Essen für heute planen",
+            icon: <IconFork size={18} />,
+            onSelect: () => {
+              setFoodDay(localDay());
+              setTab("essen");
+            },
+          },
+        ]}
+      />
       <NewEntrySheet
         open={newOpen}
         onClose={() => setNewOpen(false)}
-        onEvent={(title) => {
-          const s = new Date();
-          s.setMinutes(Math.ceil((s.getMinutes() + 1) / 15) * 15, 0, 0);
-          setEditor({ mode: "new", start: s, title });
+        onEvent={(d) => {
+          let start = d.start;
+          if (!start) {
+            start = new Date();
+            start.setMinutes(Math.ceil((start.getMinutes() + 1) / 15) * 15, 0, 0);
+          }
+          setEditor({
+            mode: "new",
+            start,
+            title: d.title,
+            allDay: d.allDay,
+            people: d.people,
+            duration: d.duration,
+          });
         }}
       />
       <NewEntrySheet open={!!taskEdit} task={taskEdit} onClose={() => setTaskEdit(null)} />
@@ -174,13 +240,36 @@ function Main() {
           )
         }
         actions={[
-          { label: "Mitteilungen", icon: <IconBell size={18} />, onSelect: () => setTimeout(() => setNotify(true), 50) },
-          { label: "Im Apple Kalender anzeigen", icon: <IconCalendar size={18} />, onSelect: () => setTimeout(() => setSubscribe(true), 50) },
-          { label: "Profil wechseln", icon: <IconPerson size={18} />, onSelect: () => setMe(null) },
-          // bewusst ganzes Neuladen, damit der Server die Owner-Sitzung prüft
-          // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-          ...(ownerDevice ? [{ label: "Verwaltung", onSelect: () => window.location.assign("/owner") }] : []),
-          { label: "Auf diesem Gerät abmelden", destructive: true, onSelect: () => void logout() },
+          {
+            label: "Mitteilungen",
+            icon: <IconBell size={18} />,
+            onSelect: () => setTimeout(() => setNotify(true), 50),
+          },
+          {
+            label: "Im Apple Kalender anzeigen",
+            icon: <IconCalendar size={18} />,
+            onSelect: () => setTimeout(() => setSubscribe(true), 50),
+          },
+          {
+            label: "Profil wechseln",
+            icon: <IconPerson size={18} />,
+            onSelect: () => setMe(null),
+          },
+          ...(ownerDevice
+            ? [
+                {
+                  label: "Verwaltung",
+                  // bewusst ganzes Neuladen, damit der Server die Owner-Sitzung prüft
+                  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+                  onSelect: () => window.location.assign("/owner"),
+                },
+              ]
+            : []),
+          {
+            label: "Auf diesem Gerät abmelden",
+            destructive: true,
+            onSelect: () => void logout(),
+          },
         ]}
       />
     </main>

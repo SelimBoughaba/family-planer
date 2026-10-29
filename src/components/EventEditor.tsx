@@ -8,7 +8,7 @@ import { Avatar, ContextMenu, type MenuAction } from "./ui";
 import { TimeDial, durationLabel } from "./TimeDial";
 import { IconRepeat, IconTrash } from "./icons";
 
-export type EditorTarget = { mode: "new"; start: Date; allDay?: boolean; title?: string } | { mode: "edit"; occ: Occurrence };
+export type EditorTarget = { mode: "new"; start: Date; allDay?: boolean; title?: string; people?: string[]; duration?: number } | { mode: "edit"; occ: Occurrence };
 
 const Label = ({ children }: { children: string }) => (
   <p className="footnote mt-5 mb-2 font-semibold" style={{ color: "var(--label-2)" }}>
@@ -79,11 +79,11 @@ function initial(target: EditorTarget, me: string | null) {
   return {
     title: target.title ?? "",
     place: "",
-    people: me ? [me] : [],
+    people: target.people?.length ? target.people : me ? [me] : [],
     date: localDay(target.start),
     allDay: !!target.allDay,
     start: minutesOf(target.start),
-    duration: 60,
+    duration: target.duration ?? 60,
     days: 1,
     recurrence: "none" as EventRecurrence | "none",
     until: "",

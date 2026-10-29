@@ -73,6 +73,8 @@ function optimistic(s: AppState, m: Mutation, me: string | null): AppState {
     }
     case "item.toggle":
       return { ...s, items: s.items.map((i) => (i.id === m.id ? { ...i, done: m.done } : i)) };
+    case "item.setAmount":
+      return { ...s, items: s.items.map((i) => (i.id === m.id ? { ...i, amount: m.amount } : i)) };
     case "item.move":
       return { ...s, items: s.items.map((i) => (i.id === m.id ? { ...i, category: m.category } : i)) };
     case "item.delete":

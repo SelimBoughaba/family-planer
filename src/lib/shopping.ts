@@ -30,6 +30,12 @@ export function guessCategory(name: string) {
   return "Vorrat";
 }
 
+/** Steht das Wort in den bekannten Lebensmitteln und Haushaltsartikeln? */
+export function knownItem(name: string) {
+  const n = ` ${name.toLowerCase()} `;
+  return Object.values(hints).some((words) => words.some((w) => n.includes(w)));
+}
+
 /** "2 l Milch", "500g Hack", "Milch 2 l" */
 export function parseItem(raw: string): { name: string; amount: string | null } {
   const t = raw.trim().replace(/\s+/g, " ");

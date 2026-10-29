@@ -1,12 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useFamily } from "@/lib/client/family";
 import { localDay, type Task } from "@/lib/types";
 import { addDays, occurrences, startOfDay, type Occurrence } from "@/lib/recurrence";
 import { recipeEmoji } from "@/lib/recipes";
-import { Avatar, AvatarStack, Card, PersonFilter, SectionTitle } from "./ui";
-import { TaskRow, useTaskMenus } from "./TaskRow";
+import { Avatar, AvatarStack, Card, PersonFilter, SectionTitle, useLongPress } from "./ui";
+import { TaskRow, useAssignDrop, useTaskMenus } from "./TaskRow";
 import { IconPin, IconPlus } from "./icons";
 
 const time = (d: Date) => d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
@@ -62,12 +62,12 @@ function CountdownRing({ now, start, color }: { now: Date; start: Date; color: s
   );
 }
 
-
 export function TodayView({
   now,
   filter,
   setFilter,
   onNew,
+  onQuick,
   onProfile,
   onOpenEvent,
   onOpenFood,
@@ -77,28 +77,51 @@ export function TodayView({
   filter: string | null;
   setFilter: (id: string | null) => void;
   onNew: () => void;
+  onQuick: () => void;
   onProfile: () => void;
   onOpenEvent: (o: Occurrence) => void;
   onOpenFood: () => void;
   onEditTask: (t: Task) => void;
 }) {
   const { state, person, color, me } = useFamily();
+  const plusPress = useLongPress(onQuick, onNew);
+  const assignDrop = useAssignDrop();
   const { openMenu, menus } = useTaskMenus(onEditTask);
   const today = localDay(now);
 
   const dayStart = +startOfDay(now);
   const occ = useMemo(() => occurrences(state?.events ?? [], new Date(dayStart), addDays(new Date(dayStart), 14), filter), [state?.events, dayStart, filter]);
-  const todays = occ.filter((o) => +o.start < dayStart + 86400000);
   const next = occ.find((o) => o.end > now && !(o.event.allDay && o.start <= now));
 
-  // Heute: fällige und überfällige, dazu heute Erledigtes; „Irgendwann“ steht im Aufgaben-Tab
+  // Wochenstreifen: gewählter Tag (0 = heute)
+  const [sel, setSel] = useState(0);
+  const strip = useMemo(() => Array.from({ length: 14 }, (_, k) => addDays(new Date(dayStart), k)), [dayStart]);
+  const selStart = strip[sel];
+  const selEnd = addDays(selStart, 1);
+  const selDay = localDay(selStart);
+  const todays = occ.filter((o) => o.start < selEnd && o.end > selStart && (sel > 0 || +o.start < dayStart + 86400000));
+
+  // Heute: fällige und überfällige, dazu heute Erledigtes; „Irgendwann“ steht im Aufgaben-Tab. Andere Tage: was dann fällig ist
   const tasks = (state?.tasks ?? [])
-    .filter((t) => (!filter || t.personId === filter) && (t.done ? t.doneAt && localDay(new Date(t.doneAt)) === today : !!t.due && t.due <= today))
+    .filter((t) =>
+      !filter || t.personId === filter
+        ? sel === 0
+          ? t.done
+            ? !!t.doneAt && localDay(new Date(t.doneAt)) === today
+            : !!t.due && t.due <= today
+          : !t.done && t.due === selDay
+        : false,
+    )
     .sort((a, b) => Number(a.done) - Number(b.done) || (a.due ?? "").localeCompare(b.due ?? ""));
   const open = tasks.filter((t) => !t.done);
 
-  const dateLabel = now.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" });
-  const nowIndex = todays.findIndex((o) => o.start > now);
+  const dateLabel = now.toLocaleDateString("de-DE", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+  const nowIndex = sel === 0 ? todays.findIndex((o) => o.start > now) : -1;
+  const selLabel = selStart.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" });
 
   return (
     <div className="mx-auto max-w-md px-4 safe-top safe-bottom">
@@ -113,13 +136,50 @@ export function TodayView({
           <button onClick={onProfile} className="press rounded-full" aria-label="Profil">
             <Avatar person={me ?? undefined} size={44} />
           </button>
-          <button onClick={onNew} className="press glass flex h-11 w-11 items-center justify-center rounded-full" aria-label="Neuer Eintrag" style={{ color: "var(--tint)" }}>
+          <button
+            {...plusPress}
+            className="press glass flex h-11 w-11 items-center justify-center rounded-full select-none"
+            aria-label="Neuer Eintrag"
+            style={{ color: "var(--tint)" }}
+          >
             <IconPlus size={22} />
           </button>
         </div>
       </header>
 
-      <PersonFilter selected={filter} onToggle={(id) => setFilter(filter === id ? null : id)} />
+      <PersonFilter selected={filter} onToggle={(id) => setFilter(filter === id ? null : id)} onDrop={assignDrop} />
+
+      <div className="no-scrollbar -mx-4 mt-4 flex gap-1.5 overflow-x-auto px-4" role="tablist" aria-label="Tage">
+        {strip.map((d, k) => {
+          const on = k === sel;
+          const end = addDays(d, 1);
+          const ids = [...new Set(occ.filter((o) => o.start < end && o.end > d).flatMap((o) => (o.event.people.length ? o.event.people : [null])))].slice(0, 3);
+          return (
+            <button
+              key={k}
+              role="tab"
+              aria-selected={on}
+              onClick={() => setSel(k)}
+              className="press flex w-[46px] shrink-0 flex-col items-center gap-1 rounded-[14px] py-2"
+              style={{
+                background: on ? "var(--tint)" : "color-mix(in oklab, var(--label) 6%, transparent)",
+                color: on ? "white" : "var(--label)",
+                transition: "background 200ms ease",
+              }}
+            >
+              <span className="caption font-semibold" style={{ opacity: on ? 0.9 : 0.6 }}>
+                {k === 0 ? "Heute" : d.toLocaleDateString("de-DE", { weekday: "short" }).replace(".", "")}
+              </span>
+              <span className="headline tabular leading-none">{d.getDate()}</span>
+              <span className="flex h-1.5 items-center gap-[3px]">
+                {ids.map((id, i) => (
+                  <span key={i} className="h-1.5 w-1.5 rounded-full" style={{ background: on ? "white" : color(id) }} />
+                ))}
+              </span>
+            </button>
+          );
+        })}
+      </div>
 
       {next ? (
         <Card className="mt-5 p-4">
@@ -131,13 +191,21 @@ export function TodayView({
               </p>
               <p className="headline mt-0.5 truncate">{next.event.title}</p>
               <p className="subhead tabular mt-0.5" style={{ color: "var(--label-2)" }}>
-                {next.event.allDay ? "Ganztägig" : `${next.start.toLocaleDateString("de-DE") === now.toLocaleDateString("de-DE") ? "" : `${next.start.toLocaleDateString("de-DE", { weekday: "short" })}, `}${time(next.start)} bis ${time(next.end)}`}
+                {next.event.allDay
+                  ? "Ganztägig"
+                  : `${next.start.toLocaleDateString("de-DE") === now.toLocaleDateString("de-DE") ? "" : `${next.start.toLocaleDateString("de-DE", { weekday: "short" })}, `}${time(next.start)} bis ${time(next.end)}`}
               </p>
             </div>
             <AvatarStack ids={next.event.people.slice(0, 3)} />
           </button>
           {next.event.place && (
-            <p className="footnote mt-3 flex items-center gap-1.5 border-t pt-3" style={{ color: "var(--label-2)", borderColor: "var(--separator)" }}>
+            <p
+              className="footnote mt-3 flex items-center gap-1.5 border-t pt-3"
+              style={{
+                color: "var(--label-2)",
+                borderColor: "var(--separator)",
+              }}
+            >
               <IconPin /> {next.event.place}
             </p>
           )}
@@ -151,9 +219,19 @@ export function TodayView({
         </Card>
       )}
 
+      {sel > 0 && todays.length === 0 && (
+        <>
+          <SectionTitle>{selLabel}</SectionTitle>
+          <Card className="p-4">
+            <p className="subhead" style={{ color: "var(--label-2)" }}>
+              Keine Termine an diesem Tag.
+            </p>
+          </Card>
+        </>
+      )}
       {todays.length > 0 && (
         <>
-          <SectionTitle>Tagesablauf</SectionTitle>
+          <SectionTitle>{sel === 0 ? "Tagesablauf" : selLabel}</SectionTitle>
           <Card className="px-4 py-1">
             {todays.map((o, i) => {
               const e = o.event;
@@ -172,7 +250,10 @@ export function TodayView({
                   <button
                     onClick={() => onOpenEvent(o)}
                     className="flex w-full items-center gap-3 py-3 text-left"
-                    style={{ opacity: past ? 0.42 : 1, borderTop: i && i !== nowIndex ? "0.5px solid var(--separator)" : "none" }}
+                    style={{
+                      opacity: past ? 0.42 : 1,
+                      borderTop: i && i !== nowIndex ? "0.5px solid var(--separator)" : "none",
+                    }}
                   >
                     <span className="subhead tabular w-12 shrink-0 font-medium" style={{ color: "var(--label-2)" }}>
                       {e.allDay ? "Ganzt." : time(o.start)}
@@ -211,7 +292,7 @@ export function TodayView({
       {tasks.length === 0 ? (
         <Card className="p-4">
           <p className="subhead" style={{ color: "var(--label-2)" }}>
-            Für heute ist nichts zu tun.
+            {sel === 0 ? "Für heute ist nichts zu tun." : "An diesem Tag ist nichts fällig."}
           </p>
         </Card>
       ) : (
@@ -222,20 +303,22 @@ export function TodayView({
         </Card>
       )}
       <p className="caption mt-2 px-1" style={{ color: "var(--label-3)" }}>
-        Nach rechts wischen erledigt, nach links verschiebt auf morgen, antippen bearbeitet, lange drücken zeigt mehr.
+        Nach rechts wischen erledigt, nach links verschiebt auf morgen, antippen bearbeitet, lange drücken zeigt mehr. Ein Profilbild oben lange drücken und auf eine Aufgabe ziehen gibt sie dieser Person.
       </p>
 
       {(() => {
-        const meal = state?.meals.find((m) => m.day === today);
+        const meal = state?.meals.find((m) => m.day === selDay);
         const recipe = meal?.recipeId ? state?.recipes.find((r) => r.id === meal.recipeId) : null;
         return (
           <>
-            <SectionTitle>Heute gibt es</SectionTitle>
+            <SectionTitle>{sel === 0 ? "Heute gibt es" : sel === 1 ? "Morgen gibt es" : `Am ${selStart.toLocaleDateString("de-DE", { weekday: "long" })} gibt es`}</SectionTitle>
             <Card className="p-0">
               <button onClick={onOpenFood} className="flex w-full items-center gap-4 p-4 text-left">
                 <span
                   className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[16px] text-3xl"
-                  style={{ background: "linear-gradient(150deg, #FFE08A, #FFB347)" }}
+                  style={{
+                    background: "linear-gradient(150deg, #FFE08A, #FFB347)",
+                  }}
                   aria-hidden
                 >
                   {meal ? recipeEmoji(meal.title, recipe?.tags) : "🤔"}
@@ -244,7 +327,8 @@ export function TodayView({
                   <span className="headline block truncate">{meal ? meal.title : "Noch nichts geplant"}</span>
                   <span className="subhead block" style={{ color: "var(--label-2)" }}>
                     {meal
-                      ? [recipe?.minutes ? `${recipe.minutes} Min.` : null, person(meal.cook) ? `kocht ${person(meal.cook)!.name}` : null].filter(Boolean).join(", ") || "Im Wochenplan ansehen"
+                      ? [recipe?.minutes ? `${recipe.minutes} Min.` : null, person(meal.cook) ? `kocht ${person(meal.cook)!.name}` : null].filter(Boolean).join(", ") ||
+                        "Im Wochenplan ansehen"
                       : state?.ai.enabled
                         ? "Tippen für Vorschläge"
                         : "Tippen zum Planen"}

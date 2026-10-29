@@ -14,7 +14,12 @@
 - Etappe 6: Aufgaben-Tab (nach Zeit, Bereich und Person, Bearbeiten per Antippen, Dienstplan reihum mit Mitteilung „Du bist dran“, Übersicht der letzten 7 Tage)
 - Stabilität: harte Zeitgrenzen für Datenbankabfragen, Pool-Neuaufbau, Rollen-Timeouts in der Datenbank
 
+- Etappe 7: Schnelleingabe in Alltagssprache, Schnellmenü am Plus, Wochenstreifen in Heute, Mengen-Rad im Einkauf, Kalender-Zoom mit zwei Fingern, Profilbild auf Aufgabe ziehen
+- iOS: Tab-Leiste als Dock am Rand, Statusleiste undurchsichtig (sonst kürzt iOS 27 die App unten)
+
 ## Als Nächstes
-- Familientest auf echten Geräten (Gesten, Push, Live-Abgleich zwischen zwei Handys)
+- Etappe 8: Essens-Glücksrad, „Wer isst mit“ mit Portionen und Mitteilung an den Koch, Rezepte aus Foto und PDF (braucht ANTHROPIC_API_KEY)
+- Etappe 9: Pinnwand mit Zetteln, Apple Pencil, Fotos und PDFs (mehrere Wände, Papierkorb, Ablaufdatum)
+- Etappe 10: Punkte, Belohnungen (Bestätigung durch Samir oder Denise), Rangliste, Wochenvorschau sonntags 18 Uhr
 
 ## Vorgemerkt
