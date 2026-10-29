@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "./db";
+import { wall } from "./berlin";
 
 export const BACKUP_VERSION = 2;
 const KEEP_AUTO = 14;
@@ -107,14 +108,9 @@ export async function saveBackup(kind: "auto" | "manual" | "before-restore") {
 export async function maybeAutoBackup() {
   const sql = db();
   // nur zwischen 2 und 5 Uhr Berliner Zeit, damit es tagsüber nie mit Änderungen kollidiert
-  const hour = Number(
-    new Date().toLocaleString("de-DE", {
-      timeZone: "Europe/Berlin",
-      hour: "2-digit",
-      hourCycle: "h23",
-    }),
-  );
-  if (hour < 2 || hour >= 5) return null;
+  // Stunde über die Zeitzonen-Bausteine, nicht als Text: „15 Uhr“ ergäbe keine Zahl und hebelte das Fenster aus
+  const hour = wall(Date.now()).h;
+  if (!Number.isFinite(hour) || hour < 2 || hour >= 5) return null;
   const [last] =
     await sql`select created_at from backups where kind = 'auto' order by created_at desc limit 1`.catch(
       (err: Error) => {

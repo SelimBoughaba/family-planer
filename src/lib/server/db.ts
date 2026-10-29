@@ -66,8 +66,20 @@ function guard<T>(run: () => PromiseLike<T>, ms: number, pool: Sql): Promise<T> 
   });
 }
 
-/** Wie postgres(), aber jede Abfrage und Transaktion hat eine harte Zeitgrenze */
+/**
+ * Wie postgres(), aber jede Abfrage und Transaktion hat eine harte Zeitgrenze und sie laufen
+ * nacheinander. Parallele Abfragen reiht postgres.js sonst auf einer Verbindung hintereinander
+ * (Pipelining), und das verträgt der Transaction-Pooler von Supabase nicht zuverlässig: Die
+ * Sicherung hing damit jede Minute, nacheinander läuft sie sofort durch. Bei fünf Personen
+ * kostet das kaum Zeit. Die Zeitgrenze zählt erst, wenn die Abfrage an der Reihe ist.
+ */
 function guarded(pool: Sql): Sql {
+  let chain: Promise<unknown> = Promise.resolve();
+  const serial = <T,>(run: () => Promise<T>): Promise<T> => {
+    const p = chain.then(run, run);
+    chain = p.catch(() => {});
+    return p;
+  };
   return new Proxy(pool, {
     apply(target, thisArg, args) {
       const q = Reflect.apply(target, thisArg, args);
@@ -76,7 +88,7 @@ function guarded(pool: Sql): Sql {
         const original = q.then.bind(q);
         let p: Promise<unknown> | null = null;
         q.then = (a?: (v: unknown) => unknown, b?: (e: unknown) => unknown) => {
-          p ??= guard(() => original((v: unknown) => v), QUERY_TIMEOUT, pool);
+          p ??= serial(() => guard(() => original((v: unknown) => v), QUERY_TIMEOUT, pool));
           return p.then(a, b);
         };
       }
@@ -84,7 +96,7 @@ function guarded(pool: Sql): Sql {
     },
     get(target, prop, receiver) {
       if (prop === "begin") {
-        return (...args: unknown[]) => guard(() => (target.begin as (...a: unknown[]) => PromiseLike<unknown>)(...args), TX_TIMEOUT, pool);
+        return (...args: unknown[]) => serial(() => guard(() => (target.begin as (...a: unknown[]) => PromiseLike<unknown>)(...args), TX_TIMEOUT, pool));
       }
       const v = Reflect.get(target, prop, receiver);
       return typeof v === "function" ? v.bind(target) : v;
