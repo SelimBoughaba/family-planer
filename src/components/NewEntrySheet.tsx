@@ -71,6 +71,8 @@ export function NewEntrySheet({ open, onClose, onEvent }: { open: boolean; onClo
   const [when, setWhen] = useState<"today" | "tomorrow" | "none" | "date">("today");
   const [date, setDate] = useState(localDay());
   const [rec, setRec] = useState<"none" | Recurrence>("none");
+  const [remind, setRemind] = useState(false);
+  const [remindTime, setRemindTime] = useState("08:00");
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -90,6 +92,7 @@ export function NewEntrySheet({ open, onClose, onEvent }: { open: boolean; onClo
     setWho([]);
     setWhen("today");
     setRec("none");
+    setRemind(false);
     setDate(localDay());
   };
 
@@ -106,6 +109,7 @@ export function NewEntrySheet({ open, onClose, onEvent }: { open: boolean; onClo
       personId: chosen[0] ?? null,
       due: rec !== "none" && !due ? localDay() : due,
       recurring: rec === "none" ? null : rec,
+      remindTime: remind && (due || rec !== "none") ? remindTime : null,
     });
     setBusy(false);
     if (ok) {
@@ -200,6 +204,36 @@ export function NewEntrySheet({ open, onClose, onEvent }: { open: boolean; onClo
               onChange={setRec}
               options={[{ id: "none" as const, label: "Nie" }, ...(Object.keys(recurrenceLabel) as Recurrence[]).map((r) => ({ id: r, label: recurrenceLabel[r] }))]}
             />
+            <Label>Erinnerung</Label>
+            {when === "none" && rec === "none" ? (
+              <p className="footnote" style={{ color: "var(--label-3)" }}>
+                Für eine Erinnerung braucht die Aufgabe einen Tag.
+              </p>
+            ) : (
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={remind}
+                  onClick={() => setRemind((r) => !r)}
+                  className="flex flex-1 items-center justify-between"
+                >
+                  <span className="body">Erinnern um</span>
+                  <span
+                    className="relative h-[31px] w-[51px] rounded-full"
+                    style={{ background: remind ? "var(--success)" : "color-mix(in oklab, var(--label) 14%, transparent)", transition: "background 200ms ease" }}
+                  >
+                    <span
+                      className="absolute top-[2px] h-[27px] w-[27px] rounded-full bg-white"
+                      style={{ left: remind ? 22 : 2, boxShadow: "0 3px 8px rgba(0,0,0,.15)", transition: "left 220ms cubic-bezier(0.3, 1.3, 0.5, 1)" }}
+                    />
+                  </span>
+                </button>
+                {remind && (
+                  <input type="time" value={remindTime} onChange={(e) => e.target.value && setRemindTime(e.target.value)} step={300} className="body glass tabular rounded-[12px] px-3 py-1.5" aria-label="Uhrzeit der Erinnerung" />
+                )}
+              </div>
+            )}
           </>
       </form>
     </div>

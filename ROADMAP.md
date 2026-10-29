@@ -5,8 +5,10 @@
 - Etappe 2: Datenbank (Supabase Frankfurt), Familienpasswort, Profile mit Farbwahl, Heute und Einkauf mit echten Daten, Live-Synchronisierung
 - Etappe 3: Kalender (Tag, Woche, Monat, Ziehen zum Verschieben und Verlängern, Drehrad, Wiederholungen mit Ausnahmen, Bearbeiten/Löschen, Abo für Apple Kalender pro Person)
 
+- Etappe 4: Mitteilungen per Push (Erinnerung pro Termin, Aufgaben mit Uhrzeit, Einladung zu Termin, Aufgabe zugewiesen), Zeitplaner jede Minute über Supabase, App-Icon und Manifest
+
 ## Als Nächstes
-- Etappe 4: Erinnerungen per Push, Zeitplaner (hält Supabase zugleich aktiv)
+- Owner-Bereich (siehe unten), jetzt an der Reihe
 - Etappe 5: Essen (Rezepte, Wochenplan, Zutaten auf die Liste, KI-Vorschläge mit Monatslimit)
 - Aufgaben-Tab: alle Aufgaben nach Bereich und Person, Dienstplan reihum
 

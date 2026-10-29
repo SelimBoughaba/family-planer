@@ -99,6 +99,7 @@ export function CalendarView({
     people: o.event.people,
     recurrence: o.event.recurrence,
     recurrenceUntil: o.event.recurrenceUntil,
+    reminders: o.event.reminders,
   });
 
   const dayList = occ.filter((o) => o.end > selected && o.start < addDays(selected, 1));

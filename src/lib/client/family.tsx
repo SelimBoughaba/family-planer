@@ -45,8 +45,10 @@ function optimistic(s: AppState, m: Mutation, me: string | null): AppState {
   switch (m.op) {
     case "person.setColor":
       return { ...s, people: s.people.map((p) => (p.id === m.id ? { ...p, color: m.color } : p)) };
+    case "person.setNotify":
+      return { ...s, people: s.people.map((p) => (p.id === m.id ? { ...p, notifyPrefs: m.prefs } : p)) };
     case "task.create": {
-      const t: Task = { id: tmp, title: m.title, area: m.area, personId: m.personId, due: m.due, recurring: m.recurring, done: false, doneAt: null };
+      const t: Task = { id: tmp, title: m.title, area: m.area, personId: m.personId, due: m.due, recurring: m.recurring, done: false, doneAt: null, remindTime: m.remindTime };
       return { ...s, tasks: [...s.tasks, t] };
     }
     case "task.toggle":
@@ -73,14 +75,14 @@ function optimistic(s: AppState, m: Mutation, me: string | null): AppState {
     case "item.clearDone":
       return { ...s, items: s.items.filter((i) => !i.done) };
     case "event.create": {
-      const e: CalEvent = { id: tmp, title: m.title, place: m.place, notes: null, startsAt: m.startsAt, endsAt: m.endsAt, allDay: m.allDay, people: m.people, createdBy: me, recurrence: m.recurrence, recurrenceUntil: m.recurrenceUntil, exdates: [] };
+      const e: CalEvent = { id: tmp, title: m.title, place: m.place, notes: null, startsAt: m.startsAt, endsAt: m.endsAt, allDay: m.allDay, people: m.people, createdBy: me, recurrence: m.recurrence, recurrenceUntil: m.recurrenceUntil, exdates: [], reminders: m.reminders };
       return { ...s, events: [...s.events, e] };
     }
     case "event.update":
       return {
         ...s,
         events: s.events.map((e) =>
-          e.id === m.id ? { ...e, title: m.title, place: m.place, startsAt: m.startsAt, endsAt: m.endsAt, allDay: m.allDay, people: m.people, recurrence: m.recurrence, recurrenceUntil: m.recurrenceUntil, exdates: m.recurrence ? e.exdates : [] } : e,
+          e.id === m.id ? { ...e, title: m.title, place: m.place, startsAt: m.startsAt, endsAt: m.endsAt, allDay: m.allDay, people: m.people, recurrence: m.recurrence, recurrenceUntil: m.recurrenceUntil, exdates: m.recurrence ? e.exdates : [], reminders: m.reminders } : e,
         ),
       };
     case "event.move":
@@ -93,7 +95,7 @@ function optimistic(s: AppState, m: Mutation, me: string | null): AppState {
         }),
       };
     case "event.detach": {
-      const copy: CalEvent = { id: tmp, title: m.title, place: m.place, notes: null, startsAt: m.startsAt, endsAt: m.endsAt, allDay: m.allDay, people: m.people, createdBy: me, recurrence: null, recurrenceUntil: null, exdates: [] };
+      const copy: CalEvent = { id: tmp, title: m.title, place: m.place, notes: null, startsAt: m.startsAt, endsAt: m.endsAt, allDay: m.allDay, people: m.people, createdBy: me, recurrence: null, recurrenceUntil: null, exdates: [], reminders: m.reminders };
       return { ...s, events: [...s.events.map((e) => (e.id === m.id ? { ...e, exdates: [...e.exdates, m.occurrence] } : e)), copy] };
     }
     case "event.delete":

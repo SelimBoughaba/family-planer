@@ -1,7 +1,8 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { after, NextResponse, type NextRequest } from "next/server";
 import { unauthorized } from "@/lib/server/auth";
 import { InvalidInput, mutate } from "@/lib/server/data";
 import { broadcastChange } from "@/lib/server/sync";
+import { planNotifications } from "@/lib/server/notify";
 import type { Mutation } from "@/lib/types";
 
 export async function POST(req: NextRequest) {
@@ -14,8 +15,13 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const plan = await planNotifications(body, body.by ?? null).catch((err) => {
+      console.error("[notify]", err);
+      return null;
+    });
     const scope = await mutate(body, body.by ?? null);
     await broadcastChange(scope, body.by);
+    if (plan) after(() => plan().catch((err) => console.error("[notify]", err)));
     return NextResponse.json({ ok: true, scope });
   } catch (err) {
     if (err instanceof InvalidInput) {

@@ -9,8 +9,10 @@ import { NewEntrySheet } from "./NewEntrySheet";
 import { CalendarView } from "./CalendarView";
 import { EventEditor, type EditorTarget } from "./EventEditor";
 import { SubscribeSheet } from "./SubscribeSheet";
+import { NotifySheet } from "./NotifySheet";
+import { registerWorker, syncPushOwner } from "@/lib/client/push";
 import { ColorPicker, PersonPicker } from "./Onboarding";
-import { IconCalendar, IconPerson } from "./icons";
+import { IconBell, IconCalendar, IconPerson } from "./icons";
 
 const upcoming: Record<"essen" | "aufgaben", { title: string; text: string }> = {
   essen: {
@@ -56,11 +58,18 @@ function Main() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [editor, setEditor] = useState<EditorTarget | null>(null);
   const [subscribe, setSubscribe] = useState(false);
+  const [notify, setNotify] = useState(false);
   const now = useNow();
 
   useEffect(() => {
     window.scrollTo({ top: 0 });
   }, [tab]);
+
+  // Service Worker aktuell halten und Gerät der gewählten Person zuordnen
+  const meId = me?.id;
+  useEffect(() => {
+    void registerWorker().then(() => (meId ? syncPushOwner(meId) : undefined));
+  }, [meId]);
 
   const ambient = useMemo(() => {
     if (filter) return [color(filter)];
@@ -134,6 +143,7 @@ function Main() {
       />
       <EventEditor target={editor} onClose={() => setEditor(null)} />
       <SubscribeSheet open={subscribe} onClose={() => setSubscribe(false)} />
+      <NotifySheet open={notify} onClose={() => setNotify(false)} />
       <ContextMenu
         open={profileOpen}
         onClose={() => setProfileOpen(false)}
@@ -151,6 +161,7 @@ function Main() {
           )
         }
         actions={[
+          { label: "Mitteilungen", icon: <IconBell size={18} />, onSelect: () => setTimeout(() => setNotify(true), 50) },
           { label: "Im Apple Kalender anzeigen", icon: <IconCalendar size={18} />, onSelect: () => setTimeout(() => setSubscribe(true), 50) },
           { label: "Profil wechseln", icon: <IconPerson size={18} />, onSelect: () => setMe(null) },
           { label: "Auf diesem Gerät abmelden", destructive: true, onSelect: () => void logout() },

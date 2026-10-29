@@ -76,3 +76,26 @@ alter table events add column if not exists exdates timestamptz[] not null defau
 create index if not exists events_series_idx on events (recurrence) where recurrence is not null;
 
 alter table people add column if not exists calendar_token text unique;
+
+-- Etappe 4: Erinnerungen und Mitteilungen
+alter table events add column if not exists reminders int[] not null default '{}'; -- Minuten vor Beginn
+alter table tasks add column if not exists remind_time time; -- Uhrzeit am Fälligkeitstag
+alter table people add column if not exists notify_prefs jsonb not null default '{"assigned": true, "invited": true}';
+
+create table if not exists push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  person_id uuid not null references people(id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  user_agent text,
+  created_at timestamptz not null default now(),
+  last_success timestamptz
+);
+alter table push_subscriptions enable row level security;
+
+create table if not exists notifications_sent (
+  key text primary key,
+  sent_at timestamptz not null default now()
+);
+alter table notifications_sent enable row level security;

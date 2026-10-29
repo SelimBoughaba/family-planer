@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFamily } from "@/lib/client/family";
-import { eventRecurrenceLabel, FALLBACK_COLOR, localDay, type EventFields, type EventRecurrence } from "@/lib/types";
+import { allDayReminderOptions, eventRecurrenceLabel, FALLBACK_COLOR, localDay, timedReminderOptions, type EventFields, type EventRecurrence } from "@/lib/types";
 import type { Occurrence } from "@/lib/recurrence";
 import { Avatar, ContextMenu, type MenuAction } from "./ui";
 import { TimeDial, durationLabel } from "./TimeDial";
@@ -53,6 +53,9 @@ function Switch({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
   );
 }
 
+const reminderValid = (r: string, allDay: boolean) =>
+  r !== "none" && (allDay ? allDayReminderOptions : timedReminderOptions).some((o) => String(o.minutes) === r);
+
 const minutesOf = (d: Date) => d.getHours() * 60 + d.getMinutes();
 
 function initial(target: EditorTarget, me: string | null) {
@@ -70,6 +73,7 @@ function initial(target: EditorTarget, me: string | null) {
       days: e.allDay ? Math.max(1, Math.round((+occ.end - +occ.start) / 86400000)) : 1,
       recurrence: (e.recurrence ?? "none") as EventRecurrence | "none",
       until: e.recurrenceUntil ?? "",
+      reminder: e.reminders.length ? String(e.reminders[0]) : "none",
     };
   }
   return {
@@ -83,6 +87,7 @@ function initial(target: EditorTarget, me: string | null) {
     days: 1,
     recurrence: "none" as EventRecurrence | "none",
     until: "",
+    reminder: "none",
   };
 }
 
@@ -127,6 +132,7 @@ function Editor({ target, onClose }: { target: EditorTarget; onClose: () => void
       people: f.people,
       recurrence,
       recurrenceUntil: recurrence && f.until ? f.until : null,
+      reminders: reminderValid(f.reminder, f.allDay) ? [Number(f.reminder)] : [],
     };
   }, [f]);
 
@@ -259,6 +265,18 @@ function Editor({ target, onClose }: { target: EditorTarget; onClose: () => void
               />
             </div>
           </>
+        )}
+
+        <Label>Erinnerung</Label>
+        <Chips
+          value={reminderValid(f.reminder, f.allDay) ? f.reminder : "none"}
+          onChange={(v) => set("reminder", v)}
+          options={[{ id: "none", label: "Keine" }, ...(f.allDay ? allDayReminderOptions : timedReminderOptions).map((o) => ({ id: String(o.minutes), label: o.label }))]}
+        />
+        {f.reminder !== "none" && reminderValid(f.reminder, f.allDay) && (
+          <p className="caption mt-1.5" style={{ color: "var(--label-3)" }}>
+            Geht an alle, die beim Termin dabei sind und Mitteilungen eingeschaltet haben.
+          </p>
         )}
 
         <Label>Wiederholen</Label>

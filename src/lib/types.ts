@@ -1,10 +1,13 @@
 // Gemeinsame Typen für Browser und Server
 
+export type NotifyPrefs = { invited: boolean; assigned: boolean };
+
 export type Person = {
   id: string;
   name: string;
   color: string | null;
   sort: number;
+  notifyPrefs: NotifyPrefs;
 };
 
 export type CalEvent = {
@@ -20,6 +23,7 @@ export type CalEvent = {
   recurrence: EventRecurrence | null;
   recurrenceUntil: string | null; // YYYY-MM-DD, einschließlich
   exdates: string[]; // ISO-Beginn ausgelassener Vorkommen
+  reminders: number[]; // Minuten vor Beginn
 };
 
 export type EventRecurrence = "daily" | "weekly" | "biweekly" | "monthly" | "yearly";
@@ -42,6 +46,7 @@ export type EventFields = {
   people: string[];
   recurrence: EventRecurrence | null;
   recurrenceUntil: string | null;
+  reminders: number[];
 };
 
 export type Recurrence = "daily" | "weekly" | "biweekly" | "monthly";
@@ -55,6 +60,7 @@ export type Task = {
   recurring: Recurrence | null;
   done: boolean;
   doneAt: string | null;
+  remindTime: string | null; // HH:MM am Fälligkeitstag
 };
 
 export type Item = {
@@ -76,7 +82,8 @@ export type AppState = {
 
 export type Mutation =
   | { op: "person.setColor"; id: string; color: string }
-  | { op: "task.create"; title: string; area: string; personId: string | null; due: string | null; recurring: Recurrence | null }
+  | { op: "person.setNotify"; id: string; prefs: NotifyPrefs }
+  | { op: "task.create"; title: string; area: string; personId: string | null; due: string | null; recurring: Recurrence | null; remindTime: string | null }
   | { op: "task.toggle"; id: string; done: boolean; today: string }
   | { op: "task.postpone"; id: string; today: string }
   | { op: "task.assign"; id: string; personId: string | null }
@@ -122,3 +129,20 @@ export function localDay(d = new Date()) {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
+
+/** Auswahl für Termin-Erinnerungen in Minuten vor Beginn */
+export const timedReminderOptions = [
+  { minutes: 0, label: "Zur Startzeit" },
+  { minutes: 5, label: "5 Min. vorher" },
+  { minutes: 15, label: "15 Min. vorher" },
+  { minutes: 30, label: "30 Min. vorher" },
+  { minutes: 60, label: "1 Std. vorher" },
+  { minutes: 120, label: "2 Std. vorher" },
+  { minutes: 1440, label: "1 Tag vorher" },
+];
+
+/** Ganztägig: Beginn ist Mitternacht, also 300 = Vortag 19 Uhr, -480 = am Tag 8 Uhr */
+export const allDayReminderOptions = [
+  { minutes: 300, label: "Am Vortag, 19 Uhr" },
+  { minutes: -480, label: "Am Tag, 8 Uhr" },
+];
