@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: "Familie",
-    statusBarStyle: "default",
+    statusBarStyle: "black",
   },
 };
 
