@@ -124,5 +124,8 @@ export async function runReminders(now = Date.now()) {
   }
 
   if (Math.random() < 0.02) await sql`delete from notifications_sent where sent_at < now() - interval '45 days'`;
+  await sql`insert into app_meta (key, value, updated_at) values ('reminders_last_run', ${sql.json({ checked, sent })}, now())
+    on conflict (key) do update set value = excluded.value, updated_at = now()`;
+  if (sent) console.log(`[reminders] ${sent} Mitteilung(en) verschickt`);
   return { checked, sent };
 }

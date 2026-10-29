@@ -99,3 +99,11 @@ create table if not exists notifications_sent (
   sent_at timestamptz not null default now()
 );
 alter table notifications_sent enable row level security;
+
+-- Systemwerte, z. B. letzter Lauf des Zeitplaners
+create table if not exists app_meta (
+  key text primary key,
+  value jsonb not null,
+  updated_at timestamptz not null default now()
+);
+alter table app_meta enable row level security;
