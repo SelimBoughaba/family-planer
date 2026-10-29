@@ -105,7 +105,7 @@ export function CalendarView({
   const dayList = occ.filter((o) => o.end > selected && o.start < addDays(selected, 1));
 
   return (
-    <div className="mx-auto flex max-w-md flex-col px-4 safe-top" style={{ height: "100dvh", paddingBottom: "calc(var(--safe-b) + 92px)" }}>
+    <div className="mx-auto flex max-w-md flex-col px-4 safe-top" style={{ height: "100dvh", paddingBottom: "calc(var(--clear) - 4px)" }}>
       <header className="flex items-end justify-between gap-2">
         <div className="min-w-0">
           <button onClick={goToday} className="footnote font-semibold" style={{ color: "var(--danger)" }}>

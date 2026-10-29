@@ -204,40 +204,45 @@ body {
   }
 }
 
-/* Abstand zum Home-Balken. Manche iOS-Versionen geben Home-Bildschirm-Apps einen kürzeren
-   Bildschirm und reservieren den unteren Rand selbst; dann darf die App ihn nicht noch einmal abziehen. */
+/* Abstand zum Home-Balken und Freiraum über der Tab-Leiste.
+   iOS 27 gibt Home-Bildschirm-Apps einen um die Statusleiste zu kurzen Bildschirm (--gap). Die Fläche
+   darunter wird aber noch gezeichnet: Leiste, Hintergrund und Fenster reichen deshalb bis ganz nach unten. */
 :root {
   --safe-b: env(safe-area-inset-bottom);
+  --gap: 0px;
+  --clear: calc(var(--safe-b) + 96px);
 }
 html.ios-gap {
-  --safe-b: 0px;
-  /* iOS färbt den Streifen unterhalb der App mit der Seitenfarbe: gleiche Farbe wie das Dock */
+  --clear: calc(var(--safe-b) + 96px - var(--gap));
+  /* falls iOS den Streifen doch selbst füllt: wenigstens in Leistenfarbe */
   background: var(--dock);
+}
+html.ios-gap .fixed.inset-0 {
+  bottom: calc(-1 * var(--gap));
 }
 
 .tabbar {
   bottom: calc(var(--safe-b) + 10px);
 }
-/* Bei der iOS-Lücke wird die schwebende Leiste zum flachen Dock, das nahtlos in den Streifen übergeht */
+/* Bei der iOS-Lücke liegt die Leiste wie bei Apple-Apps flach am unteren Rand */
 html.ios-gap .tabbar {
-  bottom: 0;
+  bottom: calc(-1 * var(--gap));
   max-width: none;
   padding: 0;
 }
 html.ios-gap .tabbar-inner {
   border-radius: 0;
   border: none;
-  background: var(--dock);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  box-shadow: 0 -0.5px 0 var(--separator);
+  border-top: 0.5px solid var(--separator);
+  padding-bottom: var(--safe-b);
+  box-shadow: none;
 }
-html.ios-gap .tabbar-inner > * {
-  max-width: 100%;
+html.ios-gap .tabbar-inner > span:first-child {
+  bottom: var(--safe-b);
 }
 
 .safe-bottom {
-  padding-bottom: calc(var(--safe-b) + 96px);
+  padding-bottom: var(--clear);
 }
 .safe-top {
   padding-top: calc(env(safe-area-inset-top) + 12px);

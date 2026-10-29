@@ -24,13 +24,14 @@ export const viewport: Viewport = {
 };
 
 /**
- * Erkennt den iOS-Fehler, bei dem eine Home-Bildschirm-App kürzer als das Display ist und das System
- * den unteren Rand selbst belegt. Dann entfällt der zusätzliche Abstand für den Home-Balken.
+ * Erkennt den iOS-Fehler, bei dem eine Home-Bildschirm-App kürzer als das Display ist und iOS
+ * die Fläche darunter nicht mehr zum Bildschirm zählt. Die Lücke wird als --gap gesetzt, damit Leiste
+ * und Hintergrund bis an den echten unteren Rand reichen.
  */
 const GAP_SCRIPT = `(function(){
 function c(){try{var d=document.documentElement;var s=!!(navigator.standalone||matchMedia("(display-mode: standalone)").matches);
 var full=Math.max(screen.width,screen.height);var portrait=innerHeight>innerWidth;var gap=portrait?full-innerHeight:0;
-var on=s&&gap>20;d.classList.toggle("ios-gap",on);
+var on=s&&gap>20;d.classList.toggle("ios-gap",on);d.style.setProperty("--gap",on?gap+"px":"0px");
 }catch(e){}}
 c();addEventListener("resize",c)})();`;
 
