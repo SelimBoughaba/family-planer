@@ -1,10 +1,14 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { people, personById, type Person } from "@/lib/mock";
+import type { Person } from "@/lib/types";
+import { FALLBACK_COLOR } from "@/lib/types";
+import { useFamily } from "@/lib/client/family";
 import { IconCalendar, IconCart, IconChecklist, IconFork, IconToday } from "./icons";
 
-export function Avatar({ person, size = 28, ring }: { person: Person; size?: number; ring?: boolean }) {
+export function Avatar({ person, size = 28, ring }: { person: Person | undefined; size?: number; ring?: boolean }) {
+  if (!person) return null;
+  const c = person.color ?? FALLBACK_COLOR;
   return (
     <span
       className="inline-flex shrink-0 items-center justify-center rounded-full font-semibold text-white"
@@ -12,22 +16,23 @@ export function Avatar({ person, size = 28, ring }: { person: Person; size?: num
         width: size,
         height: size,
         fontSize: size * 0.42,
-        background: `linear-gradient(160deg, ${person.color}, color-mix(in oklab, ${person.color} 70%, black))`,
+        background: `linear-gradient(160deg, ${c}, color-mix(in oklab, ${c} 70%, black))`,
         boxShadow: ring ? "0 0 0 2px var(--bg)" : "inset 0 1px 0 rgba(255,255,255,.35)",
       }}
       aria-label={person.name}
       title={person.name}
     >
-      {person.initial}
+      {person.name.slice(0, 1).toUpperCase()}
     </span>
   );
 }
 
 export function AvatarStack({ ids, size = 22 }: { ids: string[]; size?: number }) {
+  const { person } = useFamily();
   return (
     <span className="flex -space-x-1.5">
       {ids.map((id) => (
-        <Avatar key={id} person={personById(id)} size={size} ring />
+        <Avatar key={id} person={person(id)} size={size} ring />
       ))}
     </span>
   );
@@ -129,9 +134,10 @@ export function TabBar({ tab, onChange, badge }: { tab: Tab; onChange: (t: Tab) 
 }
 
 export function PersonFilter({ selected, onToggle }: { selected: string | null; onToggle: (id: string) => void }) {
+  const { state } = useFamily();
   return (
     <div className="no-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4 pb-1">
-      {people.map((p) => {
+      {(state?.people ?? []).map((p) => {
         const dim = selected && selected !== p.id;
         return (
           <button
@@ -143,7 +149,7 @@ export function PersonFilter({ selected, onToggle }: { selected: string | null; 
           >
             <span
               className="rounded-full p-[2.5px]"
-              style={{ boxShadow: selected === p.id ? `0 0 0 2px ${p.color}` : "none", transition: "box-shadow 200ms ease" }}
+              style={{ boxShadow: selected === p.id ? `0 0 0 2px ${p.color ?? FALLBACK_COLOR}` : "none", transition: "box-shadow 200ms ease" }}
             >
               <Avatar person={p} size={44} />
             </span>
@@ -201,7 +207,7 @@ export function ContextMenu({
         aria-label="Schließen"
       />
       <div className="sheet-in glass glass-strong relative w-full max-w-sm rounded-[22px] p-4">{preview}</div>
-      <div className="sheet-in glass glass-strong relative w-full max-w-[260px] self-start overflow-hidden rounded-[18px] sm:self-center" style={{ animationDelay: "40ms" }}>
+      <div className="sheet-in glass glass-strong relative max-h-[55dvh] w-full max-w-[260px] self-start overflow-y-auto rounded-[18px] sm:self-center" style={{ animationDelay: "40ms" }}>
         {actions.map((a, i) => (
           <button
             key={a.label}

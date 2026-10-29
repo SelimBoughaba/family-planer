@@ -1,50 +1,39 @@
 "use client";
 
 import { useState } from "react";
-import { categories, guessCategory, personById, type Item } from "@/lib/mock";
+import { useFamily } from "@/lib/client/family";
+import { categories, guessCategory, parseItem } from "@/lib/shopping";
+import type { Item } from "@/lib/types";
 import { Avatar, Card, ContextMenu } from "./ui";
 import { SwipeRow } from "./SwipeRow";
 import { IconCheck, IconPlus, IconTrash, IconChevron } from "./icons";
 
-export function ShoppingView({
-  items,
-  setItems,
-  me,
-}: {
-  items: Item[];
-  setItems: (fn: (i: Item[]) => Item[]) => void;
-  me: string;
-}) {
+export function ShoppingView() {
+  const { state, run, person } = useFamily();
   const [draft, setDraft] = useState("");
   const [showDone, setShowDone] = useState(false);
   const [menu, setMenu] = useState<Item | null>(null);
-  const [justAdded, setJustAdded] = useState<string | null>(null);
+  const [moveFor, setMoveFor] = useState<Item | null>(null);
 
+  const items = state?.items ?? [];
   const open = items.filter((i) => !i.done);
   const done = items.filter((i) => i.done);
 
-  const toggle = (id: string) => setItems((is) => is.map((i) => (i.id === id ? { ...i, done: !i.done } : i)));
-  const remove = (id: string) => setItems((is) => is.filter((i) => i.id !== id));
+  const toggle = (it: Item) => run({ op: "item.toggle", id: it.id, done: !it.done });
+  const remove = (it: Item) => run({ op: "item.delete", id: it.id });
 
   const add = () => {
-    const raw = draft.trim();
-    if (!raw) return;
-    // "2 l Milch" oder "Milch 2 l" erkennen
-    const m = raw.match(/^(\d+[.,]?\d*\s?(?:kg|g|l|ml|x|stk\.?|packungen?|pck\.?)?)\s+(.+)$/i);
-    const name = m ? m[2] : raw;
-    const amount = m ? m[1] : undefined;
-    const id = `n${Date.now()}`;
-    setItems((is) => [{ id, name, amount, category: guessCategory(name), by: me, done: false }, ...is]);
-    setJustAdded(id);
+    if (!draft.trim()) return;
+    const { name, amount } = parseItem(draft);
+    void run({ op: "item.create", name, amount, category: guessCategory(name) });
     setDraft("");
-    setTimeout(() => setJustAdded(null), 1200);
   };
 
   return (
     <div className="mx-auto max-w-md px-4 safe-top safe-bottom">
       <header className="mb-4">
         <p className="footnote font-medium tabular" style={{ color: "var(--label-2)" }}>
-          {open.length === 0 ? "Alles erledigt" : `${open.length} Artikel offen`}
+          {open.length === 0 ? "Alles besorgt" : `${open.length} Artikel offen`}
         </p>
         <h1 className="large-title">Einkauf</h1>
       </header>
@@ -62,7 +51,8 @@ export function ShoppingView({
           onChange={(e) => setDraft(e.target.value)}
           placeholder="Artikel hinzufügen, z. B. 2 l Milch"
           className="body min-w-0 flex-1 bg-transparent py-1.5 outline-none placeholder:text-[var(--label-3)]"
-          enterKeyHint="done"
+          enterKeyHint="send"
+          autoComplete="off"
           aria-label="Artikel hinzufügen"
         />
         <button
@@ -88,16 +78,16 @@ export function ShoppingView({
               {list.map((it, idx) => (
                 <SwipeRow
                   key={it.id}
-                  leading={{ label: "Im Wagen", color: "var(--success)", icon: <IconCheck size={18} />, onTrigger: () => toggle(it.id) }}
-                  trailing={{ label: "Löschen", color: "var(--danger)", icon: <IconTrash size={18} />, onTrigger: () => remove(it.id) }}
+                  leading={{ label: "Im Wagen", color: "var(--success)", icon: <IconCheck size={18} />, onTrigger: () => toggle(it) }}
+                  trailing={{ label: "Löschen", color: "var(--danger)", icon: <IconTrash size={18} />, onTrigger: () => remove(it) }}
                   onLongPress={() => setMenu(it)}
                 >
                   <div
-                    className={`flex items-center gap-3 px-4 py-3 ${justAdded === it.id ? "sheet-in" : ""}`}
+                    className={`flex items-center gap-3 px-4 py-3 ${it.id.startsWith("tmp-") ? "sheet-in" : ""}`}
                     style={{ borderTop: idx ? "0.5px solid var(--separator)" : "none" }}
                   >
                     <button
-                      onClick={() => toggle(it.id)}
+                      onClick={() => toggle(it)}
                       className="h-[26px] w-[26px] shrink-0 rounded-full"
                       style={{ border: "1.6px solid var(--label-3)" }}
                       aria-label={`${it.name} abhaken`}
@@ -108,7 +98,7 @@ export function ShoppingView({
                         {it.amount}
                       </span>
                     )}
-                    <Avatar person={personById(it.by)} size={20} />
+                    <Avatar person={person(it.addedBy)} size={20} />
                   </div>
                 </SwipeRow>
               ))}
@@ -141,7 +131,7 @@ export function ShoppingView({
               {done.map((it, idx) => (
                 <div key={it.id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: idx ? "0.5px solid var(--separator)" : "none" }}>
                   <button
-                    onClick={() => toggle(it.id)}
+                    onClick={() => toggle(it)}
                     className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full text-white"
                     style={{ background: "var(--success)" }}
                     aria-label={`${it.name} zurück auf die Liste`}
@@ -154,7 +144,7 @@ export function ShoppingView({
                 </div>
               ))}
               <button
-                onClick={() => setItems((is) => is.filter((i) => !i.done))}
+                onClick={() => run({ op: "item.clearDone" })}
                 className="subhead w-full px-4 py-3 text-left font-medium"
                 style={{ color: "var(--danger)", borderTop: "0.5px solid var(--separator)" }}
               >
@@ -171,15 +161,9 @@ export function ShoppingView({
         actions={
           menu
             ? [
-                { label: "Im Wagen", icon: <IconCheck size={18} />, onSelect: () => toggle(menu.id) },
-                ...categories
-                  .filter((c) => c !== menu.category)
-                  .slice(0, 2)
-                  .map((c) => ({
-                    label: `Nach ${c}`,
-                    onSelect: () => setItems((is) => is.map((i) => (i.id === menu.id ? { ...i, category: c } : i))),
-                  })),
-                { label: "Löschen", icon: <IconTrash size={18} />, destructive: true, onSelect: () => remove(menu.id) },
+                { label: "Im Wagen", icon: <IconCheck size={18} />, onSelect: () => toggle(menu) },
+                { label: "Andere Abteilung", onSelect: () => setTimeout(() => setMoveFor(menu), 50) },
+                { label: "Löschen", icon: <IconTrash size={18} />, destructive: true, onSelect: () => remove(menu) },
               ]
             : []
         }
@@ -192,12 +176,25 @@ export function ShoppingView({
                   {menu.amount ? `, ${menu.amount}` : ""}
                 </p>
                 <p className="footnote" style={{ color: "var(--label-2)" }}>
-                  {menu.category}, eingetragen von {personById(menu.by).name}
+                  {menu.category}
+                  {person(menu.addedBy) ? `, eingetragen von ${person(menu.addedBy)!.name}` : ""}
                 </p>
               </div>
-              <Avatar person={personById(menu.by)} size={32} />
+              <Avatar person={person(menu.addedBy)} size={32} />
             </div>
           )
+        }
+      />
+      <ContextMenu
+        open={!!moveFor}
+        onClose={() => setMoveFor(null)}
+        preview={moveFor && <p className="headline">„{moveFor.name}“ verschieben nach</p>}
+        actions={
+          moveFor
+            ? categories
+                .filter((c) => c !== moveFor.category)
+                .map((c) => ({ label: c, onSelect: () => run({ op: "item.move", id: moveFor.id, category: c }) }))
+            : []
         }
       />
     </div>

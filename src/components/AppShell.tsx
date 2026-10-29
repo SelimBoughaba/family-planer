@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { initialItems, initialTasks, makeEvents, personById, type CalEvent, type Item, type Task } from "@/lib/mock";
-import { Ambient, Card, TabBar, useNow, type Tab } from "./ui";
+import { FamilyProvider, useFamily } from "@/lib/client/family";
+import { Ambient, Avatar, Card, ContextMenu, TabBar, useNow, type Tab } from "./ui";
 import { TodayView } from "./TodayView";
 import { ShoppingView } from "./ShoppingView";
+import { NewEntrySheet } from "./NewEntrySheet";
+import { ColorPicker, PersonPicker } from "./Onboarding";
+import { IconPerson } from "./icons";
 
-const ME = "selim";
-
-const upcoming: Record<Exclude<Tab, "heute" | "einkauf">, { title: string; text: string }> = {
+const upcoming: Record<"kalender" | "essen" | "aufgaben", { title: string; text: string }> = {
   kalender: {
     title: "Kalender",
     text: "Tag, Woche, Monat und Jahr. Termine per Ziehen verschieben, Dauer mit dem Drehrad einstellen, Abo-Link für den Apple Kalender.",
@@ -19,17 +20,41 @@ const upcoming: Record<Exclude<Tab, "heute" | "einkauf">, { title: string; text:
   },
   aufgaben: {
     title: "Aufgaben",
-    text: "Nach Bereichen und Personen, wiederkehrende Aufgaben und ein Dienstplan, der Hausarbeiten automatisch reihum verteilt.",
+    text: "Alle Aufgaben nach Bereichen und Personen, mit Dienstplan, der Hausarbeiten automatisch reihum verteilt. Heute siehst du bereits die fälligen.",
   },
 };
 
 export function AppShell() {
+  return (
+    <FamilyProvider>
+      <Gate />
+    </FamilyProvider>
+  );
+}
+
+function Gate() {
+  const { state, error, me } = useFamily();
+  if (!state) {
+    return (
+      <main className="relative isolate flex min-h-dvh items-center justify-center px-6">
+        <Ambient colors={["#8E6CFF", "#3E8BFF"]} />
+        <p className="subhead text-center" style={{ color: error ? "var(--danger)" : "var(--label-2)" }}>
+          {error ?? "Wird geladen"}
+        </p>
+      </main>
+    );
+  }
+  if (!me) return <PersonPicker />;
+  if (!me.color) return <ColorPicker me={me} />;
+  return <Main />;
+}
+
+function Main() {
+  const { state, error, me, setMe, color } = useFamily();
   const [tab, setTab] = useState<Tab>("heute");
-  const [events] = useState<CalEvent[]>(makeEvents);
-  const [tasks, setTasks] = useState<Task[]>(initialTasks);
-  const [items, setItems] = useState<Item[]>(initialItems);
   const [filter, setFilter] = useState<string | null>(null);
-  const [missingAdded, setMissingAdded] = useState(false);
+  const [newOpen, setNewOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const now = useNow();
 
   useEffect(() => {
@@ -37,41 +62,35 @@ export function AppShell() {
   }, [tab]);
 
   const ambient = useMemo(() => {
-    if (filter) return [personById(filter).color];
-    if (tab === "einkauf") return [...new Set(items.filter((i) => !i.done).map((i) => personById(i.by).color))];
-    const ids = events.filter((e) => e.end > now).flatMap((e) => e.people);
-    return [...new Set(ids)].map((id) => personById(id).color);
-  }, [filter, tab, items, events, now]);
+    if (filter) return [color(filter)];
+    if (tab === "einkauf") return [...new Set((state?.items ?? []).filter((i) => !i.done).map((i) => color(i.addedBy)))];
+    const ids = (state?.events ?? []).filter((e) => new Date(e.endsAt) > now).flatMap((e) => e.people);
+    const list = [...new Set(ids)].map((id) => color(id));
+    return list.length ? list : [color(me?.id)];
+  }, [filter, tab, state, now, color, me]);
 
-  const openItems = items.filter((i) => !i.done).length;
+  const openItems = (state?.items ?? []).filter((i) => !i.done).length;
 
-  const addMissing = () => {
-    if (missingAdded) return;
-    setItems((is) => [
-      { id: "m1", name: "Bio-Zitronen", amount: "2", category: "Obst & Gemüse", by: ME, done: false },
-      { id: "m2", name: "Pecorino", category: "Kühlregal", by: ME, done: false },
-      ...is,
-    ]);
-    setMissingAdded(true);
+  const logout = async () => {
+    await fetch("/api/logout", { method: "POST" });
+    setMe(null);
+    window.location.reload();
   };
 
   return (
     <main className="relative isolate min-h-dvh">
       <Ambient colors={ambient.slice(0, 3)} />
 
-      {tab === "heute" && (
-        <TodayView
-          now={now}
-          events={events}
-          tasks={tasks}
-          setTasks={setTasks}
-          filter={filter}
-          setFilter={setFilter}
-          onAddMissing={addMissing}
-          missingAdded={missingAdded}
-        />
+      {error && (
+        <div className="fixed inset-x-0 z-30 mx-auto max-w-md px-4" style={{ top: "calc(env(safe-area-inset-top) + 6px)" }}>
+          <div className="glass glass-strong footnote fade-in rounded-[14px] px-3 py-2 text-center" style={{ color: "var(--danger)" }} role="status">
+            {error}
+          </div>
+        </div>
       )}
-      {tab === "einkauf" && <ShoppingView items={items} setItems={setItems} me={ME} />}
+
+      {tab === "heute" && <TodayView now={now} filter={filter} setFilter={setFilter} onNew={() => setNewOpen(true)} onProfile={() => setProfileOpen(true)} />}
+      {tab === "einkauf" && <ShoppingView />}
       {(tab === "kalender" || tab === "essen" || tab === "aufgaben") && (
         <div className="mx-auto max-w-md px-4 safe-top safe-bottom">
           <h1 className="large-title mb-4">{upcoming[tab].title}</h1>
@@ -85,6 +104,28 @@ export function AppShell() {
       )}
 
       <TabBar tab={tab} onChange={setTab} badge={{ einkauf: openItems }} />
+      <NewEntrySheet open={newOpen} onClose={() => setNewOpen(false)} />
+      <ContextMenu
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        preview={
+          me && (
+            <div className="flex items-center gap-3">
+              <Avatar person={me} size={44} />
+              <div>
+                <p className="headline">{me.name}</p>
+                <p className="footnote" style={{ color: "var(--label-2)" }}>
+                  Auf diesem Gerät angemeldet
+                </p>
+              </div>
+            </div>
+          )
+        }
+        actions={[
+          { label: "Profil wechseln", icon: <IconPerson size={18} />, onSelect: () => setMe(null) },
+          { label: "Auf diesem Gerät abmelden", destructive: true, onSelect: () => void logout() },
+        ]}
+      />
     </main>
   );
 }
