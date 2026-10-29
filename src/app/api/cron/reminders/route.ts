@@ -5,6 +5,8 @@ import { maybeAutoBackup } from "@/lib/server/backup";
 import { logError } from "@/lib/server/log";
 import { healStuckQueries } from "@/lib/server/heal";
 
+export const maxDuration = 55;
+
 function authorized(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
   const got = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";

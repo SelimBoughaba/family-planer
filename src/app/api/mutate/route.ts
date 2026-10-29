@@ -6,6 +6,8 @@ import { planNotifications } from "@/lib/server/notify";
 import { logError } from "@/lib/server/log";
 import type { Mutation } from "@/lib/types";
 
+export const maxDuration = 30;
+
 export async function POST(req: NextRequest) {
   const denied = await unauthorized(req);
   if (denied) return denied;

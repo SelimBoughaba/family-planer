@@ -24,6 +24,16 @@ const schema = readFileSync(new URL("../db/schema.sql", import.meta.url), "utf8"
 const hash = createHash("sha256").update(schema).digest("hex").slice(0, 16);
 
 try {
+  // Ist die Datenbank gar nicht erreichbar, den Build nicht blockieren: sonst kommt auch keine Reparatur mehr live
+  try {
+    await sql`select 1`;
+  } catch (err) {
+    console.warn("[migrate] Datenbank nicht erreichbar, Migration übersprungen:", err.message);
+    process.exit(0);
+  }
+  await diagnose();
+  await clearStuck();
+  await serverTimeouts();
   if (await upToDate()) {
     console.log("[migrate] Schema unverändert, nichts zu tun.");
   } else {
@@ -50,7 +60,6 @@ async function upToDate() {
 }
 
 async function applySchema() {
-  await clearStuck();
 
   for (let attempt = 1; attempt <= 4; attempt++) {
     try {
@@ -85,11 +94,60 @@ async function clearStuck() {
       and coalesce(application_name, '') not like 'pg_net%' and coalesce(application_name, '') not like 'pg_cron%'
       and (
         (state in ('active', 'idle in transaction', 'idle in transaction (aborted)') and xact_start < now() - interval '20 seconds')
+        or (state = 'active' and query_start < now() - interval '20 seconds')
         or (wait_event = 'ClientRead' and state = 'active' and query_start < now() - interval '5 seconds')
       )`;
   for (const r of stuck) {
     console.log(`[migrate] beende hängende Abfrage pid ${r.pid} (${r.state}, wartet auf ${r.wait_event_type ?? "-"}/${r.wait_event ?? "-"}, blockiert von ${JSON.stringify(r.blocked_by)}, seit ${r.age}): ${r.query}`);
     await sql`select pg_terminate_backend(${r.pid})`;
+  }
+}
+
+/** Überblick über die Verbindungen ins Build-Protokoll, ohne Abfrageinhalte mit Daten */
+async function diagnose() {
+  try {
+    const groups = await sql`
+      select usename, coalesce(application_name, '') as app, state, wait_event_type, wait_event, count(*)::int as n,
+        max(now() - coalesce(xact_start, query_start, backend_start)) as oldest
+      from pg_stat_activity
+      where datname = current_database() and backend_type = 'client backend' and pid <> pg_backend_pid()
+      group by 1, 2, 3, 4, 5 order by n desc limit 15`;
+    console.log("[migrate] Verbindungen:");
+    for (const g of groups) console.log(`  ${g.n}× ${g.usename} ${g.app || "-"} ${g.state ?? "-"} ${g.wait_event_type ?? "-"}/${g.wait_event ?? "-"} ältester ${g.oldest ?? "-"}`);
+    const [locks] = await sql`select count(*)::int as n from pg_locks where not granted`;
+    console.log(`[migrate] wartende Sperren: ${locks.n}`);
+  } catch (err) {
+    console.warn("[migrate] Diagnose nicht möglich:", err.message);
+  }
+}
+
+/**
+ * Dauerhafte Zeitgrenzen für die App-Rolle: Eine vergessene Transaktion oder ein endlos wartender
+ * Befehl wird von der Datenbank selbst beendet und kann den Pooler nicht mehr verstopfen.
+ */
+async function serverTimeouts() {
+  try {
+    const [{ user, version }] = await sql`select current_user as user, current_setting('server_version_num')::int as version`;
+    const wanted = {
+      idle_in_transaction_session_timeout: "30s",
+      statement_timeout: "30s",
+      lock_timeout: "10s",
+      ...(version >= 170000 ? { transaction_timeout: "60s" } : {}),
+    };
+    const [row] = await sql`select setconfig from pg_db_role_setting s join pg_roles r on r.oid = s.setrole where r.rolname = ${user} and s.setdatabase = 0`;
+    const current = new Map((row?.setconfig ?? []).map((c) => c.split("=")));
+    const missing = Object.entries(wanted).filter(([k, v]) => current.get(k) !== v);
+    if (!missing.length) return console.log("[migrate] Zeitgrenzen der Datenbank sind gesetzt.");
+    for (const [k, v] of missing) await sql.unsafe(`alter role "${user.replace(/"/g, "")}" set ${k} = '${v}'`);
+    console.log(`[migrate] Zeitgrenzen gesetzt: ${missing.map(([k, v]) => `${k}=${v}`).join(", ")}`);
+    // bestehende Pooler-Verbindungen übernehmen die Werte erst neu aufgebaut: ruhende App-Verbindungen schließen
+    const idle = await sql`
+      select pg_terminate_backend(pid) from pg_stat_activity
+      where usename = current_user and pid <> pg_backend_pid() and backend_type = 'client backend' and state = 'idle'
+        and coalesce(application_name, '') not like 'pg_net%' and coalesce(application_name, '') not like 'pg_cron%'`;
+    console.log(`[migrate] ${idle.length} ruhende Verbindung(en) erneuert.`);
+  } catch (err) {
+    console.warn("[migrate] Zeitgrenzen konnten nicht gesetzt werden:", err.message);
   }
 }
 

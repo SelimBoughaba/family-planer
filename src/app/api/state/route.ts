@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { unauthorized } from "@/lib/server/auth";
 import { loadState } from "@/lib/server/data";
 
+export const maxDuration = 30;
+
 export async function GET(req: NextRequest) {
   const denied = await unauthorized(req);
   if (denied) return denied;

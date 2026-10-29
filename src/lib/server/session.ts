@@ -37,12 +37,16 @@ let epochCache: { value: number; at: number } | null = null;
 export async function sessionEpoch() {
   if (epochCache && Date.now() - epochCache.at < 20000) return epochCache.value;
   try {
-    const [row] = await db()`select value from app_meta where key = 'session_epoch'`;
+    // höchstens kurz warten: die Anmeldung soll nicht an einer langsamen Datenbank hängen
+    const [row] = await Promise.race([
+      db()`select value from app_meta where key = 'session_epoch'`,
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("epoch_timeout")), 3000)),
+    ]);
     const value = Number(row?.value ?? 0) || 0;
     epochCache = { value, at: Date.now() };
     return value;
   } catch {
-    return epochCache?.value ?? 0;
+    return epochCache?.value ?? null;
   }
 }
 
@@ -57,7 +61,7 @@ export async function bumpSessionEpoch() {
 
 export async function createSession() {
   const exp = Math.floor(Date.now() / 1000) + SESSION_MAX_AGE;
-  const payload = `v2.${exp}.${fingerprint(password())}.${await sessionEpoch()}`;
+  const payload = `v2.${exp}.${fingerprint(password())}.${(await sessionEpoch()) ?? 0}`;
   return `${payload}.${sign(familyKey(), payload)}`;
 }
 
@@ -73,7 +77,9 @@ export async function verifySession(token: string | undefined | null): Promise<b
   } catch {
     return false;
   }
-  return Number(epoch) === (await sessionEpoch());
+  const current = await sessionEpoch();
+  // Datenbank nicht erreichbar: gültig signierte Sitzung nicht wegen der Epoche abweisen
+  return current === null || Number(epoch) === current;
 }
 
 export function passwordConfigured() {

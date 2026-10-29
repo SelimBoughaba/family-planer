@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { checkPassword, createSession, passwordConfigured, SESSION_COOKIE, SESSION_MAX_AGE } from "@/lib/server/session";
 import { checkLock, clientIp, recordAttempt, remainingAfterFailure } from "@/lib/server/ratelimit";
 
+export const maxDuration = 20;
+
 export async function POST(req: NextRequest) {
   if (!passwordConfigured()) {
     return NextResponse.json({ error: "password_missing" }, { status: 503 });
