@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { cookies } from "next/headers";
+import { connection } from "next/server";
 import type { Metadata } from "next";
 import { OwnerApp, OwnerGate } from "@/components/owner/OwnerApp";
 import { OWNER_COOKIE, ownerConfigured, SESSION_COOKIE, verifyOwnerSession, verifySession } from "@/lib/server/session";
@@ -7,6 +8,8 @@ import { OWNER_COOKIE, ownerConfigured, SESSION_COOKIE, verifyOwnerSession, veri
 export const metadata: Metadata = { title: "Verwaltung", robots: { index: false, follow: false } };
 
 async function Gate() {
+  // erst zur Anfrage auswerten: die Prüfung nutzt die aktuelle Zeit
+  await connection();
   const jar = await cookies();
   if (!(await verifySession(jar.get(SESSION_COOKIE)?.value))) return <OwnerGate state="family" />;
   if (!ownerConfigured()) return <OwnerGate state="missing" />;
