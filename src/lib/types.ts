@@ -150,7 +150,16 @@ export type BoardItem = {
 export type BoardItemPatch = Partial<Pick<BoardItem, "x" | "y" | "w" | "h" | "rot" | "z" | "color" | "text" | "ink" | "expires">>;
 
 export type Reward = { id: string; title: string; emoji: string | null; cost: number };
-export type RewardClaim = { id: string; rewardId: string | null; title: string; personId: string; cost: number; status: "pending" | "approved" | "declined"; decidedBy: string | null; createdAt: string };
+export type RewardClaim = {
+  id: string;
+  rewardId: string | null;
+  title: string;
+  personId: string;
+  cost: number;
+  status: "pending" | "approved" | "declined";
+  decidedBy: string | null;
+  createdAt: string;
+};
 /** Punktestand: Woche (ab Montag), Monat, Kontostand (verdient minus eingelöst und reserviert) */
 export type PointsInfo = { week: Record<string, number>; month: Record<string, number>; balance: Record<string, number>; rewards: Reward[]; claims: RewardClaim[] };
 
@@ -176,13 +185,13 @@ export type AppState = {
 export type Mutation =
   | { op: "person.setColor"; id: string; color: string }
   | { op: "person.setNotify"; id: string; prefs: NotifyPrefs }
-  | ({ op: "task.create" } & TaskFields)
+  | ({ op: "task.create"; id?: string } & TaskFields)
   | ({ op: "task.update"; id: string } & TaskFields)
   | { op: "task.toggle"; id: string; done: boolean; today: string }
   | { op: "task.postpone"; id: string; today: string }
   | { op: "task.assign"; id: string; personId: string | null }
   | { op: "task.delete"; id: string }
-  | { op: "item.create"; name: string; amount: string | null; category: string }
+  | { op: "item.create"; id?: string; name: string; amount: string | null; category: string }
   | { op: "item.toggle"; id: string; done: boolean }
   | { op: "item.move"; id: string; category: string }
   | { op: "item.setAmount"; id: string; amount: string | null }
@@ -223,18 +232,7 @@ export const recurrenceLabel: Record<Recurrence, string> = {
 
 export const areas = ["Haushalt", "Schule", "Uni", "Arbeit", "Garten", "Verträge", "Einkauf", "Sonstiges"];
 
-export const personColors = [
-  "#FF6B8B",
-  "#FF453A",
-  "#FF9F2E",
-  "#E5B700",
-  "#2BC48A",
-  "#30B0C7",
-  "#3E8BFF",
-  "#5E5CE6",
-  "#8E6CFF",
-  "#A2845E",
-];
+export const personColors = ["#FF6B8B", "#FF453A", "#FF9F2E", "#E5B700", "#2BC48A", "#30B0C7", "#3E8BFF", "#5E5CE6", "#8E6CFF", "#A2845E"];
 
 export const FALLBACK_COLOR = "#8E8E93";
 

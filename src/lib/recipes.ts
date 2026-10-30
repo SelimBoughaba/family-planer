@@ -57,7 +57,7 @@ export function isoMinutes(v: unknown) {
   if (typeof v !== "string") return null;
   const m = v.match(/^P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?/i);
   if (!m) return null;
-  const total = (+(m[1] ?? 0)) * 1440 + (+(m[2] ?? 0)) * 60 + +(m[3] ?? 0);
+  const total = +(m[1] ?? 0) * 1440 + +(m[2] ?? 0) * 60 + +(m[3] ?? 0);
   return total || null;
 }
 

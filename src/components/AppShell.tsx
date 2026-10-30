@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Toaster, toast } from "sonner";
 import { FamilyProvider, useFamily } from "@/lib/client/family";
 import { Ambient, Avatar, ContextMenu, TabBar, useNow, type Tab } from "./ui";
 import { TodayView } from "./TodayView";
@@ -114,6 +115,12 @@ function Main() {
     return list.length ? list : [color(me?.id)];
   }, [filter, tab, state, now, color, me]);
 
+  // Fehler als Meldung statt Banner; verschwindet, sobald wieder alles geladen ist
+  useEffect(() => {
+    if (error) toast.error(error, { id: "fp-error", duration: 6000 });
+    else toast.dismiss("fp-error");
+  }, [error]);
+
   const openItems = (state?.items ?? []).filter((i) => !i.done).length;
 
   const logout = async () => {
@@ -125,14 +132,6 @@ function Main() {
   return (
     <main className="relative isolate min-h-dvh">
       <Ambient colors={ambient.slice(0, 3)} />
-
-      {error && (
-        <div className="fixed inset-x-0 z-30 mx-auto max-w-md px-4" style={{ top: "calc(env(safe-area-inset-top) + 6px)" }}>
-          <div className="glass glass-strong footnote fade-in rounded-[14px] px-3 py-2 text-center" style={{ color: "var(--danger)" }} role="status">
-            {error}
-          </div>
-        </div>
-      )}
 
       {tab === "heute" && (
         <TodayView
@@ -161,6 +160,13 @@ function Main() {
       {tab === "essen" && <FoodView key={foodDay ?? "plan"} initialDay={foodDay} />}
       {tab === "aufgaben" && <TasksView filter={filter} setFilter={setFilter} onNew={() => setNewOpen(true)} onQuick={() => setQuickMenu(true)} onEdit={setTaskEdit} />}
 
+      <Toaster
+        position="bottom-center"
+        offset={{ bottom: "calc(var(--safe-b) + 96px)" }}
+        mobileOffset={{ bottom: "calc(var(--safe-b) + 96px)", left: "12px", right: "12px" }}
+        gap={8}
+        toastOptions={{ className: "fp-toast", duration: 4000 }}
+      />
       <TabBar
         tab={tab}
         onChange={(t) => {

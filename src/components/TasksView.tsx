@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useFamily } from "@/lib/client/family";
 import { localDay, recurrenceLabel, type Task } from "@/lib/types";
-import { Avatar, Card, PersonFilter, SectionTitle, useLongPress } from "./ui";
+import { AnimatePresence, Avatar, Card, ListItem, PersonFilter, SectionTitle, useLongPress } from "./ui";
 import { TaskRow, dueLabel, useAssignDrop, useTaskMenus } from "./TaskRow";
 import { IconPlus } from "./icons";
 import { PointsView } from "./PointsView";
@@ -108,7 +108,7 @@ export function TasksView({
       <div
         className="relative mt-4 flex rounded-[10px] p-[2px]"
         style={{
-          background: "color-mix(in oklab, var(--label) 8%, transparent)",
+          background: "var(--fill)",
         }}
       >
         <span
@@ -263,18 +263,21 @@ export function TasksView({
                 </span>
               </SectionTitle>
               <Card className="overflow-hidden">
-                {g.items.map((t, i) => (
-                  <TaskRow
-                    key={t.id}
-                    task={t}
-                    first={i === 0}
-                    today={today}
-                    onEdit={onEdit}
-                    onMenu={openMenu}
-                    showDue={mode === "bereich" || g.title === "Nächste 7 Tage" || g.title === "Später"}
-                    showArea={mode !== "bereich"}
-                  />
-                ))}
+                <AnimatePresence initial={false}>
+                  {g.items.map((t, i) => (
+                    <ListItem key={t.id}>
+                      <TaskRow
+                        task={t}
+                        first={i === 0}
+                        today={today}
+                        onEdit={onEdit}
+                        onMenu={openMenu}
+                        showDue={mode === "bereich" || g.title === "Nächste 7 Tage" || g.title === "Später"}
+                        showArea={mode !== "bereich"}
+                      />
+                    </ListItem>
+                  ))}
+                </AnimatePresence>
               </Card>
             </section>
           ))}
@@ -297,8 +300,7 @@ export function TasksView({
             </>
           )}
           <p className="caption mt-2 px-1" style={{ color: "var(--label-3)" }}>
-            Nach rechts wischen erledigt, nach links verschiebt auf morgen, antippen bearbeitet, lange drücken zeigt mehr. Ein Profilbild oben lange drücken und auf eine Aufgabe
-            ziehen gibt sie dieser Person.
+            Nach rechts wischen erledigt, nach links auf morgen. Lange drücken zeigt mehr. Ein Profilbild oben lange drücken und auf eine Aufgabe ziehen gibt sie dieser Person.
           </p>
         </>
       )}

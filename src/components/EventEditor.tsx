@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useFamily } from "@/lib/client/family";
 import { allDayReminderOptions, eventRecurrenceLabel, FALLBACK_COLOR, localDay, timedReminderOptions, type EventFields, type EventRecurrence } from "@/lib/types";
 import type { Occurrence } from "@/lib/recurrence";
-import { Avatar, ContextMenu, type MenuAction } from "./ui";
+import { AnimatePresence, Avatar, Chips, ContextMenu, SheetFrame, Switch, type MenuAction } from "./ui";
 import { TimeDial, durationLabel } from "./TimeDial";
 import { IconRepeat, IconTrash } from "./icons";
 
@@ -16,45 +16,16 @@ const Label = ({ children }: { children: string }) => (
   </p>
 );
 
-function Chips<T extends string>({ value, options, onChange }: { value: T; options: { id: T; label: string }[]; onChange: (v: T) => void }) {
-  return (
-    <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
-      {options.map((o) => (
-        <button
-          key={o.id}
-          type="button"
-          onClick={() => onChange(o.id)}
-          className="press subhead shrink-0 rounded-full px-3.5 py-1.5 font-medium"
-          style={{
-            background: o.id === value ? "var(--tint)" : "color-mix(in oklab, var(--label) 7%, transparent)",
-            color: o.id === value ? "white" : "var(--label)",
-            transition: "background 160ms ease",
-          }}
-          aria-pressed={o.id === value}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function Switch({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
+function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
     <button type="button" onClick={() => onChange(!on)} className="mt-4 flex w-full items-center justify-between" role="switch" aria-checked={on}>
       <span className="body">{label}</span>
-      <span className="relative h-[31px] w-[51px] rounded-full" style={{ background: on ? "var(--success)" : "color-mix(in oklab, var(--label) 14%, transparent)", transition: "background 200ms ease" }}>
-        <span
-          className="absolute top-[2px] h-[27px] w-[27px] rounded-full bg-white"
-          style={{ left: on ? 22 : 2, boxShadow: "0 3px 8px rgba(0,0,0,.15)", transition: "left 220ms cubic-bezier(0.3, 1.3, 0.5, 1)" }}
-        />
-      </span>
+      <Switch on={on} />
     </button>
   );
 }
 
-const reminderValid = (r: string, allDay: boolean) =>
-  r !== "none" && (allDay ? allDayReminderOptions : timedReminderOptions).some((o) => String(o.minutes) === r);
+const reminderValid = (r: string, allDay: boolean) => r !== "none" && (allDay ? allDayReminderOptions : timedReminderOptions).some((o) => String(o.minutes) === r);
 
 const minutesOf = (d: Date) => d.getHours() * 60 + d.getMinutes();
 
@@ -92,10 +63,9 @@ function initial(target: EditorTarget, me: string | null) {
 }
 
 export function EventEditor({ target, onClose }: { target: EditorTarget | null; onClose: () => void }) {
-  if (!target) return null;
   // Schlüssel sorgt dafür, dass jeder Aufruf mit frischem Formular startet
-  const key = target.mode === "edit" ? target.occ.key : `new-${+target.start}`;
-  return <Editor key={key} target={target} onClose={onClose} />;
+  const key = !target ? "none" : target.mode === "edit" ? target.occ.key : `new-${+target.start}`;
+  return <AnimatePresence>{target && <Editor key={key} target={target} onClose={onClose} />}</AnimatePresence>;
 }
 
 function Editor({ target, onClose }: { target: EditorTarget; onClose: () => void }) {
@@ -181,27 +151,26 @@ function Editor({ target, onClose }: { target: EditorTarget; onClose: () => void
         : [];
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center" role="dialog" aria-modal aria-label={editing ? "Termin bearbeiten" : "Neuer Termin"}>
-      <button className="fade-in absolute inset-0" style={{ background: "rgba(0,0,0,.25)" }} onClick={onClose} aria-label="Abbrechen" />
-      <form
+    <>
+      <SheetFrame
+        label={editing ? "Termin bearbeiten" : "Neuer Termin"}
+        onClose={onClose}
         onSubmit={(e) => {
           e.preventDefault();
           void save();
         }}
-        className="sheet-in glass glass-strong relative max-h-[94dvh] w-full max-w-md overflow-y-auto rounded-t-[30px] px-4 pt-2"
-        style={{ paddingBottom: "calc(var(--safe-b) + 24px)" }}
+        header={
+          <div className="flex items-center justify-between py-1">
+            <button type="button" onClick={onClose} className="body" style={{ color: "var(--tint)" }}>
+              Abbrechen
+            </button>
+            <span className="headline">{editing ? "Termin" : "Neuer Termin"}</span>
+            <button type="submit" disabled={!fields.title || busy} className="body font-semibold" style={{ color: fields.title ? "var(--tint)" : "var(--label-3)" }}>
+              {editing ? "Sichern" : "Hinzufügen"}
+            </button>
+          </div>
+        }
       >
-        <span className="mx-auto mb-2 block h-[5px] w-9 rounded-full" style={{ background: "var(--label-3)" }} aria-hidden />
-        <div className="flex items-center justify-between py-1">
-          <button type="button" onClick={onClose} className="body" style={{ color: "var(--tint)" }}>
-            Abbrechen
-          </button>
-          <span className="headline">{editing ? "Termin" : "Neuer Termin"}</span>
-          <button type="submit" disabled={!fields.title || busy} className="body font-semibold" style={{ color: fields.title ? "var(--tint)" : "var(--label-3)" }}>
-            {editing ? "Sichern" : "Hinzufügen"}
-          </button>
-        </div>
-
         <input
           ref={titleRef}
           value={f.title}
@@ -230,7 +199,14 @@ function Editor({ target, onClose }: { target: EditorTarget; onClose: () => void
           {people.map((p) => {
             const on = f.people.includes(p.id);
             return (
-              <button key={p.id} type="button" onClick={() => togglePerson(p.id)} className="press flex flex-col items-center gap-1" aria-pressed={on} style={{ opacity: on ? 1 : 0.4, transition: "opacity 160ms ease" }}>
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => togglePerson(p.id)}
+                className="press flex flex-col items-center gap-1"
+                aria-pressed={on}
+                style={{ opacity: on ? 1 : 0.4, transition: "opacity 160ms ease" }}
+              >
                 <Avatar person={p} size={40} />
                 <span className="caption">{p.name}</span>
               </button>
@@ -239,8 +215,14 @@ function Editor({ target, onClose }: { target: EditorTarget; onClose: () => void
         </div>
 
         <Label>Datum</Label>
-        <input type="date" value={f.date} onChange={(e) => e.target.value && set("date", e.target.value)} className="body glass w-full rounded-[12px] px-3 py-2" aria-label="Datum" />
-        <Switch on={f.allDay} onChange={(v) => set("allDay", v)} label="Ganztägig" />
+        <input
+          type="date"
+          value={f.date}
+          onChange={(e) => e.target.value && set("date", e.target.value)}
+          className="body glass w-full rounded-[12px] px-3 py-2"
+          aria-label="Datum"
+        />
+        <Toggle on={f.allDay} onChange={(v) => set("allDay", v)} label="Ganztägig" />
 
         {f.allDay ? (
           <>
@@ -259,9 +241,7 @@ function Editor({ target, onClose }: { target: EditorTarget; onClose: () => void
               <Chips
                 value={String(f.duration)}
                 onChange={(v) => set("duration", Number(v))}
-                options={[30, 60, 90, 120, 180]
-                  .concat([30, 60, 90, 120, 180].includes(f.duration) ? [] : [f.duration])
-                  .map((m) => ({ id: String(m), label: durationLabel(m) }))}
+                options={[30, 60, 90, 120, 180].concat([30, 60, 90, 120, 180].includes(f.duration) ? [] : [f.duration]).map((m) => ({ id: String(m), label: durationLabel(m) }))}
               />
             </div>
           </>
@@ -288,7 +268,14 @@ function Editor({ target, onClose }: { target: EditorTarget; onClose: () => void
         {f.recurrence !== "none" && (
           <label className="mt-3 flex items-center justify-between gap-3">
             <span className="body">Endet am</span>
-            <input type="date" value={f.until} min={f.date} onChange={(e) => set("until", e.target.value)} className="body glass rounded-[12px] px-3 py-2" aria-label="Wiederholung endet am" />
+            <input
+              type="date"
+              value={f.until}
+              min={f.date}
+              onChange={(e) => set("until", e.target.value)}
+              className="body glass rounded-[12px] px-3 py-2"
+              aria-label="Wiederholung endet am"
+            />
           </label>
         )}
         {f.recurrence !== "none" && !f.until && (
@@ -307,7 +294,7 @@ function Editor({ target, onClose }: { target: EditorTarget; onClose: () => void
             <IconTrash size={18} /> Termin löschen
           </button>
         )}
-      </form>
+      </SheetFrame>
 
       <ContextMenu
         open={!!scope}
@@ -315,6 +302,6 @@ function Editor({ target, onClose }: { target: EditorTarget; onClose: () => void
         preview={<p className="headline">{scope === "delete" ? "Welche Termine löschen?" : "Änderung übernehmen für"}</p>}
         actions={scopeActions}
       />
-    </div>
+    </>
   );
 }

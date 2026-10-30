@@ -47,7 +47,14 @@ export function RecipeImages({ paths, onRemove }: { paths: string[]; onRemove?: 
         })}
       </div>
       {big && (
-        <div className="fade-in fixed inset-0 z-[70] flex items-center justify-center p-3" style={{ background: "rgba(0,0,0,.85)" }} onClick={() => setBig(null)} role="dialog" aria-modal aria-label="Originalrezept">
+        <div
+          className="fade-in fixed inset-0 z-[70] flex items-center justify-center p-3"
+          style={{ background: "rgba(0,0,0,.85)" }}
+          onClick={() => setBig(null)}
+          role="dialog"
+          aria-modal
+          aria-label="Originalrezept"
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={fileUrl(big)} alt="Originalrezept" className="max-h-full max-w-full rounded-[12px] object-contain" />
         </div>

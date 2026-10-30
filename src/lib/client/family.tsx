@@ -50,9 +50,10 @@ function optimistic(s: AppState, m: Mutation, me: string | null): AppState {
     case "person.setNotify":
       return { ...s, people: s.people.map((p) => (p.id === m.id ? { ...p, notifyPrefs: m.prefs } : p)) };
     case "task.create": {
+      const id = m.id ?? tmp;
       const personId = m.rotation.length >= 2 && (!m.personId || !m.rotation.includes(m.personId)) ? m.rotation[0] : m.personId;
       const t: Task = {
-        id: tmp,
+        id,
         title: m.title,
         area: m.area,
         personId,
@@ -99,7 +100,7 @@ function optimistic(s: AppState, m: Mutation, me: string | null): AppState {
     case "task.delete":
       return { ...s, tasks: s.tasks.filter((t) => t.id !== m.id) };
     case "item.create": {
-      const it: Item = { id: tmp, name: m.name, amount: m.amount, category: m.category, addedBy: me, done: false, createdAt: new Date().toISOString() };
+      const it: Item = { id: m.id ?? tmp, name: m.name, amount: m.amount, category: m.category, addedBy: me, done: false, createdAt: new Date().toISOString() };
       return { ...s, items: [it, ...s.items] };
     }
     case "item.toggle":
@@ -390,7 +391,9 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const run = useCallback(
-    async (m: Mutation) => {
+    async (input: Mutation) => {
+      // neue Aufgaben und Artikel bekommen ihre ID schon hier, so bleibt die Zeile beim Nachladen dieselbe
+      const m = (input.op === "task.create" || input.op === "item.create") && !input.id && typeof crypto?.randomUUID === "function" ? { ...input, id: crypto.randomUUID() } : input;
       setState((s) => (s ? optimistic(s, m, meId) : s));
       pending.current++;
       setSyncing(true);

@@ -45,7 +45,13 @@ export function BoardTile({ onOpen }: { onOpen: (boardId: string) => void }) {
                 <span
                   key={i}
                   className="flex h-[78px] w-[78px] shrink-0 items-start overflow-hidden p-1.5 text-[11px] leading-tight"
-                  style={{ background: p.color ?? "#FFE27A", transform: `rotate(${rots[i]}deg)`, boxShadow: "0 8px 10px -6px rgba(0,0,0,.45)", fontFamily: HAND_FONT, color: "#1c1c1e" }}
+                  style={{
+                    background: p.color ?? "#FFE27A",
+                    transform: `rotate(${rots[i]}deg)`,
+                    boxShadow: "0 8px 10px -6px rgba(0,0,0,.45)",
+                    fontFamily: HAND_FONT,
+                    color: "#1c1c1e",
+                  }}
                 >
                   {p.text ?? "✏️"}
                 </span>

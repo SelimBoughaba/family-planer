@@ -137,7 +137,7 @@ export function CalendarView({
         </div>
       </header>
 
-      <div className="mt-3 relative flex rounded-[10px] p-[2px]" style={{ background: "color-mix(in oklab, var(--label) 8%, transparent)" }}>
+      <div className="mt-3 relative flex rounded-[10px] p-[2px]" style={{ background: "var(--fill)" }}>
         <span
           className="absolute top-[2px] bottom-[2px] rounded-[8px]"
           style={{
@@ -202,7 +202,8 @@ export function CalendarView({
             ? [
                 {
                   label: "Nur diesen Termin",
-                  onSelect: () => void run({ op: "event.detach", id: confirm.occ.event.id, occurrence: confirm.occ.occurrence, ...fieldsOf(confirm.occ, confirm.start, confirm.end) }),
+                  onSelect: () =>
+                    void run({ op: "event.detach", id: confirm.occ.event.id, occurrence: confirm.occ.occurrence, ...fieldsOf(confirm.occ, confirm.start, confirm.end) }),
                 },
                 {
                   label: "Alle Termine der Serie",
@@ -287,7 +288,13 @@ function MonthGrid({
               const today = sameDay(d, now);
               const sel = sameDay(d, selected);
               return (
-                <button key={+d} onClick={() => onSelect(d)} className="flex flex-col items-center gap-1 py-1" aria-pressed={sel} aria-label={d.toLocaleDateString("de-DE", { day: "numeric", month: "long" })}>
+                <button
+                  key={+d}
+                  onClick={() => onSelect(d)}
+                  className="flex flex-col items-center gap-1 py-1"
+                  aria-pressed={sel}
+                  aria-label={d.toLocaleDateString("de-DE", { day: "numeric", month: "long" })}
+                >
                   <span
                     className="subhead tabular flex h-8 w-8 items-center justify-center rounded-full"
                     style={{
@@ -324,7 +331,12 @@ function MonthGrid({
           </p>
         )}
         {list.map((o, i) => (
-          <button key={o.key} onClick={() => onOpen(o)} className="flex w-full items-center gap-3 px-4 py-3 text-left" style={{ borderTop: i ? "0.5px solid var(--separator)" : "none" }}>
+          <button
+            key={o.key}
+            onClick={() => onOpen(o)}
+            className="flex w-full items-center gap-3 px-4 py-3 text-left"
+            style={{ borderTop: i ? "0.5px solid var(--separator)" : "none" }}
+          >
             <span className="subhead tabular w-12 shrink-0 font-medium" style={{ color: "var(--label-2)" }}>
               {o.event.allDay ? "Ganzt." : fmtTime(o.start)}
             </span>

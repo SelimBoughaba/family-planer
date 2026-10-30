@@ -62,7 +62,9 @@ export function NoteEditor({ note, onClose, onSave, onDelete }: { note: BoardIte
 
   const save = () => {
     const back = 1 / scale;
-    const ink = strokes.length ? strokes.map((s) => ({ ...s, s: Math.round(s.s * back * 10) / 10, p: s.p.map((v, i) => (i % 3 === 2 ? v : Math.round(v * back * 10) / 10)) })) : null;
+    const ink = strokes.length
+      ? strokes.map((s) => ({ ...s, s: Math.round(s.s * back * 10) / 10, p: s.p.map((v, i) => (i % 3 === 2 ? v : Math.round(v * back * 10) / 10)) }))
+      : null;
     onSave({ text: text.trim() || null, ink, color, expires: withExpiry && expires ? expires : null });
   };
 
@@ -98,9 +100,15 @@ export function NoteEditor({ note, onClose, onSave, onDelete }: { note: BoardIte
         ))}
       </div>
 
-      <div className="relative mt-4 flex rounded-[10px] p-[2px]" style={{ background: "color-mix(in oklab, var(--label) 8%, transparent)" }}>
+      <div className="relative mt-4 flex rounded-[10px] p-[2px]" style={{ background: "var(--fill)" }}>
         {(["tippen", "schreiben"] as const).map((m) => (
-          <button key={m} onClick={() => setMode(m)} className="footnote relative flex-1 rounded-[8px] py-1.5 font-semibold" style={{ background: mode === m ? "var(--glass-strong)" : "transparent" }} aria-pressed={mode === m}>
+          <button
+            key={m}
+            onClick={() => setMode(m)}
+            className="footnote relative flex-1 rounded-[8px] py-1.5 font-semibold"
+            style={{ background: mode === m ? "var(--glass-strong)" : "transparent" }}
+            aria-pressed={mode === m}
+          >
             {m === "tippen" ? "⌨️ Tippen" : "✏️ Mit Stift schreiben"}
           </button>
         ))}
@@ -147,16 +155,34 @@ export function NoteEditor({ note, onClose, onSave, onDelete }: { note: BoardIte
         <div className="mt-3 flex items-center justify-between gap-2">
           <div className="flex gap-1.5">
             {INK_COLORS.map((c) => (
-              <button key={c} onClick={() => setPenColor(c)} className="press h-7 w-7 rounded-full" style={{ background: c, boxShadow: penColor === c ? "0 0 0 2px var(--bg), 0 0 0 4px var(--tint)" : "none" }} aria-label={`Stiftfarbe ${c}`} />
+              <button
+                key={c}
+                onClick={() => setPenColor(c)}
+                className="press h-7 w-7 rounded-full"
+                style={{ background: c, boxShadow: penColor === c ? "0 0 0 2px var(--bg), 0 0 0 4px var(--tint)" : "none" }}
+                aria-label={`Stiftfarbe ${c}`}
+              />
             ))}
           </div>
           <div className="flex gap-1">
             {INK_SIZES.map((s, i) => (
-              <button key={s} onClick={() => setPenSize(i)} className="press flex h-8 w-8 items-center justify-center rounded-full" style={{ background: penSize === i ? "color-mix(in oklab, var(--tint) 16%, transparent)" : "transparent" }} aria-label={`Stärke ${i + 1}`}>
+              <button
+                key={s}
+                onClick={() => setPenSize(i)}
+                className="press flex h-8 w-8 items-center justify-center rounded-full"
+                style={{ background: penSize === i ? "color-mix(in oklab, var(--tint) 16%, transparent)" : "transparent" }}
+                aria-label={`Stärke ${i + 1}`}
+              >
                 <span className="rounded-full" style={{ width: s + 3, height: s + 3, background: "var(--label)" }} />
               </button>
             ))}
-            <button onClick={() => setStrokes((s) => s.slice(0, -1))} disabled={!strokes.length} className="press subhead ml-1 rounded-full px-2.5 font-semibold" style={{ color: strokes.length ? "var(--tint)" : "var(--label-3)" }} aria-label="Letzten Strich zurücknehmen">
+            <button
+              onClick={() => setStrokes((s) => s.slice(0, -1))}
+              disabled={!strokes.length}
+              className="press subhead ml-1 rounded-full px-2.5 font-semibold"
+              style={{ color: strokes.length ? "var(--tint)" : "var(--label-3)" }}
+              aria-label="Letzten Strich zurücknehmen"
+            >
               ↶
             </button>
           </div>
@@ -170,12 +196,20 @@ export function NoteEditor({ note, onClose, onSave, onDelete }: { note: BoardIte
 
       <div className="mt-5 flex items-center justify-between gap-3">
         <button role="switch" aria-checked={withExpiry} onClick={() => setWithExpiry((v) => !v)} className="body flex items-center gap-3">
-          <span className="relative h-[31px] w-[51px] shrink-0 rounded-full" style={{ background: withExpiry ? "var(--success)" : "color-mix(in oklab, var(--label) 14%, transparent)", transition: "background 200ms ease" }}>
-            <span className="absolute top-[2px] h-[27px] w-[27px] rounded-full bg-white" style={{ left: withExpiry ? 22 : 2, boxShadow: "0 3px 8px rgba(0,0,0,.15)", transition: "left 220ms ease" }} />
+          <span
+            className="relative h-[31px] w-[51px] shrink-0 rounded-full"
+            style={{ background: withExpiry ? "var(--success)" : "color-mix(in oklab, var(--label) 14%, transparent)", transition: "background 200ms ease" }}
+          >
+            <span
+              className="absolute top-[2px] h-[27px] w-[27px] rounded-full bg-white"
+              style={{ left: withExpiry ? 22 : 2, boxShadow: "0 3px 8px rgba(0,0,0,.15)", transition: "left 220ms ease" }}
+            />
           </span>
           Hängt sich selbst ab
         </button>
-        {withExpiry && <input type="date" value={expires} onChange={(e) => setExpires(e.target.value)} className="body glass rounded-[12px] px-3 py-1.5" aria-label="Ablaufdatum" />}
+        {withExpiry && (
+          <input type="date" value={expires} onChange={(e) => setExpires(e.target.value)} className="body glass rounded-[12px] px-3 py-1.5" aria-label="Ablaufdatum" />
+        )}
       </div>
 
       {onDelete && (

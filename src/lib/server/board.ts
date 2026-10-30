@@ -108,14 +108,18 @@ export async function mutateBoard(m: Mutation, actor: string | null): Promise<st
   const sql = db();
   switch (m.op) {
     case "board.create": {
-      const name = String(m.name ?? "").trim().slice(0, 40);
+      const name = String(m.name ?? "")
+        .trim()
+        .slice(0, 40);
       if (!name) throw new BoardInputError("Bitte einen Namen angeben.");
       const id = isId(m.id) ? m.id : randomUUID();
       await sql`insert into boards (id, name, sort) values (${id}, ${name}, (select coalesce(max(sort), 0) + 1 from boards)) on conflict (id) do nothing`;
       return "boards";
     }
     case "board.rename": {
-      const name = String(m.name ?? "").trim().slice(0, 40);
+      const name = String(m.name ?? "")
+        .trim()
+        .slice(0, 40);
       if (!isId(m.id) || !name) throw new BoardInputError("Bitte einen Namen angeben.");
       await sql`update boards set name = ${name} where id = ${m.id}`;
       return "boards";

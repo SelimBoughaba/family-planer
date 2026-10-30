@@ -50,7 +50,11 @@ export async function planNotifications(m: Mutation, actor: string | null): Prom
     const [c] = await sql`select person_id, title, status from reward_claims where id = ${m.id}`;
     if (!c || c.status !== "pending" || c.person_id === actor) return null;
     return async () => {
-      await sendToPeople([c.person_id as string], { title: m.approve ? "Belohnung bestätigt 🎉" : "Belohnung abgelehnt", body: `${name(actor)} hat „${c.title}“ ${m.approve ? "bestätigt" : "abgelehnt, die Punkte sind wieder gutgeschrieben"}`, url: "/" });
+      await sendToPeople([c.person_id as string], {
+        title: m.approve ? "Belohnung bestätigt 🎉" : "Belohnung abgelehnt",
+        body: `${name(actor)} hat „${c.title}“ ${m.approve ? "bestätigt" : "abgelehnt, die Punkte sind wieder gutgeschrieben"}`,
+        url: "/",
+      });
     };
   }
 
@@ -65,7 +69,12 @@ export async function planNotifications(m: Mutation, actor: string | null): Prom
     if (before && !!before.present === m.present) return null;
     const who = name(m.personId);
     return async () => {
-      await sendToPeople([cook], { title: "Essen heute", body: m.present ? `${who} isst heute doch mit` : `${who} isst heute nicht mit`, url: "/", tag: `dinner-change:${m.day}:${m.personId}` });
+      await sendToPeople([cook], {
+        title: "Essen heute",
+        body: m.present ? `${who} isst heute doch mit` : `${who} isst heute nicht mit`,
+        url: "/",
+        tag: `dinner-change:${m.day}:${m.personId}`,
+      });
     };
   }
 

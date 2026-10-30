@@ -113,7 +113,12 @@ export function MealWheel({ day, onPick }: { day: string; onPick: (r: Recipe) =>
             const large = seg > 180 ? 1 : 0;
             return (
               <g key={r.id}>
-                <path d={`M0 0 L${R * Math.cos(a0)} ${R * Math.sin(a0)} A${R} ${R} 0 ${large} 1 ${R * Math.cos(a1)} ${R * Math.sin(a1)} Z`} fill={COLORS[i % COLORS.length]} stroke="white" strokeWidth="1.5" />
+                <path
+                  d={`M0 0 L${R * Math.cos(a0)} ${R * Math.sin(a0)} A${R} ${R} 0 ${large} 1 ${R * Math.cos(a1)} ${R * Math.sin(a1)} Z`}
+                  fill={COLORS[i % COLORS.length]}
+                  stroke="white"
+                  strokeWidth="1.5"
+                />
                 <g transform={`rotate(${mid}) translate(58 0)`}>
                   <text textAnchor="middle" dominantBaseline="central" fontSize="14" transform="translate(30 0) rotate(90)">
                     {recipeEmoji(r.title, r.tags)}
@@ -146,18 +151,28 @@ export function MealWheel({ day, onPick }: { day: string; onPick: (r: Recipe) =>
             <button onClick={() => onPick(result)} className="press subhead flex-1 rounded-[12px] py-2.5 font-semibold text-white" style={{ background: "var(--tint)" }}>
               Einplanen
             </button>
-            <button onClick={() => spin()} className="press subhead flex-1 rounded-[12px] py-2.5 font-semibold" style={{ background: "color-mix(in oklab, var(--tint) 12%, transparent)", color: "var(--tint)" }}>
+            <button
+              onClick={() => spin()}
+              className="press subhead flex-1 rounded-[12px] py-2.5 font-semibold"
+              style={{ background: "color-mix(in oklab, var(--tint) 12%, transparent)", color: "var(--tint)" }}
+            >
               Nochmal
             </button>
           </div>
         </div>
       ) : (
-        <button onClick={() => spin()} disabled={spinning} className="press subhead mt-5 w-full rounded-[12px] py-2.5 font-semibold text-white" style={{ background: spinning ? "var(--label-3)" : "var(--tint)" }}>
+        <button
+          onClick={() => spin()}
+          disabled={spinning}
+          className="press subhead mt-5 w-full rounded-[12px] py-2.5 font-semibold text-white"
+          style={{ background: spinning ? "var(--label-3)" : "var(--tint)" }}
+        >
           {spinning ? "Dreht …" : "Drehen"}
         </button>
       )}
       <p className="caption mt-2 text-center" style={{ color: "var(--label-3)" }}>
-        Oder mit dem Finger anschubsen. {(state?.recipes.filter((r) => r.favorite).length ?? 0) >= 4 ? "Es dreht über eure Favoriten" : "Es dreht über alle Rezepte"}, ohne was in der Woche davor schon dran war.
+        Oder mit dem Finger anschubsen. {(state?.recipes.filter((r) => r.favorite).length ?? 0) >= 4 ? "Es dreht über eure Favoriten" : "Es dreht über alle Rezepte"}, ohne was in
+        der Woche davor schon dran war.
       </p>
     </div>
   );

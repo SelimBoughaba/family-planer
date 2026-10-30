@@ -20,8 +20,7 @@ export async function getLists(): Promise<Lists> {
 }
 
 export async function setLists(lists: Lists) {
-  const clean = (xs: unknown, max: number) =>
-    [...new Set((Array.isArray(xs) ? xs : []).map((x) => String(x).trim()).filter((x) => x && x.length <= 40))].slice(0, max);
+  const clean = (xs: unknown, max: number) => [...new Set((Array.isArray(xs) ? xs : []).map((x) => String(x).trim()).filter((x) => x && x.length <= 40))].slice(0, max);
   const value = { categories: clean(lists.categories, 30), areas: clean(lists.areas, 30) };
   if (!value.categories.length || !value.areas.length) throw new Error("Listen dürfen nicht leer sein");
   await db()`insert into app_meta (key, value) values ('lists', ${db().json(value)})

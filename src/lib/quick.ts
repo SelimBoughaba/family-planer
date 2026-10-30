@@ -25,10 +25,51 @@ const SHORT = ["so", "mo", "di", "mi", "do", "fr", "sa"];
 const MONTHS = ["januar", "februar", "märz", "april", "mai", "juni", "juli", "august", "september", "oktober", "november", "dezember"];
 
 const EVENT_WORDS = [
-  "termin", "arzt", "ärztin", "zahnarzt", "kinderarzt", "hausarzt", "frauenarzt", "augenarzt", "friseur", "frisör", "physio",
-  "training", "probe", "spiel", "turnier", "geburtstag", "party", "feier", "treffen", "elternabend", "elterngespräch", "sprechstunde",
-  "urlaub", "ferien", "ausflug", "konzert", "kino", "theater", "besuch", "flug", "reise", "prüfung", "klausur", "hochzeit", "taufe",
-  "meeting", "schwimmen", "fußball", "kurs", "unterricht", "nachhilfe", "abholen", "vorstellung", "impfung", "untersuchung",
+  "termin",
+  "arzt",
+  "ärztin",
+  "zahnarzt",
+  "kinderarzt",
+  "hausarzt",
+  "frauenarzt",
+  "augenarzt",
+  "friseur",
+  "frisör",
+  "physio",
+  "training",
+  "probe",
+  "spiel",
+  "turnier",
+  "geburtstag",
+  "party",
+  "feier",
+  "treffen",
+  "elternabend",
+  "elterngespräch",
+  "sprechstunde",
+  "urlaub",
+  "ferien",
+  "ausflug",
+  "konzert",
+  "kino",
+  "theater",
+  "besuch",
+  "flug",
+  "reise",
+  "prüfung",
+  "klausur",
+  "hochzeit",
+  "taufe",
+  "meeting",
+  "schwimmen",
+  "fußball",
+  "kurs",
+  "unterricht",
+  "nachhilfe",
+  "abholen",
+  "vorstellung",
+  "impfung",
+  "untersuchung",
 ];
 
 const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -180,9 +221,7 @@ export function describeWhen(q: QuickParse, now = new Date()) {
   const today = startOfDay(now);
   if (q.day) {
     const diff = Math.round((+q.day - +today) / 86400000);
-    parts.push(
-      diff === 0 ? "heute" : diff === 1 ? "morgen" : diff === 2 ? "übermorgen" : q.day.toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "short" }),
-    );
+    parts.push(diff === 0 ? "heute" : diff === 1 ? "morgen" : diff === 2 ? "übermorgen" : q.day.toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "short" }));
   }
   const f = (x: { h: number; m: number }) => `${String(x.h).padStart(2, "0")}:${String(x.m).padStart(2, "0")}`;
   if (q.time) parts.push(q.end ? `${f(q.time)} bis ${f(q.end)}` : `${f(q.time)} Uhr`);

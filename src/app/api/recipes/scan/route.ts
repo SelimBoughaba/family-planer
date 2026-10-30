@@ -17,7 +17,8 @@ export async function POST(req: NextRequest) {
   try {
     return NextResponse.json({ recipe: await recipeFromFiles(paths), via: "ai" });
   } catch (err) {
-    if (err instanceof ImportError || err instanceof AiUnavailable || err instanceof StorageError) return NextResponse.json({ error: "scan_failed", message: err.message }, { status: 422 });
+    if (err instanceof ImportError || err instanceof AiUnavailable || err instanceof StorageError)
+      return NextResponse.json({ error: "scan_failed", message: err.message }, { status: 422 });
     await logError("scan", err);
     return NextResponse.json({ error: "server_error", message: "Das Rezept konnte nicht gelesen werden." }, { status: 500 });
   }

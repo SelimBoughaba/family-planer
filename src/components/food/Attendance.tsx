@@ -27,11 +27,20 @@ export function AttendanceRow({ day, size = 32, interactive = true, names = fals
         const s = presence[p.id]?.state ?? "yes";
         const label = `${p.name}: ${s === "yes" ? "isst mit" : s === "no" ? "nicht da" : `wahrscheinlich nicht (${presence[p.id]?.reason})`}`;
         const face = (
-          <span className="relative block" style={{ opacity: s === "yes" ? 1 : s === "maybe" ? 0.5 : 0.28, filter: s === "no" ? "grayscale(1)" : "none", transition: "opacity 200ms ease, filter 200ms ease" }}>
+          <span
+            className="relative block"
+            style={{ opacity: s === "yes" ? 1 : s === "maybe" ? 0.5 : 0.28, filter: s === "no" ? "grayscale(1)" : "none", transition: "opacity 200ms ease, filter 200ms ease" }}
+          >
             <Avatar person={p} size={size} />
-            {s === "no" && <span className="absolute top-1/2 left-[-8%] h-[2.5px] w-[116%] -translate-y-1/2 -rotate-45 rounded-full" style={{ background: "var(--label)" }} aria-hidden />}
+            {s === "no" && (
+              <span className="absolute top-1/2 left-[-8%] h-[2.5px] w-[116%] -translate-y-1/2 -rotate-45 rounded-full" style={{ background: "var(--label)" }} aria-hidden />
+            )}
             {s === "maybe" && (
-              <span className="caption absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full font-bold text-white" style={{ background: "#FF9F0A", fontSize: 10 }} aria-hidden>
+              <span
+                className="caption absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full font-bold text-white"
+                style={{ background: "#FF9F0A", fontSize: 10 }}
+                aria-hidden
+              >
                 ?
               </span>
             )}

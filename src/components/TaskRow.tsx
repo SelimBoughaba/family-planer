@@ -1,5 +1,6 @@
 "use client";
 
+import { toast } from "sonner";
 import { useState } from "react";
 import { useFamily } from "@/lib/client/family";
 import { localDay, recurrenceLabel, type Task } from "@/lib/types";
@@ -40,7 +41,7 @@ export function TaskRow({
   const { run, person, color } = useFamily();
   const c = color(t.personId);
   const overdue = !!t.due && t.due < today && !t.done;
-  const toggle = () => run({ op: "task.toggle", id: t.id, done: !t.done, today });
+  const toggle = () => toggleTask(run, t, today);
   const plan = t.rotation.length >= 2;
   const nextName = plan ? person(t.rotation[(t.rotation.indexOf(t.personId ?? "") + 1) % t.rotation.length])?.name : null;
 
@@ -95,6 +96,16 @@ export function TaskRow({
   );
 }
 
+/** Abhaken mit Meldung und Rückgängig; Wieder-Öffnen ohne Meldung */
+export function toggleTask(run: ReturnType<typeof useFamily>["run"], t: Task, today: string) {
+  void run({ op: "task.toggle", id: t.id, done: !t.done, today });
+  if (t.done) return;
+  toast(`${t.title} erledigt`, {
+    description: t.points > 0 ? `+${t.points} ${t.points === 1 ? "Punkt" : "Punkte"}` : undefined,
+    action: { label: "Rückgängig", onClick: () => void run({ op: "task.toggle", id: t.id, done: false, today }) },
+  });
+}
+
 /** Menü bei langem Druck und Auswahl, wer übernimmt */
 export function useTaskMenus(onEdit: (t: Task) => void) {
   const { state, run, person } = useFamily();
@@ -103,11 +114,35 @@ export function useTaskMenus(onEdit: (t: Task) => void) {
   const today = localDay();
 
   const actions = (t: Task): MenuAction[] => [
-    { label: t.done ? "Wieder öffnen" : "Erledigt", icon: <IconCheck size={18} />, onSelect: () => run({ op: "task.toggle", id: t.id, done: !t.done, today }) },
+    { label: t.done ? "Wieder öffnen" : "Erledigt", icon: <IconCheck size={18} />, onSelect: () => toggleTask(run, t, today) },
     ...(t.done ? [] : [{ label: "Auf morgen", icon: <IconClock size={18} />, onSelect: () => run({ op: "task.postpone", id: t.id, today }) }]),
     { label: "Bearbeiten", icon: <IconPencil size={18} />, onSelect: () => setTimeout(() => onEdit(t), 50) },
     ...(t.rotation.length >= 2 ? [] : [{ label: "Jemand anderem geben", icon: <IconPerson size={18} />, onSelect: () => setTimeout(() => setAssign(t), 50) }]),
-    { label: "Löschen", icon: <IconTrash size={18} />, destructive: true, onSelect: () => run({ op: "task.delete", id: t.id }) },
+    {
+      label: "Löschen",
+      icon: <IconTrash size={18} />,
+      destructive: true,
+      onSelect: () => {
+        void run({ op: "task.delete", id: t.id });
+        toast(`${t.title} gelöscht`, {
+          action: {
+            label: "Rückgängig",
+            onClick: () =>
+              void run({
+                op: "task.create",
+                title: t.title,
+                area: t.area,
+                personId: t.personId,
+                due: t.due,
+                recurring: t.recurring,
+                remindTime: t.remindTime,
+                rotation: t.rotation,
+                points: t.points,
+              }),
+          },
+        });
+      },
+    },
   ];
 
   const menus = (

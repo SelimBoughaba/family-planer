@@ -39,7 +39,9 @@ export async function suggestMeals(hint: string, day: string | null): Promise<Su
     sql`select day::text as day, title from meal_plan where day between (now() - interval '14 days')::date and (now() + interval '7 days')::date order by day`,
     sql`select name from shopping_items where done = false limit 40`,
   ]);
-  const list = recipes.map((r) => `- ${r.id}: ${r.title}${r.minutes ? ` (${r.minutes} Min.)` : ""}${(r.tags as string[])?.length ? ` [${(r.tags as string[]).join(", ")}]` : ""}`).join("\n");
+  const list = recipes
+    .map((r) => `- ${r.id}: ${r.title}${r.minutes ? ` (${r.minutes} Min.)` : ""}${(r.tags as string[])?.length ? ` [${(r.tags as string[]).join(", ")}]` : ""}`)
+    .join("\n");
   const user = [
     `Plane ein Abendessen${day ? ` für ${day}` : ""} für eine Familie mit fünf Personen (zwei davon 12 Jahre alt).`,
     hint ? `Wunsch: ${hint.slice(0, 300)}` : "",

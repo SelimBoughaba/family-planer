@@ -75,7 +75,7 @@ function guard<T>(run: () => PromiseLike<T>, ms: number, pool: Sql): Promise<T> 
  */
 function guarded(pool: Sql): Sql {
   let chain: Promise<unknown> = Promise.resolve();
-  const serial = <T,>(run: () => Promise<T>): Promise<T> => {
+  const serial = <T>(run: () => Promise<T>): Promise<T> => {
     const p = chain.then(run, run);
     chain = p.catch(() => {});
     return p;

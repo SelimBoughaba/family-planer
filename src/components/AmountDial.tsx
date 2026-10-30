@@ -14,8 +14,25 @@ function step(unit: Unit, value: number) {
 }
 
 const UNIT_ALIASES: Record<string, Unit> = {
-  stück: "Stück", stk: "Stück", "stk.": "Stück", x: "Stück", g: "g", gr: "g", kg: "kg", ml: "ml", l: "l", liter: "l",
-  packung: "Packung", packungen: "Packung", pck: "Packung", "pck.": "Packung", bund: "Bund", dose: "Dose", dosen: "Dose", flasche: "Flasche", flaschen: "Flasche",
+  stück: "Stück",
+  stk: "Stück",
+  "stk.": "Stück",
+  x: "Stück",
+  g: "g",
+  gr: "g",
+  kg: "kg",
+  ml: "ml",
+  l: "l",
+  liter: "l",
+  packung: "Packung",
+  packungen: "Packung",
+  pck: "Packung",
+  "pck.": "Packung",
+  bund: "Bund",
+  dose: "Dose",
+  dosen: "Dose",
+  flasche: "Flasche",
+  flaschen: "Flasche",
 };
 
 export function parseAmount(a: string | null): { value: number; unit: Unit } {
@@ -139,7 +156,10 @@ export function AmountDial({ name, amount, onClose, onSave }: { name: string; am
               );
             })}
           </svg>
-          <div className="absolute inset-[22%] flex flex-col items-center justify-center rounded-full" style={{ background: "var(--glass-strong)", boxShadow: "inset 0 1px 0 var(--glass-edge)" }}>
+          <div
+            className="absolute inset-[22%] flex flex-col items-center justify-center rounded-full"
+            style={{ background: "var(--glass-strong)", boxShadow: "inset 0 1px 0 var(--glass-edge)" }}
+          >
             <span className="tabular text-[44px] leading-none font-bold">{Number.isInteger(value) ? value : value.toLocaleString("de-DE")}</span>
             <span className="subhead mt-1" style={{ color: "var(--label-2)" }}>
               {unit}

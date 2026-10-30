@@ -40,7 +40,9 @@ function Inner({ day, onClose, onNewRecipe }: { day: string; onClose: () => void
   const [msg, setMsg] = useState<string | null>(null);
   const ai = state?.ai;
 
-  const recipes = (state?.recipes ?? []).filter((r) => !q.trim() || r.title.toLowerCase().includes(q.trim().toLowerCase()) || r.tags.some((t) => t.toLowerCase().includes(q.trim().toLowerCase())));
+  const recipes = (state?.recipes ?? []).filter(
+    (r) => !q.trim() || r.title.toLowerCase().includes(q.trim().toLowerCase()) || r.tags.some((t) => t.toLowerCase().includes(q.trim().toLowerCase())),
+  );
 
   const choose = async (title: string, recipeId: string | null) => {
     if (await run({ op: "meal.set", day, recipeId, title, cook, note: null })) onClose();
@@ -71,7 +73,14 @@ function Inner({ day, onClose, onNewRecipe }: { day: string; onClose: () => void
       <FieldLabel>Wer kocht?</FieldLabel>
       <div className="no-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4">
         {(state?.people ?? []).map((p) => (
-          <button key={p.id} type="button" onClick={() => setCook(cook === p.id ? null : p.id)} className="press flex flex-col items-center gap-1" aria-pressed={cook === p.id} style={{ opacity: cook === p.id ? 1 : 0.4 }}>
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => setCook(cook === p.id ? null : p.id)}
+            className="press flex flex-col items-center gap-1"
+            aria-pressed={cook === p.id}
+            style={{ opacity: cook === p.id ? 1 : 0.4 }}
+          >
             <Avatar person={p} size={38} />
             <span className="caption">{p.name}</span>
           </button>
@@ -86,13 +95,24 @@ function Inner({ day, onClose, onNewRecipe }: { day: string; onClose: () => void
         <Chips
           value={mode}
           onChange={setMode}
-          options={[{ id: "rezept", label: "Aus Rezepten" }, { id: "rad", label: "🎡 Glücksrad" }, { id: "frei", label: "Freier Text" }, ...(ai?.enabled ? [{ id: "ki" as const, label: "Vorschlag" }] : [])]}
+          options={[
+            { id: "rezept", label: "Aus Rezepten" },
+            { id: "rad", label: "🎡 Glücksrad" },
+            { id: "frei", label: "Freier Text" },
+            ...(ai?.enabled ? [{ id: "ki" as const, label: "Vorschlag" }] : []),
+          ]}
         />
       </div>
 
       {mode === "rezept" && (
         <>
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rezept suchen" className="body glass mt-4 w-full rounded-[14px] px-3 py-2.5" aria-label="Rezept suchen" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Rezept suchen"
+            className="body glass mt-4 w-full rounded-[14px] px-3 py-2.5"
+            aria-label="Rezept suchen"
+          />
           <div className="mt-3 flex flex-col gap-2">
             {recipes.length === 0 && (
               <p className="subhead px-1 py-2" style={{ color: "var(--label-2)" }}>
@@ -136,8 +156,21 @@ function Inner({ day, onClose, onNewRecipe }: { day: string; onClose: () => void
             if (free.trim()) void choose(free.trim(), null);
           }}
         >
-          <input value={free} onChange={(e) => setFree(e.target.value)} placeholder="z. B. Pizza bestellen, Reste, Grillen" className="body glass w-full rounded-[14px] px-3 py-2.5" maxLength={140} aria-label="Essen" autoFocus />
-          <button type="submit" disabled={!free.trim()} className="press subhead mt-3 w-full rounded-[12px] py-2.5 font-semibold text-white" style={{ background: free.trim() ? "var(--tint)" : "var(--label-3)" }}>
+          <input
+            value={free}
+            onChange={(e) => setFree(e.target.value)}
+            placeholder="z. B. Pizza bestellen, Reste, Grillen"
+            className="body glass w-full rounded-[14px] px-3 py-2.5"
+            maxLength={140}
+            aria-label="Essen"
+            autoFocus
+          />
+          <button
+            type="submit"
+            disabled={!free.trim()}
+            className="press subhead mt-3 w-full rounded-[12px] py-2.5 font-semibold text-white"
+            style={{ background: free.trim() ? "var(--tint)" : "var(--label-3)" }}
+          >
             Eintragen
           </button>
         </form>
@@ -152,7 +185,14 @@ function Inner({ day, onClose, onNewRecipe }: { day: string; onClose: () => void
               void ask();
             }}
           >
-            <input value={hint} onChange={(e) => setHint(e.target.value)} placeholder="Wunsch, z. B. schnell, vegetarisch, mit Zucchini" className="body glass min-w-0 flex-1 rounded-[14px] px-3 py-2.5" maxLength={200} aria-label="Wunsch" />
+            <input
+              value={hint}
+              onChange={(e) => setHint(e.target.value)}
+              placeholder="Wunsch, z. B. schnell, vegetarisch, mit Zucchini"
+              className="body glass min-w-0 flex-1 rounded-[14px] px-3 py-2.5"
+              maxLength={200}
+              aria-label="Wunsch"
+            />
             <button type="submit" disabled={busy === "ask"} className="press subhead rounded-[12px] px-3.5 py-2.5 font-semibold text-white" style={{ background: "var(--tint)" }}>
               {busy === "ask" ? "Denkt" : ideas ? "Neu" : "Fragen"}
             </button>
@@ -169,11 +209,20 @@ function Inner({ day, onClose, onNewRecipe }: { day: string; onClose: () => void
                   {s.minutes ? `, etwa ${s.minutes} Min.` : ""}
                 </p>
                 <div className="mt-2.5 flex gap-2">
-                  <button onClick={() => void choose(s.title, s.recipeId)} className="press subhead flex-1 rounded-[10px] py-2 font-semibold text-white" style={{ background: "var(--tint)" }}>
+                  <button
+                    onClick={() => void choose(s.title, s.recipeId)}
+                    className="press subhead flex-1 rounded-[10px] py-2 font-semibold text-white"
+                    style={{ background: "var(--tint)" }}
+                  >
                     Eintragen
                   </button>
                   {!s.recipeId && (
-                    <button onClick={() => void elaborate(s)} disabled={!!busy} className="press subhead flex-1 rounded-[10px] py-2 font-semibold" style={{ background: "color-mix(in oklab, var(--tint) 12%, transparent)", color: "var(--tint)" }}>
+                    <button
+                      onClick={() => void elaborate(s)}
+                      disabled={!!busy}
+                      className="press subhead flex-1 rounded-[10px] py-2 font-semibold"
+                      style={{ background: "color-mix(in oklab, var(--tint) 12%, transparent)", color: "var(--tint)" }}
+                    >
                       {busy === s.title ? "Schreibt Rezept" : "Als Rezept"}
                     </button>
                   )}
@@ -188,7 +237,8 @@ function Inner({ day, onClose, onNewRecipe }: { day: string; onClose: () => void
           </div>
           {ai && (
             <p className="caption mt-3 px-1 tabular" style={{ color: "var(--label-3)" }}>
-              Diesen Monat {ai.usedUsd.toLocaleString("de-DE", { style: "currency", currency: "USD", maximumFractionDigits: 3 })} von {ai.limitUsd.toLocaleString("de-DE", { style: "currency", currency: "USD" })} verbraucht.
+              Diesen Monat {ai.usedUsd.toLocaleString("de-DE", { style: "currency", currency: "USD", maximumFractionDigits: 3 })} von{" "}
+              {ai.limitUsd.toLocaleString("de-DE", { style: "currency", currency: "USD" })} verbraucht.
             </p>
           )}
         </div>
@@ -201,7 +251,11 @@ function Inner({ day, onClose, onNewRecipe }: { day: string; onClose: () => void
       )}
 
       {current && (
-        <button onClick={async () => (await run({ op: "meal.clear", day })) && onClose()} className="press body mt-7 w-full rounded-[14px] py-3 font-medium" style={{ color: "var(--danger)", background: "color-mix(in oklab, var(--danger) 10%, transparent)" }}>
+        <button
+          onClick={async () => (await run({ op: "meal.clear", day })) && onClose()}
+          className="press body mt-7 w-full rounded-[14px] py-3 font-medium"
+          style={{ color: "var(--danger)", background: "color-mix(in oklab, var(--danger) 10%, transparent)" }}
+        >
           „{current.title}“ austragen
         </button>
       )}

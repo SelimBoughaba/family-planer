@@ -10,7 +10,13 @@ export async function POST(req: NextRequest) {
   if (denied) return denied;
   const b = await req.json().catch(() => ({}));
   const sub = b.subscription;
-  if (!isUuid(b.personId) || typeof sub?.endpoint !== "string" || !sub.endpoint.startsWith("https://") || typeof sub?.keys?.p256dh !== "string" || typeof sub?.keys?.auth !== "string") {
+  if (
+    !isUuid(b.personId) ||
+    typeof sub?.endpoint !== "string" ||
+    !sub.endpoint.startsWith("https://") ||
+    typeof sub?.keys?.p256dh !== "string" ||
+    typeof sub?.keys?.auth !== "string"
+  ) {
     return NextResponse.json({ error: "invalid_input" }, { status: 400 });
   }
   const sql = db();

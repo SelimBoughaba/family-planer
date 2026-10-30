@@ -62,7 +62,11 @@ function Detail({ recipe, onClose, onEdit, forDay }: { recipe: Recipe; onClose: 
       }
     >
       <div className="mt-2 flex items-start gap-4">
-        <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[18px] text-3xl" style={{ background: "linear-gradient(150deg, color-mix(in oklab, var(--tint) 18%, white), color-mix(in oklab, var(--tint) 6%, white))" }} aria-hidden>
+        <span
+          className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[18px] text-3xl"
+          style={{ background: "linear-gradient(150deg, color-mix(in oklab, var(--tint) 18%, white), color-mix(in oklab, var(--tint) 6%, white))" }}
+          aria-hidden
+        >
           {recipeEmoji(recipe.title, recipe.tags)}
         </span>
         <div className="min-w-0 flex-1">
@@ -74,12 +78,12 @@ function Detail({ recipe, onClose, onEdit, forDay }: { recipe: Recipe; onClose: 
           )}
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             {recipe.minutes && (
-              <span className="footnote flex items-center gap-1 rounded-full px-2 py-0.5" style={{ background: "color-mix(in oklab, var(--label) 7%, transparent)" }}>
+              <span className="footnote flex items-center gap-1 rounded-full px-2 py-0.5" style={{ background: "var(--fill)" }}>
                 <IconClock size={13} /> {recipe.minutes} Min.
               </span>
             )}
             {recipe.tags.map((t) => (
-              <span key={t} className="footnote rounded-full px-2 py-0.5" style={{ background: "color-mix(in oklab, var(--label) 7%, transparent)" }}>
+              <span key={t} className="footnote rounded-full px-2 py-0.5" style={{ background: "var(--fill)" }}>
                 {t}
               </span>
             ))}
@@ -94,7 +98,7 @@ function Detail({ recipe, onClose, onEdit, forDay }: { recipe: Recipe; onClose: 
         <button
           onClick={() => void run({ op: "recipe.favorite", id: recipe.id, favorite: !recipe.favorite })}
           className="press subhead rounded-[12px] px-4 py-2.5 font-semibold"
-          style={{ background: "color-mix(in oklab, var(--label) 7%, transparent)", color: recipe.favorite ? "#FF9F0A" : "var(--label)" }}
+          style={{ background: "var(--fill)", color: recipe.favorite ? "#FF9F0A" : "var(--label)" }}
           aria-pressed={recipe.favorite}
         >
           {recipe.favorite ? "★ Favorit" : "☆ Favorit"}
@@ -132,17 +136,22 @@ function Detail({ recipe, onClose, onEdit, forDay }: { recipe: Recipe; onClose: 
           return (
             <button
               key={k}
-              onClick={() => setSkip((s) => {
-                const n = new Set(s);
-                if (n.has(k)) n.delete(k);
-                else n.add(k);
-                return n;
-              })}
+              onClick={() =>
+                setSkip((s) => {
+                  const n = new Set(s);
+                  if (n.has(k)) n.delete(k);
+                  else n.add(k);
+                  return n;
+                })
+              }
               className="flex w-full items-center gap-3 px-4 py-2.5 text-left"
               style={{ borderTop: k ? "0.5px solid var(--separator)" : "none" }}
               aria-pressed={on}
             >
-              <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full text-white" style={{ background: on ? "var(--tint)" : "transparent", border: on ? "none" : "1.5px solid var(--label-3)" }}>
+              <span
+                className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full text-white"
+                style={{ background: on ? "var(--tint)" : "transparent", border: on ? "none" : "1.5px solid var(--label-3)" }}
+              >
                 {on && <IconCheck size={12} />}
               </span>
               <span className="body min-w-0 flex-1" style={{ color: on ? "var(--label)" : "var(--label-3)" }}>
@@ -240,4 +249,3 @@ function Detail({ recipe, onClose, onEdit, forDay }: { recipe: Recipe; onClose: 
     </Sheet>
   );
 }
-

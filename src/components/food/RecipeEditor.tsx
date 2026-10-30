@@ -58,7 +58,12 @@ function Editor({ target, onClose, onSaved }: { target: EditorTarget; onClose: (
       .map(parseIngredient),
     steps: f.steps
       .split(/\n\s*\n|\n(?=\d+[.)]\s)/)
-      .map((s) => s.replace(/^\d+[.)]\s*/, "").replace(/\s*\n\s*/g, " ").trim())
+      .map((s) =>
+        s
+          .replace(/^\d+[.)]\s*/, "")
+          .replace(/\s*\n\s*/g, " ")
+          .trim(),
+      )
       .filter(Boolean),
     tags: f.tags
       .split(",")
@@ -136,7 +141,12 @@ function Editor({ target, onClose, onSaved }: { target: EditorTarget; onClose: (
         </button>
       }
       trailing={
-        <button onClick={() => void save()} disabled={!f.title.trim() || !!busy} className="body font-semibold" style={{ color: f.title.trim() ? "var(--tint)" : "var(--label-3)" }}>
+        <button
+          onClick={() => void save()}
+          disabled={!f.title.trim() || !!busy}
+          className="body font-semibold"
+          style={{ color: f.title.trim() ? "var(--tint)" : "var(--label-3)" }}
+        >
           Sichern
         </button>
       }
@@ -160,19 +170,38 @@ function Editor({ target, onClose, onSaved }: { target: EditorTarget; onClose: (
               className="body min-w-0 flex-1 bg-transparent outline-none placeholder:text-[var(--label-3)]"
               aria-label="Link zu einem Rezept"
             />
-            <button type="submit" disabled={!importUrl.trim() || !!busy} className="press subhead rounded-full px-3 py-1.5 font-semibold text-white" style={{ background: importUrl.trim() ? "var(--tint)" : "var(--label-3)" }}>
+            <button
+              type="submit"
+              disabled={!importUrl.trim() || !!busy}
+              className="press subhead rounded-full px-3 py-1.5 font-semibold text-white"
+              style={{ background: importUrl.trim() ? "var(--tint)" : "var(--label-3)" }}
+            >
               {busy === "import" ? "Lädt" : "Holen"}
             </button>
           </form>
           {ai && (
             <div className="mt-3 flex gap-2">
-              <label className="press subhead flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-[12px] py-2 font-semibold" style={{ background: "var(--glass-strong)", color: "var(--tint)" }}>
+              <label
+                className="press subhead flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-[12px] py-2 font-semibold"
+                style={{ background: "var(--glass-strong)", color: "var(--tint)" }}
+              >
                 📷 Foto machen
                 <input type="file" accept="image/*" capture="environment" className="sr-only" disabled={!!busy} onChange={(e) => void scan(e.target.files)} />
               </label>
-              <label className="press subhead flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-[12px] py-2 font-semibold" style={{ background: "var(--glass-strong)", color: "var(--tint)" }}>
+              <label
+                className="press subhead flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-[12px] py-2 font-semibold"
+                style={{ background: "var(--glass-strong)", color: "var(--tint)" }}
+              >
                 📄 Foto oder PDF
-                <input type="file" accept="image/*,application/pdf" multiple className="sr-only" disabled={!!busy} onChange={(e) => void scan(e.target.files)} aria-label="Fotos oder PDF auswählen" />
+                <input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  multiple
+                  className="sr-only"
+                  disabled={!!busy}
+                  onChange={(e) => void scan(e.target.files)}
+                  aria-label="Fotos oder PDF auswählen"
+                />
               </label>
             </div>
           )}
@@ -222,7 +251,17 @@ function Editor({ target, onClose, onSaved }: { target: EditorTarget; onClose: (
         maxLength={140}
         aria-label="Name des Gerichts"
       />
-      {f.images.length > 0 && <RecipeImages paths={f.images} onRemove={(p) => set("images", f.images.filter((x) => x !== p))} />}
+      {f.images.length > 0 && (
+        <RecipeImages
+          paths={f.images}
+          onRemove={(p) =>
+            set(
+              "images",
+              f.images.filter((x) => x !== p),
+            )
+          }
+        />
+      )}
       <input
         value={f.description}
         onChange={(e) => set("description", e.target.value)}
@@ -251,7 +290,13 @@ function Editor({ target, onClose, onSaved }: { target: EditorTarget; onClose: (
           <span className="subhead" style={{ color: "var(--label-2)" }}>
             Minuten
           </span>
-          <input value={f.minutes} onChange={(e) => set("minutes", e.target.value.replace(/\D/g, ""))} inputMode="numeric" className="headline tabular w-12 bg-transparent text-right outline-none" aria-label="Zubereitungszeit in Minuten" />
+          <input
+            value={f.minutes}
+            onChange={(e) => set("minutes", e.target.value.replace(/\D/g, ""))}
+            inputMode="numeric"
+            className="headline tabular w-12 bg-transparent text-right outline-none"
+            aria-label="Zubereitungszeit in Minuten"
+          />
         </label>
       </div>
 
@@ -276,10 +321,23 @@ function Editor({ target, onClose, onSaved }: { target: EditorTarget; onClose: (
       />
 
       <FieldLabel>Schlagworte, mit Komma getrennt</FieldLabel>
-      <input value={f.tags} onChange={(e) => set("tags", e.target.value)} placeholder="vegetarisch, schnell, Kinder mögen es" className="body glass w-full rounded-[14px] px-3 py-2.5" aria-label="Schlagworte" />
+      <input
+        value={f.tags}
+        onChange={(e) => set("tags", e.target.value)}
+        placeholder="vegetarisch, schnell, Kinder mögen es"
+        className="body glass w-full rounded-[14px] px-3 py-2.5"
+        aria-label="Schlagworte"
+      />
 
       <FieldLabel>Quelle (optional)</FieldLabel>
-      <input value={f.sourceUrl} onChange={(e) => set("sourceUrl", e.target.value)} placeholder="https://" inputMode="url" className="body glass w-full rounded-[14px] px-3 py-2.5" aria-label="Quelle" />
+      <input
+        value={f.sourceUrl}
+        onChange={(e) => set("sourceUrl", e.target.value)}
+        placeholder="https://"
+        inputMode="url"
+        className="body glass w-full rounded-[14px] px-3 py-2.5"
+        aria-label="Quelle"
+      />
     </Sheet>
   );
 }

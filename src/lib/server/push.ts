@@ -37,11 +37,10 @@ export async function sendToPeople(personIds: string[], payload: PushPayload) {
   await Promise.all(
     subs.map(async (s) => {
       try {
-        await webpush.sendNotification(
-          { endpoint: s.endpoint as string, keys: { p256dh: s.p256dh as string, auth: s.auth as string } },
-          JSON.stringify(payload),
-          { TTL: 60 * 60, urgency: "high" },
-        );
+        await webpush.sendNotification({ endpoint: s.endpoint as string, keys: { p256dh: s.p256dh as string, auth: s.auth as string } }, JSON.stringify(payload), {
+          TTL: 60 * 60,
+          urgency: "high",
+        });
         ok++;
         await sql`update push_subscriptions set last_success = now() where id = ${s.id as string}`;
       } catch (err) {

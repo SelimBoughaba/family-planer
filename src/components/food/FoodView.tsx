@@ -76,7 +76,7 @@ export function FoodView({ initialDay }: { initialDay?: string | null }) {
         </button>
       </header>
 
-      <div className="relative flex rounded-[10px] p-[2px]" style={{ background: "color-mix(in oklab, var(--label) 8%, transparent)" }}>
+      <div className="relative flex rounded-[10px] p-[2px]" style={{ background: "var(--fill)" }}>
         <span
           className="absolute top-[2px] bottom-[2px] rounded-[8px]"
           style={{
@@ -167,7 +167,7 @@ export function FoodView({ initialDay }: { initialDay?: string | null }) {
                           setMealDay(day);
                         }}
                         className="footnote rounded-full px-2.5 py-1 font-semibold"
-                        style={{ background: "color-mix(in oklab, var(--label) 7%, transparent)" }}
+                        style={{ background: "var(--fill)" }}
                       >
                         Ändern
                       </span>

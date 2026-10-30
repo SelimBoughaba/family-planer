@@ -102,7 +102,10 @@ function Board({ initial, onClose }: { initial: string; onClose: () => void }) {
     if (!list.length) {
       view.current = { x: r.width / 2 - 450 * 0.7, y: r.height / 2 - 300 * 0.7, k: 0.7 };
     } else {
-      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      let x0 = Infinity,
+        y0 = Infinity,
+        x1 = -Infinity,
+        y1 = -Infinity;
       for (const i of list) {
         const w = i.kind === "ink" ? 60 : i.w;
         const h = i.kind === "ink" ? 60 : i.h;
@@ -196,7 +199,27 @@ function Board({ initial, onClose }: { initial: string; onClose: () => void }) {
     } else {
       const id = uuid();
       session.current = id;
-      const it: BoardItem = { id, boardId, kind: "ink", x: a.ax, y: a.ay, w: 1, h: 1, rot: 0, z: topZ(), color: null, text: null, ink: [a.stroke], file: null, thumb: null, fileName: null, expires: null, createdBy: null, updatedAt: new Date().toISOString(), deletedAt: null };
+      const it: BoardItem = {
+        id,
+        boardId,
+        kind: "ink",
+        x: a.ax,
+        y: a.ay,
+        w: 1,
+        h: 1,
+        rot: 0,
+        z: topZ(),
+        color: null,
+        text: null,
+        ink: [a.stroke],
+        file: null,
+        thumb: null,
+        fileName: null,
+        expires: null,
+        createdBy: null,
+        updatedAt: new Date().toISOString(),
+        deletedAt: null,
+      };
       setItems((l) => [...l, it]);
       itemsRef.current = [...itemsRef.current, it];
       creating.current.set(id, run({ op: "bitem.create", id, boardId, kind: "ink", x: a.ax, y: a.ay, w: 1, h: 1, ink: [a.stroke] }));
@@ -415,7 +438,27 @@ function Board({ initial, onClose }: { initial: string; onClose: () => void }) {
     }
     const spot = freeSpot(180, 180);
     const id = uuid();
-    const it: BoardItem = { id, boardId, kind: "note", x: spot.x, y: spot.y, w: 180, h: 180, rot: rnd(4), z: topZ(), color: d.color, text: d.text, ink: d.ink, file: null, thumb: null, fileName: null, expires: d.expires, createdBy: null, updatedAt: new Date().toISOString(), deletedAt: null };
+    const it: BoardItem = {
+      id,
+      boardId,
+      kind: "note",
+      x: spot.x,
+      y: spot.y,
+      w: 180,
+      h: 180,
+      rot: rnd(4),
+      z: topZ(),
+      color: d.color,
+      text: d.text,
+      ink: d.ink,
+      file: null,
+      thumb: null,
+      fileName: null,
+      expires: d.expires,
+      createdBy: null,
+      updatedAt: new Date().toISOString(),
+      deletedAt: null,
+    };
     setItems((l) => [...l, it]);
     itemsRef.current = [...itemsRef.current, it];
     void run({ op: "bitem.create", id, boardId, kind: "note", x: it.x, y: it.y, w: 180, h: 180, rot: it.rot, color: d.color, text: d.text, ink: d.ink, expires: d.expires });
@@ -438,7 +481,27 @@ function Board({ initial, onClose }: { initial: string; onClose: () => void }) {
           const w = 200;
           const h = Math.round((w - 16) * (thumb?.ratio ?? 1.41) + 34);
           const spot = freeSpot(w, h);
-          const it: BoardItem = { id, boardId, kind: "pdf", x: spot.x, y: spot.y, w, h, rot: rnd(3), z: topZ(), color: null, text: null, ink: null, file, thumb: thumbPath, fileName: f.name.slice(0, 120), expires: null, createdBy: null, updatedAt: new Date().toISOString(), deletedAt: null };
+          const it: BoardItem = {
+            id,
+            boardId,
+            kind: "pdf",
+            x: spot.x,
+            y: spot.y,
+            w,
+            h,
+            rot: rnd(3),
+            z: topZ(),
+            color: null,
+            text: null,
+            ink: null,
+            file,
+            thumb: thumbPath,
+            fileName: f.name.slice(0, 120),
+            expires: null,
+            createdBy: null,
+            updatedAt: new Date().toISOString(),
+            deletedAt: null,
+          };
           setItems((l) => [...l, it]);
           itemsRef.current = [...itemsRef.current, it];
           await run({ op: "bitem.create", id, boardId, kind: "pdf", x: it.x, y: it.y, w, h, rot: it.rot, file, thumb: thumbPath, fileName: it.fileName });
@@ -451,7 +514,27 @@ function Board({ initial, onClose }: { initial: string; onClose: () => void }) {
           const w = 230;
           const h = Math.round((w - 16) * ratio + 34);
           const spot = freeSpot(w, h);
-          const it: BoardItem = { id, boardId, kind: "photo", x: spot.x, y: spot.y, w, h, rot: rnd(5), z: topZ(), color: null, text: null, ink: null, file, thumb: null, fileName: null, expires: null, createdBy: null, updatedAt: new Date().toISOString(), deletedAt: null };
+          const it: BoardItem = {
+            id,
+            boardId,
+            kind: "photo",
+            x: spot.x,
+            y: spot.y,
+            w,
+            h,
+            rot: rnd(5),
+            z: topZ(),
+            color: null,
+            text: null,
+            ink: null,
+            file,
+            thumb: null,
+            fileName: null,
+            expires: null,
+            createdBy: null,
+            updatedAt: new Date().toISOString(),
+            deletedAt: null,
+          };
           setItems((l) => [...l, it]);
           itemsRef.current = [...itemsRef.current, it];
           await run({ op: "bitem.create", id, boardId, kind: "photo", x: it.x, y: it.y, w, h, rot: it.rot, file });
@@ -471,7 +554,12 @@ function Board({ initial, onClose }: { initial: string; onClose: () => void }) {
     ...(it.kind === "photo" ? [{ label: "Groß ansehen", onSelect: () => setTimeout(() => setViewer(it), 50) }] : []),
     ...(it.kind === "pdf" && it.file ? [{ label: "PDF öffnen", onSelect: () => window.open(fileUrl(it.file!), "_blank") }] : []),
     { label: "Nach vorne", onSelect: () => update(it.id, { z: frontZ }) },
-    ...(it.kind !== "ink" ? [{ label: "Größer", onSelect: () => scaleItem(it, 1.25) }, { label: "Kleiner", onSelect: () => scaleItem(it, 0.8) }] : []),
+    ...(it.kind !== "ink"
+      ? [
+          { label: "Größer", onSelect: () => scaleItem(it, 1.25) },
+          { label: "Kleiner", onSelect: () => scaleItem(it, 0.8) },
+        ]
+      : []),
     ...(it.kind !== "ink" ? [{ label: it.rot ? "Gerade hängen" : "Schräg hängen", onSelect: () => update(it.id, { rot: it.rot ? 0 : rnd(5) || 3 }) }] : []),
     ...(it.kind === "note" ? [{ label: "Farbe", onSelect: () => setTimeout(() => setColorFor(it), 50) }] : []),
     { label: "In den Papierkorb", destructive: true, onSelect: () => remove(it) },
@@ -552,11 +640,25 @@ function Board({ initial, onClose }: { initial: string; onClose: () => void }) {
         {mode === "pen" && (
           <div className="glass glass-strong flex items-center gap-2 rounded-full px-3 py-2">
             {INK_COLORS.map((c) => (
-              <button key={c} onClick={() => setPenColor(c)} className="press h-7 w-7 rounded-full" style={{ background: c, boxShadow: penColor === c ? "0 0 0 2px var(--glass-strong), 0 0 0 4px var(--tint)" : "none" }} aria-label={`Stiftfarbe ${c}`} aria-pressed={penColor === c} />
+              <button
+                key={c}
+                onClick={() => setPenColor(c)}
+                className="press h-7 w-7 rounded-full"
+                style={{ background: c, boxShadow: penColor === c ? "0 0 0 2px var(--glass-strong), 0 0 0 4px var(--tint)" : "none" }}
+                aria-label={`Stiftfarbe ${c}`}
+                aria-pressed={penColor === c}
+              />
             ))}
             <span className="mx-1 h-6 w-px" style={{ background: "var(--separator)" }} />
             {INK_SIZES.map((s, i) => (
-              <button key={s} onClick={() => setPenSize(i)} className="press flex h-8 w-8 items-center justify-center rounded-full" style={{ background: penSize === i ? "color-mix(in oklab, var(--tint) 18%, transparent)" : "transparent" }} aria-label={`Stärke ${i + 1}`} aria-pressed={penSize === i}>
+              <button
+                key={s}
+                onClick={() => setPenSize(i)}
+                className="press flex h-8 w-8 items-center justify-center rounded-full"
+                style={{ background: penSize === i ? "color-mix(in oklab, var(--tint) 18%, transparent)" : "transparent" }}
+                aria-label={`Stärke ${i + 1}`}
+                aria-pressed={penSize === i}
+              >
                 <span className="rounded-full" style={{ width: s + 3, height: s + 3, background: "var(--label)" }} />
               </button>
             ))}
@@ -570,7 +672,13 @@ function Board({ initial, onClose }: { initial: string; onClose: () => void }) {
               ["eraser", "🧽", "Radierer"],
             ] as const
           ).map(([m, icon, label]) => (
-            <button key={m} onClick={() => setMode(m)} className="press flex h-12 w-14 flex-col items-center justify-center rounded-[16px]" style={{ background: mode === m ? "color-mix(in oklab, var(--tint) 18%, transparent)" : "transparent", color: mode === m ? "var(--tint)" : "var(--label)" }} aria-pressed={mode === m}>
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className="press flex h-12 w-14 flex-col items-center justify-center rounded-[16px]"
+              style={{ background: mode === m ? "color-mix(in oklab, var(--tint) 18%, transparent)" : "transparent", color: mode === m ? "var(--tint)" : "var(--label)" }}
+              aria-pressed={mode === m}
+            >
               <span className="text-lg leading-none" aria-hidden>
                 {icon}
               </span>
@@ -589,7 +697,15 @@ function Board({ initial, onClose }: { initial: string; onClose: () => void }) {
               🖼️
             </span>
             <span className="text-[10px] font-semibold">Foto, PDF</span>
-            <input type="file" accept="image/*,application/pdf" multiple className="sr-only" disabled={!!busy} onChange={(e) => void addFiles(e.target.files).then(() => (e.target.value = ""))} aria-label="Foto oder PDF anpinnen" />
+            <input
+              type="file"
+              accept="image/*,application/pdf"
+              multiple
+              className="sr-only"
+              disabled={!!busy}
+              onChange={(e) => void addFiles(e.target.files).then(() => (e.target.value = ""))}
+              aria-label="Foto oder PDF anpinnen"
+            />
           </label>
         </div>
       </div>
@@ -603,7 +719,15 @@ function Board({ initial, onClose }: { initial: string; onClose: () => void }) {
         preview={
           menu && (
             <p className="headline">
-              {menu.kind === "note" ? (menu.text ? `„${menu.text.slice(0, 60)}“` : "Zettel") : menu.kind === "photo" ? "Foto" : menu.kind === "pdf" ? (menu.fileName ?? "PDF") : "Zeichnung"}
+              {menu.kind === "note"
+                ? menu.text
+                  ? `„${menu.text.slice(0, 60)}“`
+                  : "Zettel"
+                : menu.kind === "photo"
+                  ? "Foto"
+                  : menu.kind === "pdf"
+                    ? (menu.fileName ?? "PDF")
+                    : "Zeichnung"}
             </p>
           )
         }
@@ -624,10 +748,25 @@ function Board({ initial, onClose }: { initial: string; onClose: () => void }) {
         }
       />
 
-      {note && <NoteEditor key={note.item?.id ?? "neu"} note={note.item} onClose={() => setNote(null)} onSave={saveNote} onDelete={note.item ? () => (remove(note.item!), setNote(null)) : undefined} />}
+      {note && (
+        <NoteEditor
+          key={note.item?.id ?? "neu"}
+          note={note.item}
+          onClose={() => setNote(null)}
+          onSave={saveNote}
+          onDelete={note.item ? () => (remove(note.item!), setNote(null)) : undefined}
+        />
+      )}
 
       {viewer?.file && (
-        <div className="fade-in fixed inset-0 z-[90] flex items-center justify-center p-3" style={{ background: "rgba(0,0,0,.9)" }} onClick={() => setViewer(null)} role="dialog" aria-modal aria-label="Foto">
+        <div
+          className="fade-in fixed inset-0 z-[90] flex items-center justify-center p-3"
+          style={{ background: "rgba(0,0,0,.9)" }}
+          onClick={() => setViewer(null)}
+          role="dialog"
+          aria-modal
+          aria-label="Foto"
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={fileUrl(viewer.file)} alt="" className="max-h-full max-w-full rounded-[10px] object-contain" />
         </div>
@@ -683,7 +822,15 @@ function Board({ initial, onClose }: { initial: string; onClose: () => void }) {
             </button>
           }
         >
-          <input value={nameSheet.value} onChange={(e) => setNameSheet({ ...nameSheet, value: e.target.value })} placeholder="z. B. Schule, Notfall, Urlaub" maxLength={40} autoFocus className="body glass mt-3 w-full rounded-[14px] px-3 py-2.5" aria-label="Name" />
+          <input
+            value={nameSheet.value}
+            onChange={(e) => setNameSheet({ ...nameSheet, value: e.target.value })}
+            placeholder="z. B. Schule, Notfall, Urlaub"
+            maxLength={40}
+            autoFocus
+            className="body glass mt-3 w-full rounded-[14px] px-3 py-2.5"
+            aria-label="Name"
+          />
         </Sheet>
       )}
 
@@ -704,9 +851,13 @@ function Board({ initial, onClose }: { initial: string; onClose: () => void }) {
                   {t.kind === "note" ? "🗒️" : t.kind === "photo" ? "🖼️" : t.kind === "pdf" ? "📄" : "✏️"}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="body block truncate">{t.kind === "note" ? (t.text ?? "Handschriftlicher Zettel") : t.kind === "pdf" ? (t.fileName ?? "PDF") : t.kind === "photo" ? "Foto" : "Zeichnung"}</span>
+                  <span className="body block truncate">
+                    {t.kind === "note" ? (t.text ?? "Handschriftlicher Zettel") : t.kind === "pdf" ? (t.fileName ?? "PDF") : t.kind === "photo" ? "Foto" : "Zeichnung"}
+                  </span>
                   <span className="footnote" style={{ color: "var(--label-2)" }}>
-                    {t.deletedAt ? `gelöscht am ${new Date(t.deletedAt).toLocaleDateString("de-DE")}` : `abgelaufen am ${new Date(`${t.expires}T12:00`).toLocaleDateString("de-DE")}`}
+                    {t.deletedAt
+                      ? `gelöscht am ${new Date(t.deletedAt).toLocaleDateString("de-DE")}`
+                      : `abgelaufen am ${new Date(`${t.expires}T12:00`).toLocaleDateString("de-DE")}`}
                   </span>
                 </span>
                 <button

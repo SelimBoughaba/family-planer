@@ -39,7 +39,11 @@ function local(d: Date) {
   return { date: `${p.year}${p.month}${p.day}`, time: `${p.hour}${p.minute}${p.second}` };
 }
 
-const utc = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+const utc = (d: Date) =>
+  d
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}/, "");
 
 /** Ende des Kalendertags in Berlin als UTC, für UNTIL */
 function endOfLocalDayUtc(day: string) {

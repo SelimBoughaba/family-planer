@@ -49,17 +49,7 @@ type Drag = "start" | "end" | "move" | null;
  * Dreht man über die 12, läuft die Zeit weiter in die andere Tageshälfte.
  * start: Minuten seit Mitternacht, duration: Minuten (bis 12 Std.).
  */
-export function TimeDial({
-  start,
-  duration,
-  color,
-  onChange,
-}: {
-  start: number;
-  duration: number;
-  color: string;
-  onChange: (start: number, duration: number) => void;
-}) {
+export function TimeDial({ start, duration, color, onChange }: { start: number; duration: number; color: string; onChange: (start: number, duration: number) => void }) {
   const ref = useRef<SVGSVGElement>(null);
   const [drag, setDrag] = useState<Drag>(null);
   const last = useRef(0);
@@ -150,13 +140,7 @@ export function TimeDial({
         ).map(([which, p]) => (
           <g key={which} onPointerDown={(e) => down(which, e)} style={{ cursor: "grab" }}>
             <circle cx={p.x} cy={p.y} r="22" fill="transparent" />
-            <circle
-              cx={p.x}
-              cy={p.y}
-              r={drag === which ? 11 : 9.5}
-              fill="white"
-              style={{ transition: "r 120ms ease", filter: "drop-shadow(0 1px 3px rgba(0,0,0,.3))" }}
-            />
+            <circle cx={p.x} cy={p.y} r={drag === which ? 11 : 9.5} fill="white" style={{ transition: "r 120ms ease", filter: "drop-shadow(0 1px 3px rgba(0,0,0,.3))" }} />
             {which === "start" ? (
               <circle cx={p.x} cy={p.y} r="3" style={{ fill: color }} />
             ) : (

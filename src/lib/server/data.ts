@@ -165,8 +165,14 @@ function recipeFields(m: RecipeFields) {
     .slice(0, 80)
     .map((i) => ({ amount: str(i?.amount, 40, true), name: str(i?.name, 120, true) }))
     .filter((i): i is { amount: string | null; name: string } => !!i.name);
-  const steps = (Array.isArray(m.steps) ? m.steps : []).slice(0, 60).map((x) => str(x, 2000, true)).filter((x): x is string => !!x);
-  const tags = (Array.isArray(m.tags) ? m.tags : []).slice(0, 12).map((x) => str(x, 30, true)).filter((x): x is string => !!x);
+  const steps = (Array.isArray(m.steps) ? m.steps : [])
+    .slice(0, 60)
+    .map((x) => str(x, 2000, true))
+    .filter((x): x is string => !!x);
+  const tags = (Array.isArray(m.tags) ? m.tags : [])
+    .slice(0, 12)
+    .map((x) => str(x, 30, true))
+    .filter((x): x is string => !!x);
   const servings = Number.isInteger(m.servings) && m.servings > 0 && m.servings <= 50 ? m.servings : 4;
   const minutes = Number.isInteger(m.minutes) && (m.minutes as number) > 0 && (m.minutes as number) < 2000 ? (m.minutes as number) : null;
   const url = str(m.sourceUrl, 500, true);
@@ -218,9 +224,7 @@ function eventFields(m: EventFields) {
     people: Array.isArray(m.people) ? [...new Set(m.people)].slice(0, 10).map((p) => uuid(p)!) : [],
     recurrence,
     until: recurrence ? dateStr(m.recurrenceUntil, true) : null,
-    reminders: Array.isArray(m.reminders)
-      ? [...new Set(m.reminders.filter((x) => Number.isInteger(x) && x >= -1440 && x <= 10080))].slice(0, 3)
-      : [],
+    reminders: Array.isArray(m.reminders) ? [...new Set(m.reminders.filter((x) => Number.isInteger(x) && x >= -1440 && x <= 10080))].slice(0, 3) : [],
   };
 }
 
@@ -259,8 +263,10 @@ export async function mutate(m: Mutation, by: string | null): Promise<string> {
     }
     case "task.create": {
       const f = await taskFields(m);
-      await sql`insert into tasks (title, area, person_id, due, recurring, remind_time, rotation, points, created_by)
-        values (${f.title}, ${f.area}, ${f.personId}, ${f.due}, ${f.recurring}, ${f.remindTime}, ${sql.array(f.rotation)}::uuid[], ${f.points}, ${actor})`;
+      // die ID kommt vom Gerät, damit die Zeile beim Nachladen dieselbe bleibt
+      await sql`insert into tasks (id, title, area, person_id, due, recurring, remind_time, rotation, points, created_by)
+        values (coalesce(${uuid(m.id, true)}::uuid, gen_random_uuid()), ${f.title}, ${f.area}, ${f.personId}, ${f.due}, ${f.recurring}, ${f.remindTime}, ${sql.array(f.rotation)}::uuid[], ${f.points}, ${actor})
+        on conflict (id) do nothing`;
       return "tasks";
     }
     case "task.update": {
@@ -287,6 +293,11 @@ export async function mutate(m: Mutation, by: string | null): Promise<string> {
         if (!t.done) await bookTask({ id, title: t.title as string, person_id: (t.person_id as string) ?? null, points: Number(t.points ?? 1) }, true, actor);
       } else {
         await sql`update tasks set done = false, done_at = null where id = ${id}`;
+        // Rückgängig bei wiederkehrenden Aufgaben: die gerade angelegte nächste Runde wieder entfernen, solange sie unberührt ist
+        if (t.recurring && t.done && t.done_at) {
+          await sql`delete from tasks where id <> ${id} and done = false and title = ${t.title} and recurring = ${t.recurring}
+            and created_at between ${t.done_at} and ${t.done_at}::timestamptz + interval '5 seconds'`;
+        }
         await bookTask({ id, title: t.title as string, person_id: null, points: 0 }, false, actor);
       }
       return "tasks";
@@ -306,9 +317,10 @@ export async function mutate(m: Mutation, by: string | null): Promise<string> {
 
     case "item.create": {
       const { categories } = await getLists();
-      const cat = categories.includes(m.category) ? m.category : (categories.includes("Vorrat") ? "Vorrat" : categories[categories.length - 1]);
-      await sql`insert into shopping_items (name, amount, category, added_by)
-        values (${str(m.name, 80)!}, ${str(m.amount, 30, true)}, ${cat}, ${actor})`;
+      const cat = categories.includes(m.category) ? m.category : categories.includes("Vorrat") ? "Vorrat" : categories[categories.length - 1];
+      await sql`insert into shopping_items (id, name, amount, category, added_by)
+        values (coalesce(${uuid(m.id, true)}::uuid, gen_random_uuid()), ${str(m.name, 80)!}, ${str(m.amount, 30, true)}, ${cat}, ${actor})
+        on conflict (id) do nothing`;
       return "items";
     }
     case "item.toggle":
@@ -450,7 +462,6 @@ export async function mutate(m: Mutation, by: string | null): Promise<string> {
 }
 
 // --- Kalender-Abo --------------------------------------------------------
-
 
 export async function ensureCalendarToken(personId: string) {
   const sql = db();

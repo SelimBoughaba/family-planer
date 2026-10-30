@@ -1,39 +1,54 @@
 @import "tailwindcss";
 
-/* Grundtöne nach iOS-Systemfarben, Personenfarben getrennt in data.ts */
+/* Ruhig mit Liquid Glass: kühler, ruhiger Grund, Glasflächen mit Lichtkante, eine Akzentfarbe.
+   Personenfarben getrennt in data.ts, sie erscheinen nur als Akzent. */
 :root {
-  --bg: #f2f2f7;
-  --label: #1c1c1e;
-  --label-2: rgba(60, 60, 67, 0.62);
-  --label-3: rgba(60, 60, 67, 0.32);
-  --separator: rgba(60, 60, 67, 0.14);
-  --tint: #0a84ff;
+  --bg: #f3f4f7;
+  --label: #15161a;
+  --label-2: rgba(60, 64, 78, 0.64);
+  --label-3: rgba(60, 64, 78, 0.34);
+  --separator: rgba(20, 24, 40, 0.08);
+  --fill: rgba(20, 24, 40, 0.05);
+  --tint: #0a6cff;
   --danger: #ff3b30;
-  --success: #34c759;
+  --success: #2fb34f;
 
-  --glass: rgba(255, 255, 255, 0.52);
-  --glass-strong: rgba(255, 255, 255, 0.72);
-  --glass-edge: rgba(255, 255, 255, 0.75);
-  --glass-shade: rgba(0, 0, 0, 0.06);
-  --glass-shadow: 0 10px 40px -12px rgba(30, 30, 60, 0.18), 0 2px 6px rgba(30, 30, 60, 0.05);
-  --blob-opacity: 0.36;
-  --row-solid: rgba(255, 255, 255, 0.96);
+  --glass: rgba(255, 255, 255, 0.6);
+  --glass-strong: rgba(255, 255, 255, 0.8);
+  --glass-edge: rgba(255, 255, 255, 0.95);
+  --glass-rim-low: rgba(255, 255, 255, 0.25);
+  --glass-shade: rgba(20, 24, 40, 0.05);
+  --glass-outline: rgba(20, 24, 40, 0.06);
+  --glass-shadow: 0 1px 2px rgba(20, 24, 40, 0.04), 0 10px 28px -12px rgba(20, 24, 40, 0.16);
+  --blob-opacity: 0.07;
+  --row-solid: rgba(255, 255, 255, 0.97);
+  --scrim: rgba(12, 14, 20, 0.28);
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #000000;
-    --label: #f5f5f7;
-    --label-2: rgba(235, 235, 245, 0.6);
-    --label-3: rgba(235, 235, 245, 0.3);
-    --separator: rgba(84, 84, 88, 0.45);
-    --glass: rgba(44, 44, 46, 0.5);
-    --glass-strong: rgba(44, 44, 46, 0.72);
-    --glass-edge: rgba(255, 255, 255, 0.14);
+    --bg: #0b0c0f;
+    --label: #f2f3f6;
+    --label-2: rgba(235, 237, 245, 0.6);
+    --label-3: rgba(235, 237, 245, 0.3);
+    --separator: rgba(255, 255, 255, 0.08);
+    --fill: rgba(255, 255, 255, 0.07);
+    --tint: #3d8bff;
+    --success: #34c759;
+    --glass: rgba(40, 42, 50, 0.52);
+    --glass-strong: rgba(40, 42, 50, 0.78);
+    --glass-edge: rgba(255, 255, 255, 0.2);
+    --glass-rim-low: rgba(255, 255, 255, 0.03);
     --glass-shade: rgba(0, 0, 0, 0.3);
-    --glass-shadow: 0 10px 40px -12px rgba(0, 0, 0, 0.7), 0 2px 6px rgba(0, 0, 0, 0.4);
-    --blob-opacity: 0.32;
-    --row-solid: rgba(28, 28, 30, 0.97);
+    --glass-outline: rgba(255, 255, 255, 0.05);
+    --glass-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.7);
+    --blob-opacity: 0.1;
+    --row-solid: rgba(26, 27, 33, 0.97);
+    --scrim: rgba(0, 0, 0, 0.5);
   }
 }
 
@@ -65,20 +80,40 @@ body {
   min-height: 100dvh;
 }
 
-/* Liquid Glass: Brechung durch Blur und Sättigung, Lichtkante oben, Schatten unten */
-.glass {
-  background: var(--glass);
-  -webkit-backdrop-filter: blur(28px) saturate(185%);
-  backdrop-filter: blur(28px) saturate(185%);
-  border: 0.5px solid var(--glass-edge);
-  box-shadow:
-    inset 0 1px 0 0 var(--glass-edge),
-    inset 0 -1px 0 0 var(--glass-shade),
-    var(--glass-shadow);
-}
-
-.glass-strong {
-  background: var(--glass-strong);
+/* Liquid Glass: Brechung durch Blur und Sättigung, Lichtkante oben links, feine Kontur, weicher Schatten */
+@layer components {
+  .glass {
+    position: relative;
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+    box-shadow:
+      0 0 0 0.5px var(--glass-outline),
+      inset 0 -1px 0 0 var(--glass-shade),
+      var(--glass-shadow);
+  }
+  /* spiegelnde Kante: hell oben links, verläuft nach unten, leicht zurück unten rechts */
+  .glass::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(155deg, var(--glass-edge), var(--glass-rim-low) 38%, transparent 62%, var(--glass-rim-low));
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+  .glass-strong {
+    background: var(--glass-strong);
+  }
+  /* feste Fläche für Zeilen in Listen, wenn Glas zu unruhig wäre */
+  .surface {
+    background: var(--row-solid);
+  }
 }
 
 /* Fallback für Geräte ohne backdrop-filter */
@@ -88,18 +123,19 @@ body {
   }
 }
 
+/* große Titel enger gesetzt, sonst wirken sie locker */
 .large-title {
   font-size: 34px;
-  line-height: 41px;
+  line-height: 40px;
   font-weight: 700;
-  letter-spacing: 0.37px;
+  letter-spacing: -0.025em;
 }
 
 .title-2 {
-  font-size: 22px;
-  line-height: 28px;
+  font-size: 20px;
+  line-height: 25px;
   font-weight: 700;
-  letter-spacing: 0.35px;
+  letter-spacing: -0.015em;
 }
 
 .headline {
@@ -136,11 +172,30 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Drücken: sofortige Rückmeldung, kurz und ohne Überschwingen */
 .press {
-  transition: transform 160ms cubic-bezier(0.3, 0.7, 0.4, 1);
+  transition: transform 140ms var(--ease-out);
 }
 .press:active {
   transform: scale(0.97);
+}
+
+/* schnelles Antippen ohne Doppeltipp-Verzögerung, kein Markieren beim langen Drücken */
+button,
+[role="button"],
+a {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* iPhone zoomt in Felder unter 16 px hinein */
+@media (pointer: coarse) {
+  input,
+  textarea,
+  select {
+    font-size: max(16px, 1em);
+  }
 }
 
 :focus-visible {
@@ -149,52 +204,63 @@ body {
   border-radius: 10px;
 }
 
-/* Hintergrundlicht */
+/* Hintergrundlicht: ruhig und langsam, gibt dem Glas etwas zum Brechen */
 @keyframes drift {
-  0% { transform: translate3d(0, 0, 0) scale(1); }
-  50% { transform: translate3d(6vw, -4vh, 0) scale(1.12); }
-  100% { transform: translate3d(0, 0, 0) scale(1); }
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(5vw, -3vh, 0) scale(1.08);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
 }
 
 .blob {
   position: absolute;
   border-radius: 9999px;
-  filter: blur(60px);
+  filter: blur(70px);
   opacity: var(--blob-opacity);
-  animation: drift 22s ease-in-out infinite;
+  animation: drift 40s ease-in-out infinite;
   transition: background-color 900ms ease;
 }
 
-@keyframes sheet-in {
-  from { transform: translateY(24px) scale(0.96); opacity: 0; }
-  to { transform: translateY(0) scale(1); opacity: 1; }
-}
-.sheet-in {
-  animation: sheet-in 280ms cubic-bezier(0.2, 0.9, 0.3, 1.1) both;
-}
-
 @keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
 }
 .fade-in {
-  animation: fade-in 200ms ease both;
+  animation: fade-in 200ms ease-out both;
 }
 
+/* neue Einträge: kurz von leicht unten, ohne Sprung */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.rise {
+  animation: rise 240ms var(--ease-out) both;
+}
+
+/* Häkchen: wächst aus 80 %, ohne Überschwingen */
 @keyframes check-pop {
-  0% { transform: scale(0.6); }
-  60% { transform: scale(1.15); }
-  100% { transform: scale(1); }
+  from {
+    transform: scale(0.8);
+    opacity: 0;
+  }
 }
 .check-pop {
-  animation: check-pop 320ms cubic-bezier(0.3, 0.8, 0.4, 1.2) both;
+  animation: check-pop 200ms var(--ease-out) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .blob,
-  .sheet-in,
-  .check-pop,
-  .fade-in {
+  .rise,
+  .check-pop {
     animation: none;
   }
   .press:active {
@@ -205,16 +271,12 @@ body {
 /* Abstand zum Home-Balken und Freiraum über der Tab-Leiste */
 :root {
   --safe-b: env(safe-area-inset-bottom);
-  --clear: calc(var(--safe-b) + 84px);
+  --clear: calc(var(--safe-b) + 92px);
 }
 
-/* Tab-Leiste wie bei Apple-Apps: flach am unteren Rand, Glas, Haarlinie oben */
+/* Tab-Leiste wie in iOS 26: schwebende Glaskapsel knapp über dem Home-Balken */
 .tabbar {
-  background: var(--glass-strong);
-  -webkit-backdrop-filter: blur(28px) saturate(185%);
-  backdrop-filter: blur(28px) saturate(185%);
-  border-top: 0.5px solid var(--separator);
-  padding-bottom: max(var(--safe-b), 4px);
+  bottom: max(calc(var(--safe-b) - 12px), 10px);
 }
 
 .safe-bottom {
@@ -232,10 +294,23 @@ body {
 }
 
 @keyframes shake {
-  10%, 90% { transform: translateX(-2px); }
-  20%, 80% { transform: translateX(4px); }
-  30%, 50%, 70% { transform: translateX(-8px); }
-  40%, 60% { transform: translateX(8px); }
+  10%,
+  90% {
+    transform: translateX(-2px);
+  }
+  20%,
+  80% {
+    transform: translateX(4px);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translateX(-8px);
+  }
+  40%,
+  60% {
+    transform: translateX(8px);
+  }
 }
 
 /* Textfelder zeigen den Cursor, ein Rahmen wäre doppelt */
@@ -249,4 +324,34 @@ textarea:focus-visible {
   background: color-mix(in oklab, var(--tint) 16%, transparent);
   box-shadow: inset 0 0 0 2px var(--tint);
   border-radius: 14px;
+}
+
+/* Meldungen (Sonner) im Glas-Stil; Selektoren bewusst spezifischer als Sonners eigene Stile */
+:root [data-sonner-toaster] [data-sonner-toast].fp-toast {
+  background: var(--glass-strong);
+  color: var(--label);
+  border: 0;
+  border-radius: 18px;
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  box-shadow: 0 0 0 0.5px var(--glass-outline), var(--glass-shadow);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  padding: 12px 12px 12px 16px;
+}
+:root [data-sonner-toaster] [data-sonner-toast].fp-toast [data-description] {
+  color: var(--label-2);
+  font-size: 13px;
+}
+:root [data-sonner-toaster] [data-sonner-toast].fp-toast [data-button] {
+  background: var(--fill);
+  color: var(--tint);
+  font-weight: 600;
+  font-size: 15px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+}
+:root [data-sonner-toaster] [data-sonner-toast].fp-toast[data-type="error"] [data-icon] {
+  color: var(--danger);
 }

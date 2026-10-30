@@ -57,8 +57,7 @@ function reminderText(e: EventRow, start: Date, offset: number) {
     return `${when} ganztägig${e.place ? `, ${e.place}` : ""}`;
   }
   const time = formatBerlin(start, { hour: "2-digit", minute: "2-digit" });
-  const lead =
-    offset <= 0 ? "Jetzt" : offset < 60 ? `In ${offset} Min.` : offset < 1440 ? `In ${offset / 60} Std.` : `Morgen`;
+  const lead = offset <= 0 ? "Jetzt" : offset < 60 ? `In ${offset} Min.` : offset < 1440 ? `In ${offset / 60} Std.` : `Morgen`;
   return `${lead}, um ${time} Uhr${e.place ? `, ${e.place}` : ""}`;
 }
 

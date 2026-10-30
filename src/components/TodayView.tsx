@@ -5,7 +5,7 @@ import { useFamily } from "@/lib/client/family";
 import { localDay, type Task } from "@/lib/types";
 import { addDays, occurrences, startOfDay, type Occurrence } from "@/lib/recurrence";
 import { recipeEmoji } from "@/lib/recipes";
-import { Avatar, AvatarStack, Card, PersonFilter, SectionTitle, useLongPress } from "./ui";
+import { AnimatePresence, Avatar, AvatarStack, Card, ListItem, PersonFilter, SectionTitle, useLongPress } from "./ui";
 import { TaskRow, useAssignDrop, useTaskMenus } from "./TaskRow";
 import { BoardTile } from "./board/BoardTile";
 import { AttendanceRow, MaybeHint, eatersLabel, usePresence } from "./food/Attendance";
@@ -27,12 +27,12 @@ function untilLabel(now: Date, start: Date) {
 function CountdownRing({ now, start, color }: { now: Date; start: Date; color: string }) {
   const min = Math.max(0, (start.getTime() - now.getTime()) / 60000);
   const frac = Math.min(min / 120, 1);
-  const r = 26;
+  const r = 25;
   const c = 2 * Math.PI * r;
   const big = min >= 60;
   return (
-    <svg width="64" height="64" viewBox="0 0 64 64" className="shrink-0" aria-hidden>
-      <circle cx="32" cy="32" r={r} fill="none" stroke="var(--separator)" strokeWidth="5" />
+    <svg width="60" height="60" viewBox="2 2 60 60" className="shrink-0" aria-hidden>
+      <circle cx="32" cy="32" r={r} fill="none" stroke="var(--fill)" strokeWidth="5" />
       <circle
         cx="32"
         cy="32"
@@ -44,15 +44,12 @@ function CountdownRing({ now, start, color }: { now: Date; start: Date; color: s
         strokeDasharray={c}
         strokeDashoffset={c * (1 - frac)}
         transform="rotate(-90 32 32)"
-        style={{ transition: "stroke-dashoffset 800ms ease" }}
+        style={{ transition: "stroke-dashoffset 400ms var(--ease-out)" }}
       />
       {min > 0 && min < 24 * 60 ? (
         <>
-          <text x="32" y="33" textAnchor="middle" fontSize="16" fontWeight="650" fill="var(--label)" className="tabular">
-            {big ? Math.round(min / 60) : Math.round(min)}
-          </text>
-          <text x="32" y="45" textAnchor="middle" fontSize="9.5" fontWeight="500" fill="var(--label-2)">
-            {big ? "Std." : "Min."}
+          <text x="32" y="36.5" textAnchor="middle" fontSize="13" fontWeight="700" fill={color} className="tabular">
+            {big ? `${Math.floor(Math.round(min) / 60)}:${String(Math.round(min) % 60).padStart(2, "0")}` : `${Math.round(min)} m`}
           </text>
         </>
       ) : (
@@ -119,6 +116,10 @@ export function TodayView({
     )
     .sort((a, b) => Number(a.done) - Number(b.done) || (a.due ?? "").localeCompare(b.due ?? ""));
   const open = tasks.filter((t) => !t.done);
+  const doneToday = tasks.filter((t) => t.done);
+  const [showDone, setShowDone] = useState(false);
+  // Erledigtes klappt zusammen, sonst wächst die Liste über den Tag
+  const visible = showDone || doneToday.length <= 2 ? tasks : open;
 
   const dateLabel = now.toLocaleDateString("de-DE", {
     weekday: "long",
@@ -139,22 +140,22 @@ export function TodayView({
         </div>
         <div className="flex items-center gap-2">
           <button onClick={onProfile} className="press rounded-full" aria-label="Profil">
-            <Avatar person={me ?? undefined} size={44} />
+            <Avatar person={me ?? undefined} size={40} />
           </button>
           <button
             {...plusPress}
-            className="press glass flex h-11 w-11 items-center justify-center rounded-full select-none"
+            className="press glass glass-strong flex h-10 w-10 items-center justify-center rounded-full select-none"
             aria-label="Neuer Eintrag"
             style={{ color: "var(--tint)" }}
           >
-            <IconPlus size={22} />
+            <IconPlus size={20} />
           </button>
         </div>
       </header>
 
       <PersonFilter selected={filter} onToggle={(id) => setFilter(filter === id ? null : id)} onDrop={assignDrop} />
 
-      <div className="no-scrollbar -mx-4 mt-4 flex gap-1.5 overflow-x-auto px-4" role="tablist" aria-label="Tage">
+      <div className="no-scrollbar -mx-4 mt-4 flex gap-1 overflow-x-auto px-4" role="tablist" aria-label="Tage">
         {strip.map((d, k) => {
           const on = k === sel;
           const end = addDays(d, 1);
@@ -167,18 +168,18 @@ export function TodayView({
               onClick={() => setSel(k)}
               className="press flex w-[46px] shrink-0 flex-col items-center gap-1 rounded-[14px] py-2"
               style={{
-                background: on ? "var(--tint)" : "color-mix(in oklab, var(--label) 6%, transparent)",
-                color: on ? "white" : "var(--label)",
-                transition: "background 200ms ease",
+                background: on ? "var(--label)" : "transparent",
+                color: on ? "var(--bg)" : "var(--label)",
+                transition: "background-color 180ms ease, color 180ms ease",
               }}
             >
-              <span className="caption font-semibold" style={{ opacity: on ? 0.9 : 0.6 }}>
+              <span className="caption font-semibold" style={{ opacity: on ? 0.8 : 0.55 }}>
                 {k === 0 ? "Heute" : d.toLocaleDateString("de-DE", { weekday: "short" }).replace(".", "")}
               </span>
               <span className="headline tabular leading-none">{d.getDate()}</span>
-              <span className="flex h-1.5 items-center gap-[3px]">
+              <span className="flex h-1 items-center gap-[3px]">
                 {ids.map((id, i) => (
-                  <span key={i} className="h-1.5 w-1.5 rounded-full" style={{ background: on ? "white" : color(id) }} />
+                  <span key={i} className="h-1 w-1 rounded-full" style={{ background: on ? "var(--bg)" : color(id) }} />
                 ))}
               </span>
             </button>
@@ -187,14 +188,19 @@ export function TodayView({
       </div>
 
       {next ? (
-        <Card className="mt-5 p-4">
-          <button onClick={() => onOpenEvent(next)} className="flex w-full items-center gap-4 text-left">
+        <Card className="mt-4 p-4">
+          <span
+            className="pointer-events-none absolute inset-0 rounded-[inherit]"
+            style={{ background: `linear-gradient(135deg, color-mix(in oklab, ${color(next.event.people[0])} 14%, transparent), transparent 70%)` }}
+            aria-hidden
+          />
+          <button onClick={() => onOpenEvent(next)} className="relative flex w-full items-center gap-3.5 text-left">
             <CountdownRing now={now} start={next.start} color={color(next.event.people[0])} />
             <div className="min-w-0 flex-1">
               <p className="footnote font-semibold" style={{ color: color(next.event.people[0]) }}>
                 Als Nächstes, {untilLabel(now, next.start)}
               </p>
-              <p className="headline mt-0.5 truncate">{next.event.title}</p>
+              <p className="mt-0.5 truncate text-[20px] leading-[25px] font-semibold tracking-[-0.015em]">{next.event.title}</p>
               <p className="subhead tabular mt-0.5" style={{ color: "var(--label-2)" }}>
                 {next.event.allDay
                   ? "Ganztägig"
@@ -205,7 +211,7 @@ export function TodayView({
           </button>
           {next.event.place && (
             <p
-              className="footnote mt-3 flex items-center gap-1.5 border-t pt-3"
+              className="footnote relative mt-3 flex items-center gap-1.5 border-t pt-3"
               style={{
                 color: "var(--label-2)",
                 borderColor: "var(--separator)",
@@ -216,7 +222,7 @@ export function TodayView({
           )}
         </Card>
       ) : (
-        <Card className="mt-5 p-4">
+        <Card className="mt-4 p-4">
           <p className="headline">Keine anstehenden Termine.</p>
           <p className="subhead mt-1" style={{ color: "var(--label-2)" }}>
             Über das Plus oben legst du einen Termin oder eine Aufgabe an.
@@ -236,7 +242,9 @@ export function TodayView({
       )}
       {todays.length > 0 && (
         <>
-          <SectionTitle>{sel === 0 ? "Tagesablauf" : selLabel}</SectionTitle>
+          <SectionTitle trailing={<span style={{ color: "var(--label-2)" }}>{todays.length === 1 ? "1 Termin" : `${todays.length} Termine`}</span>}>
+            {sel === 0 ? "Tagesablauf" : selLabel}
+          </SectionTitle>
           <Card className="px-4 py-1">
             {todays.map((o, i) => {
               const e = o.event;
@@ -263,7 +271,7 @@ export function TodayView({
                     <span className="subhead tabular w-12 shrink-0 font-medium" style={{ color: "var(--label-2)" }}>
                       {e.allDay ? "Ganzt." : time(o.start)}
                     </span>
-                    <span className="flex h-9 w-1 shrink-0 flex-col overflow-hidden rounded-full">
+                    <span className="flex h-9 w-[3px] shrink-0 flex-col overflow-hidden rounded-full">
                       {(e.people.length ? e.people : [null]).map((id, k) => (
                         <span key={k} className="flex-1" style={{ background: color(id) }} />
                       ))}
@@ -302,13 +310,28 @@ export function TodayView({
         </Card>
       ) : (
         <Card className="overflow-hidden">
-          {tasks.map((t, i) => (
-            <TaskRow key={t.id} task={t} first={i === 0} today={today} onEdit={onEditTask} onMenu={openMenu} />
-          ))}
+          <AnimatePresence initial={false}>
+            {visible.map((t, i) => (
+              <ListItem key={t.id}>
+                <TaskRow task={t} first={i === 0} today={today} onEdit={onEditTask} onMenu={openMenu} />
+              </ListItem>
+            ))}
+          </AnimatePresence>
+          {doneToday.length > 2 && (
+            <button
+              onClick={() => setShowDone((v) => !v)}
+              className="subhead flex w-full items-center justify-between px-4 py-3 text-left"
+              style={{ borderTop: visible.length ? "0.5px solid var(--separator)" : "none", color: "var(--label-2)" }}
+              aria-expanded={showDone}
+            >
+              <span>{doneToday.length} heute erledigt</span>
+              <span style={{ color: "var(--tint)" }}>{showDone ? "Ausblenden" : "Zeigen"}</span>
+            </button>
+          )}
         </Card>
       )}
       <p className="caption mt-2 px-1" style={{ color: "var(--label-3)" }}>
-        Nach rechts wischen erledigt, nach links verschiebt auf morgen, antippen bearbeitet, lange drücken zeigt mehr. Ein Profilbild oben lange drücken und auf eine Aufgabe ziehen gibt sie dieser Person.
+        Nach rechts wischen erledigt, nach links auf morgen. Lange drücken zeigt mehr.
       </p>
 
       {(() => {
@@ -319,13 +342,7 @@ export function TodayView({
             <SectionTitle>{sel === 0 ? "Heute gibt es" : sel === 1 ? "Morgen gibt es" : `Am ${selStart.toLocaleDateString("de-DE", { weekday: "long" })} gibt es`}</SectionTitle>
             <Card className="p-0">
               <button onClick={onOpenFood} className="flex w-full items-center gap-4 p-4 text-left">
-                <span
-                  className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[16px] text-3xl"
-                  style={{
-                    background: "linear-gradient(150deg, #FFE08A, #FFB347)",
-                  }}
-                  aria-hidden
-                >
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] text-[26px]" style={{ background: "var(--fill)" }} aria-hidden>
                   {meal ? recipeEmoji(meal.title, recipe?.tags) : "🤔"}
                 </span>
                 <span className="min-w-0 flex-1">

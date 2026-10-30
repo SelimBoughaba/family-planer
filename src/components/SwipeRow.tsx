@@ -107,10 +107,7 @@ export function SwipeRow({ children, leading, trailing, onLongPress, className }
           }}
           aria-hidden
         >
-          <span
-            className="flex items-center gap-2 subhead font-semibold"
-            style={{ transform: `scale(${armed ? 1.08 : 0.9})`, transition: "transform 160ms ease" }}
-          >
+          <span className="flex items-center gap-2 subhead font-semibold" style={{ transform: `scale(${armed ? 1.08 : 0.9})`, transition: "transform 160ms ease" }}>
             {active.icon}
             {active.label}
           </span>

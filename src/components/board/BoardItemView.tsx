@@ -10,7 +10,14 @@ export const HAND_FONT = '"Bradley Hand", "Marker Felt", "Segoe Print", "Comic S
 /** Striche als SVG; Koordinaten relativ zum Element */
 export function InkSvg({ ink, width, height, overflow = false }: { ink: Stroke[]; width: number; height: number; overflow?: boolean }) {
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="pointer-events-none absolute top-0 left-0" style={{ overflow: overflow ? "visible" : "hidden" }} aria-hidden>
+    <svg
+      width={width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      className="pointer-events-none absolute top-0 left-0"
+      style={{ overflow: overflow ? "visible" : "hidden" }}
+      aria-hidden
+    >
       {ink.map((s, i) => (
         <path key={i} d={strokePath(s, hasPressure(s))} fill={s.c} />
       ))}
@@ -69,7 +76,10 @@ export const BoardItemView = memo(function BoardItemView({ item, selected }: { i
       >
         <Pin color="#FF3B30" />
         {item.text && (
-          <p className="overflow-hidden px-3 pt-4 pb-2 break-words whitespace-pre-wrap" style={{ fontFamily: HAND_FONT, fontSize: item.text.length > 80 ? 15 : item.text.length > 30 ? 18 : 22, lineHeight: 1.25, color: "#1c1c1e", maxHeight: "100%" }}>
+          <p
+            className="overflow-hidden px-3 pt-4 pb-2 break-words whitespace-pre-wrap"
+            style={{ fontFamily: HAND_FONT, fontSize: item.text.length > 80 ? 15 : item.text.length > 30 ? 18 : 22, lineHeight: 1.25, color: "#1c1c1e", maxHeight: "100%" }}
+          >
             {item.text}
           </p>
         )}

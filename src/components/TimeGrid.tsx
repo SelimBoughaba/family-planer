@@ -146,16 +146,19 @@ export function TimeGrid({
     const target = e.currentTarget as HTMLElement;
     const pointerId = e.pointerId;
     pending.current = { occ, kind, x: e.clientX, y: e.clientY, dayIndex, id: pointerId };
-    pressTimer.current = setTimeout(() => {
-      const p = pending.current;
-      if (!p) return;
-      try {
-        target.setPointerCapture(pointerId);
-      } catch {}
-      navigator.vibrate?.(10);
-      setDrag({ occ: p.occ, kind: p.kind, startX: p.x, startY: p.y, dayIndex: p.dayIndex, dMin: 0, dDays: 0 });
-      suppressClick.current = true;
-    }, kind === "resize" ? 180 : LONG_PRESS);
+    pressTimer.current = setTimeout(
+      () => {
+        const p = pending.current;
+        if (!p) return;
+        try {
+          target.setPointerCapture(pointerId);
+        } catch {}
+        navigator.vibrate?.(10);
+        setDrag({ occ: p.occ, kind: p.kind, startX: p.x, startY: p.y, dayIndex: p.dayIndex, dMin: 0, dDays: 0 });
+        suppressClick.current = true;
+      },
+      kind === "resize" ? 180 : LONG_PRESS,
+    );
   };
 
   const onMove = (e: React.PointerEvent) => {
@@ -359,13 +362,7 @@ export function TimeGrid({
               <span key={h} className="pointer-events-none absolute inset-x-0 h-px" style={{ top: h * HOUR, background: "var(--separator)" }} />
             ))}
             {days.map((d, di) => (
-              <div
-                key={+d}
-                className="relative flex-1"
-                style={{ borderLeft: di ? "0.5px solid var(--separator)" : "none" }}
-                onClick={slotClick(di)}
-                role="presentation"
-              >
+              <div key={+d} className="relative flex-1" style={{ borderLeft: di ? "0.5px solid var(--separator)" : "none" }} onClick={slotClick(di)} role="presentation">
                 {sameDay(d, now) && (
                   <div className="pointer-events-none absolute inset-x-0 z-20 flex items-center" style={{ top: nowTop }}>
                     <span className="-ml-1 h-2 w-2 rounded-full" style={{ background: "var(--danger)" }} />
@@ -397,7 +394,10 @@ export function TimeGrid({
                       onContextMenu={(e) => e.preventDefault()}
                     >
                       <div className="px-1 py-0.5" style={{ WebkitTouchCallout: "none" }}>
-                        <p className={`${compact ? "text-[10.5px] leading-[13px]" : "footnote"} line-clamp-3 font-semibold`} style={{ color: `color-mix(in oklab, ${c} 55%, var(--label))` }}>
+                        <p
+                          className={`${compact ? "text-[10.5px] leading-[13px]" : "footnote"} line-clamp-3 font-semibold`}
+                          style={{ color: `color-mix(in oklab, ${c} 55%, var(--label))` }}
+                        >
                           {p.occ.event.title}
                         </p>
                         {!compact && p.height > 36 && (
@@ -407,11 +407,7 @@ export function TimeGrid({
                           </p>
                         )}
                       </div>
-                      <span
-                        className="absolute inset-x-0 bottom-0 h-3 cursor-ns-resize"
-                        onPointerDown={onBlockDown(p.occ, "resize", di)}
-                        aria-hidden
-                      />
+                      <span className="absolute inset-x-0 bottom-0 h-3 cursor-ns-resize" onPointerDown={onBlockDown(p.occ, "resize", di)} aria-hidden />
                     </div>
                   );
                 })}

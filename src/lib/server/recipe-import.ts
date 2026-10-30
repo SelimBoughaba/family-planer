@@ -96,7 +96,11 @@ function findRecipe(node: unknown): Json | null {
 
 function steps(v: unknown): string[] {
   if (!v) return [];
-  if (typeof v === "string") return v.split(/\n+|(?<=\.)\s{2,}/).map(decode).filter(Boolean);
+  if (typeof v === "string")
+    return v
+      .split(/\n+|(?<=\.)\s{2,}/)
+      .map(decode)
+      .filter(Boolean);
   if (Array.isArray(v)) return v.flatMap(steps);
   const o = v as Json;
   if (o["@type"] === "HowToSection") return steps(o.itemListElement);
@@ -152,7 +156,11 @@ const recipeTool = {
       minutes: { type: "integer", description: "Gesamtzeit in Minuten" },
       ingredients: {
         type: "array",
-        items: { type: "object", properties: { amount: { type: "string", description: "z. B. 200 g, 2 EL, leer wenn keine Menge" }, name: { type: "string" } }, required: ["name"] },
+        items: {
+          type: "object",
+          properties: { amount: { type: "string", description: "z. B. 200 g, 2 EL, leer wenn keine Menge" }, name: { type: "string" } },
+          required: ["name"],
+        },
       },
       steps: { type: "array", items: { type: "string" } },
       tags: { type: "array", items: { type: "string" }, description: "z. B. vegetarisch, schnell, Kinder" },
@@ -162,7 +170,16 @@ const recipeTool = {
   },
 };
 
-type AiRecipe = { title: string; description?: string; servings: number; minutes?: number; ingredients: { amount?: string; name: string }[]; steps: string[]; tags?: string[]; found: boolean };
+type AiRecipe = {
+  title: string;
+  description?: string;
+  servings: number;
+  minutes?: number;
+  ingredients: { amount?: string; name: string }[];
+  steps: string[];
+  tags?: string[];
+  found: boolean;
+};
 
 function normalize(r: AiRecipe, url: string | null): RecipeFields {
   return {
@@ -173,7 +190,10 @@ function normalize(r: AiRecipe, url: string | null): RecipeFields {
     minutes: Number.isInteger(r.minutes) && (r.minutes as number) > 0 ? (r.minutes as number) : null,
     ingredients: (r.ingredients ?? []).filter((i) => i?.name).map((i) => ({ amount: i.amount?.trim() || null, name: String(i.name).trim() })),
     steps: (r.steps ?? []).map((s) => String(s).trim()).filter(Boolean),
-    tags: (r.tags ?? []).map((t) => String(t).trim()).filter(Boolean).slice(0, 8),
+    tags: (r.tags ?? [])
+      .map((t) => String(t).trim())
+      .filter(Boolean)
+      .slice(0, 8),
     sourceUrl: url,
   };
 }

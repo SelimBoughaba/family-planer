@@ -141,7 +141,7 @@ export function PointsView() {
                 key={s.title}
                 onClick={() => void run({ op: "reward.create", title: s.title, emoji: s.emoji, cost: s.cost })}
                 className="press footnote rounded-full px-3 py-1.5 font-medium"
-                style={{ background: "color-mix(in oklab, var(--label) 7%, transparent)" }}
+                style={{ background: "var(--fill)" }}
               >
                 {s.emoji} {s.title} · {s.cost}
               </button>
@@ -163,10 +163,7 @@ export function PointsView() {
                   setManage(r);
                 }}
               >
-                <span
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] text-xl"
-                  style={{ background: "color-mix(in oklab, var(--label) 6%, transparent)" }}
-                >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] text-xl" style={{ background: "var(--fill)" }}>
                   {r.emoji ?? "🎁"}
                 </span>
                 <div className="min-w-0 flex-1">
@@ -181,7 +178,7 @@ export function PointsView() {
                   disabled={!enough}
                   className="press subhead shrink-0 rounded-full px-3.5 py-1.5 font-semibold"
                   style={{
-                    background: enough ? "var(--tint)" : "color-mix(in oklab, var(--label) 7%, transparent)",
+                    background: enough ? "var(--tint)" : "var(--fill)",
                     color: enough ? "white" : "var(--label-3)",
                   }}
                 >
@@ -325,11 +322,7 @@ function PendingRow({
       </div>
       {canDecide && (
         <div className="mt-2.5 flex gap-2 pl-11">
-          <button
-            onClick={() => onDecide(false)}
-            className="press subhead flex-1 rounded-full py-1.5 font-semibold"
-            style={{ background: "color-mix(in oklab, var(--label) 7%, transparent)" }}
-          >
+          <button onClick={() => onDecide(false)} className="press subhead flex-1 rounded-full py-1.5 font-semibold" style={{ background: "var(--fill)" }}>
             Ablehnen
           </button>
           <button onClick={() => onDecide(true)} className="press subhead flex-1 rounded-full py-1.5 font-semibold text-white" style={{ background: "var(--success)" }}>
@@ -390,7 +383,7 @@ function NewRewardSheet({ open, onClose }: { open: boolean; onClose: () => void 
             type="button"
             onClick={() => setEmoji(e)}
             className="press flex h-10 w-10 items-center justify-center rounded-[12px] text-xl"
-            style={{ background: e === emoji ? "color-mix(in oklab, var(--tint) 22%, transparent)" : "color-mix(in oklab, var(--label) 6%, transparent)" }}
+            style={{ background: e === emoji ? "color-mix(in oklab, var(--tint) 22%, transparent)" : "var(--fill)" }}
             aria-pressed={e === emoji}
           >
             {e}

@@ -106,8 +106,13 @@ function ConfirmDialog({ c, onClose }: { c: Confirm | null; onClose: () => void 
   const ok = !c.typed || typed.trim().toUpperCase() === c.typed;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-6" role="alertdialog" aria-modal>
-      <button className="fade-in absolute inset-0" style={{ background: "rgba(0,0,0,.3)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" }} onClick={onClose} aria-label="Abbrechen" />
-      <div className="sheet-in glass glass-strong relative w-full max-w-sm rounded-[22px] p-5">
+      <button
+        className="fade-in absolute inset-0"
+        style={{ background: "rgba(0,0,0,.3)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" }}
+        onClick={onClose}
+        aria-label="Abbrechen"
+      />
+      <div className="rise glass glass-strong relative w-full max-w-sm rounded-[22px] p-5">
         <p className="headline">{c.title}</p>
         <p className="subhead mt-1.5" style={{ color: "var(--label-2)" }}>
           {c.text}
@@ -123,7 +128,7 @@ function ConfirmDialog({ c, onClose }: { c: Confirm | null; onClose: () => void 
           />
         )}
         <div className="mt-5 flex gap-2">
-          <button onClick={onClose} className="press body flex-1 rounded-[12px] py-2.5 font-medium" style={{ background: "color-mix(in oklab, var(--label) 7%, transparent)" }}>
+          <button onClick={onClose} className="press body flex-1 rounded-[12px] py-2.5 font-medium" style={{ background: "var(--fill)" }}>
             Abbrechen
           </button>
           <button
@@ -167,7 +172,8 @@ export function OwnerGate({ state }: { state: "family" | "missing" | "login" }) 
     const b = await res.json().catch(() => ({}));
     setPw("");
     setBusy(false);
-    if (b.error === "wrong_password") setMsg(b.remaining > 0 ? `Falsches Passwort. Noch ${b.remaining} Versuche, dann 15 Minuten Pause.` : "Falsches Passwort. Dieses Gerät ist jetzt 15 Minuten gesperrt.");
+    if (b.error === "wrong_password")
+      setMsg(b.remaining > 0 ? `Falsches Passwort. Noch ${b.remaining} Versuche, dann 15 Minuten Pause.` : "Falsches Passwort. Dieses Gerät ist jetzt 15 Minuten gesperrt.");
     else if (b.error === "locked_device") setMsg("Zu viele Fehlversuche. Bitte in 15 Minuten erneut versuchen.");
     else if (b.error === "locked_global") setMsg("Vorübergehend gesperrt. Bitte in einer Stunde erneut versuchen.");
     else setMsg("Anmeldung gerade nicht möglich.");
@@ -214,7 +220,12 @@ export function OwnerGate({ state }: { state: "family" | "missing" | "login" }) 
             <p className="footnote mt-3 min-h-[36px] text-center" style={{ color: "var(--danger)" }} aria-live="polite">
               {msg}
             </p>
-            <button type="submit" disabled={!pw || busy} className="press headline mt-1 w-full rounded-[16px] py-3.5 text-white" style={{ background: pw ? "var(--tint)" : "var(--label-3)" }}>
+            <button
+              type="submit"
+              disabled={!pw || busy}
+              className="press headline mt-1 w-full rounded-[16px] py-3.5 text-white"
+              style={{ background: pw ? "var(--tint)" : "var(--label-3)" }}
+            >
               {busy ? "Wird geprüft" : "Entsperren"}
             </button>
             <Link href="/" className="subhead mt-5 block text-center" style={{ color: "var(--tint)" }}>
@@ -321,7 +332,11 @@ export function OwnerApp() {
 
       {toast && (
         <div className="fixed inset-x-0 z-50 mx-auto max-w-md px-4" style={{ bottom: "calc(var(--safe-b) + 20px)" }}>
-          <div className="sheet-in glass glass-strong subhead rounded-[16px] px-4 py-3 text-center font-medium" style={{ color: toast.bad ? "var(--danger)" : "var(--label)" }} role="status">
+          <div
+            className="rise glass glass-strong subhead rounded-[16px] px-4 py-3 text-center font-medium"
+            style={{ color: toast.bad ? "var(--danger)" : "var(--label)" }}
+            role="status"
+          >
             {toast.text}
           </div>
         </div>
@@ -446,22 +461,46 @@ function PeopleTab({ s, act, setConfirm }: TabProps) {
                     if (await act({ op: "person.rename", id: p.id, name }, "Name geändert.")) setEditing(null);
                   }}
                 >
-                  <input value={name} onChange={(e) => setName(e.target.value)} className="body glass min-w-0 flex-1 rounded-[10px] px-2.5 py-1.5" autoFocus maxLength={30} aria-label="Neuer Name" />
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="body glass min-w-0 flex-1 rounded-[10px] px-2.5 py-1.5"
+                    autoFocus
+                    maxLength={30}
+                    aria-label="Neuer Name"
+                  />
                   <ActionButton onClick={() => {}}>Sichern</ActionButton>
                 </form>
               ) : (
                 <>
                   <span className="headline flex-1">{p.name}</span>
-                  <button onClick={() => void act({ op: "person.move", id: p.id, dir: -1 })} disabled={idx === 0} className="p-1.5" aria-label="Nach oben" style={{ opacity: idx === 0 ? 0.25 : 1 }}>
+                  <button
+                    onClick={() => void act({ op: "person.move", id: p.id, dir: -1 })}
+                    disabled={idx === 0}
+                    className="p-1.5"
+                    aria-label="Nach oben"
+                    style={{ opacity: idx === 0 ? 0.25 : 1 }}
+                  >
                     <IconChevron size={16} className="-rotate-90" />
                   </button>
-                  <button onClick={() => void act({ op: "person.move", id: p.id, dir: 1 })} disabled={idx === s.people.length - 1} className="p-1.5" aria-label="Nach unten" style={{ opacity: idx === s.people.length - 1 ? 0.25 : 1 }}>
+                  <button
+                    onClick={() => void act({ op: "person.move", id: p.id, dir: 1 })}
+                    disabled={idx === s.people.length - 1}
+                    className="p-1.5"
+                    aria-label="Nach unten"
+                    style={{ opacity: idx === s.people.length - 1 ? 0.25 : 1 }}
+                  >
                     <IconChevron size={16} className="rotate-90" />
                   </button>
                 </>
               )}
             </div>
-            <Row onClick={() => { setEditing(p.id); setName(p.name); }}>
+            <Row
+              onClick={() => {
+                setEditing(p.id);
+                setName(p.name);
+              }}
+            >
               <span className="body flex-1">Umbenennen</span>
               <IconChevron size={14} />
             </Row>
@@ -506,14 +545,23 @@ function PeopleTab({ s, act, setConfirm }: TabProps) {
                     Mitteilungen seit {fmt(d.createdAt, false)}, zuletzt zugestellt {ago(d.lastSuccess)}
                   </p>
                 </div>
-                <button onClick={() => void act({ op: "device.delete", id: d.id }, "Gerät entfernt.")} className="p-1.5" aria-label="Gerät entfernen" style={{ color: "var(--danger)" }}>
+                <button
+                  onClick={() => void act({ op: "device.delete", id: d.id }, "Gerät entfernt.")}
+                  className="p-1.5"
+                  aria-label="Gerät entfernen"
+                  style={{ color: "var(--danger)" }}
+                >
                   <IconTrash size={18} />
                 </button>
               </Row>
             ))}
             <Row>
               <span className="body flex-1">{p.devices.length ? "Testnachricht an alle Geräte" : "Keine Geräte mit Mitteilungen"}</span>
-              {p.devices.length > 0 && <ActionButton onClick={() => void act({ op: "device.test", personId: p.id }, (r) => (r.delivered ? "Testnachricht verschickt." : "Kein Gerät erreicht."))}>Senden</ActionButton>}
+              {p.devices.length > 0 && (
+                <ActionButton onClick={() => void act({ op: "device.test", personId: p.id }, (r) => (r.delivered ? "Testnachricht verschickt." : "Kein Gerät erreicht."))}>
+                  Senden
+                </ActionButton>
+              )}
             </Row>
             <Row last>
               <span className="body flex-1" style={{ color: "var(--danger)" }}>
@@ -547,7 +595,14 @@ function PeopleTab({ s, act, setConfirm }: TabProps) {
             if (newName.trim() && (await act({ op: "person.add", name: newName }, `${newName.trim()} wurde hinzugefügt.`))) setNewName("");
           }}
         >
-          <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Name" maxLength={30} className="body min-w-0 flex-1 bg-transparent outline-none placeholder:text-[var(--label-3)]" aria-label="Name der neuen Person" />
+          <input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="Name"
+            maxLength={30}
+            className="body min-w-0 flex-1 bg-transparent outline-none placeholder:text-[var(--label-3)]"
+            aria-label="Name der neuen Person"
+          />
           <ActionButton onClick={() => {}} disabled={!newName.trim()}>
             Hinzufügen
           </ActionButton>
@@ -645,7 +700,12 @@ function DataTab({ s, act, setConfirm, say, reload }: TabProps & { say: (t: stri
               Zurück
             </ActionButton>
             {b.kind !== "auto" && (
-              <button onClick={() => void act({ op: "backup.delete", id: b.id }, "Sicherung gelöscht.")} className="p-1" aria-label="Sicherung löschen" style={{ color: "var(--danger)" }}>
+              <button
+                onClick={() => void act({ op: "backup.delete", id: b.id }, "Sicherung gelöscht.")}
+                className="p-1"
+                aria-label="Sicherung löschen"
+                style={{ color: "var(--danger)" }}
+              >
                 <IconTrash size={17} />
               </button>
             )}
@@ -704,7 +764,13 @@ function ListEditor({ title, items, onSave, hint }: { title: string; items: stri
     <Section title={title} hint={hint}>
       {list.map((x, i) => (
         <Row key={`${x}-${i}`}>
-          <input value={x} onChange={(e) => setList(list.map((y, k) => (k === i ? e.target.value : y)))} className="body min-w-0 flex-1 bg-transparent outline-none" maxLength={40} aria-label={`${title} ${i + 1}`} />
+          <input
+            value={x}
+            onChange={(e) => setList(list.map((y, k) => (k === i ? e.target.value : y)))}
+            className="body min-w-0 flex-1 bg-transparent outline-none"
+            maxLength={40}
+            aria-label={`${title} ${i + 1}`}
+          />
           <button onClick={() => move(i, -1)} className="p-1" aria-label="Nach oben" style={{ opacity: i === 0 ? 0.25 : 1 }}>
             <IconChevron size={15} className="-rotate-90" />
           </button>
@@ -724,17 +790,28 @@ function ListEditor({ title, items, onSave, hint }: { title: string; items: stri
           setDraft("");
         }}
       >
-        <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Neuer Eintrag" maxLength={40} className="body min-w-0 flex-1 bg-transparent outline-none placeholder:text-[var(--label-3)]" aria-label={`${title} hinzufügen`} />
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="Neuer Eintrag"
+          maxLength={40}
+          className="body min-w-0 flex-1 bg-transparent outline-none placeholder:text-[var(--label-3)]"
+          aria-label={`${title} hinzufügen`}
+        />
         <ActionButton onClick={() => {}} disabled={!draft.trim()}>
           Dazu
         </ActionButton>
       </form>
       {dirty && (
         <div className="flex gap-2 px-4 pb-3">
-          <button onClick={() => setList(items)} className="press subhead flex-1 rounded-[12px] py-2 font-semibold" style={{ background: "color-mix(in oklab, var(--label) 7%, transparent)" }}>
+          <button onClick={() => setList(items)} className="press subhead flex-1 rounded-[12px] py-2 font-semibold" style={{ background: "var(--fill)" }}>
             Verwerfen
           </button>
-          <button onClick={() => void onSave(list.map((x) => x.trim()).filter(Boolean))} className="press subhead flex-1 rounded-[12px] py-2 font-semibold text-white" style={{ background: "var(--tint)" }}>
+          <button
+            onClick={() => void onSave(list.map((x) => x.trim()).filter(Boolean))}
+            className="press subhead flex-1 rounded-[12px] py-2 font-semibold text-white"
+            style={{ background: "var(--tint)" }}
+          >
             Speichern
           </button>
         </div>
@@ -796,7 +873,13 @@ function LogTab({ s, act, setConfirm }: TabProps) {
           <ActionButton
             destructive
             onClick={() =>
-              setConfirm({ title: "Protokoll leeren?", text: "Alle aufgezeichneten Fehler werden gelöscht.", action: "Leeren", destructive: true, run: async () => void (await act({ op: "cleanup.errors" }, "Protokoll geleert.")) })
+              setConfirm({
+                title: "Protokoll leeren?",
+                text: "Alle aufgezeichneten Fehler werden gelöscht.",
+                action: "Leeren",
+                destructive: true,
+                run: async () => void (await act({ op: "cleanup.errors" }, "Protokoll geleert.")),
+              })
             }
           >
             Protokoll leeren
@@ -804,7 +887,10 @@ function LogTab({ s, act, setConfirm }: TabProps) {
         </div>
       )}
 
-      <Section title="Fehlgeschlagene Anmeldungen, 7 Tage" hint="IP-Adressen sind gekürzt. Viele Versuche von einer fremden Adresse deuten auf jemanden hin, der das Passwort errät.">
+      <Section
+        title="Fehlgeschlagene Anmeldungen, 7 Tage"
+        hint="IP-Adressen sind gekürzt. Viele Versuche von einer fremden Adresse deuten auf jemanden hin, der das Passwort errät."
+      >
         {s.failedLogins.length === 0 && (
           <Row last>
             <span className="subhead" style={{ color: "var(--label-2)" }}>
@@ -837,7 +923,11 @@ function AiSection({ s, act }: Omit<TabProps, "setConfirm">) {
   return (
     <Section
       title="KI für Rezepte und Vorschläge"
-      hint={s.ai.configured ? `Modell ${s.ai.model}. Ist das Limit erreicht, sind die KI-Knöpfe bis zum Monatsende aus; alles andere funktioniert weiter.` : "Für KI-Funktionen wird in Vercel ein ANTHROPIC_API_KEY hinterlegt. Ohne Schlüssel funktionieren Rezepte, Import über strukturierte Daten und der Wochenplan trotzdem."}
+      hint={
+        s.ai.configured
+          ? `Modell ${s.ai.model}. Ist das Limit erreicht, sind die KI-Knöpfe bis zum Monatsende aus; alles andere funktioniert weiter.`
+          : "Für KI-Funktionen wird in Vercel ein ANTHROPIC_API_KEY hinterlegt. Ohne Schlüssel funktionieren Rezepte, Import über strukturierte Daten und der Wochenplan trotzdem."
+      }
     >
       <Row>
         <Dot ok={s.ai.configured} />
@@ -868,7 +958,13 @@ function AiSection({ s, act }: Omit<TabProps, "setConfirm">) {
         }}
       >
         <span className="body flex-1">Monatslimit in US-Dollar</span>
-        <input value={limit} onChange={(e) => setLimit(e.target.value)} inputMode="decimal" className="body glass tabular w-20 rounded-[10px] px-2.5 py-1.5 text-right" aria-label="Monatslimit in US-Dollar" />
+        <input
+          value={limit}
+          onChange={(e) => setLimit(e.target.value)}
+          inputMode="decimal"
+          className="body glass tabular w-20 rounded-[10px] px-2.5 py-1.5 text-right"
+          aria-label="Monatslimit in US-Dollar"
+        />
         <ActionButton onClick={() => {}}>Sichern</ActionButton>
       </form>
     </Section>

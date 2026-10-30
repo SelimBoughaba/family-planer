@@ -12,7 +12,14 @@ export function PersonPicker() {
   const people = state?.people ?? [];
   return (
     <main className="relative isolate flex min-h-dvh flex-col justify-center px-5 py-10">
-      <Ambient colors={people.map((p) => p.color).filter(Boolean).slice(0, 3) as string[]} />
+      <Ambient
+        colors={
+          people
+            .map((p) => p.color)
+            .filter(Boolean)
+            .slice(0, 3) as string[]
+        }
+      />
       <div className="mx-auto w-full max-w-sm">
         <h1 className="large-title">Wer bist du?</h1>
         <p className="subhead mt-1" style={{ color: "var(--label-2)" }}>

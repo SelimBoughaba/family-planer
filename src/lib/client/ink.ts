@@ -54,7 +54,10 @@ export function hitsStroke(s: Stroke, x: number, y: number, r: number) {
 
 /** Begrenzungsrahmen aller Striche (relativ) */
 export function inkBounds(ink: Stroke[]) {
-  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  let x0 = Infinity,
+    y0 = Infinity,
+    x1 = -Infinity,
+    y1 = -Infinity;
   for (const s of ink)
     for (let i = 0; i + 1 < s.p.length; i += 3) {
       x0 = Math.min(x0, s.p[i] - s.s);

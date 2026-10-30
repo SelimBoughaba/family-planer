@@ -1,10 +1,11 @@
 "use client";
 
+import { toast } from "sonner";
 import { useState } from "react";
 import { useFamily } from "@/lib/client/family";
 import { guessCategory, parseItem } from "@/lib/shopping";
 import type { Item } from "@/lib/types";
-import { Avatar, Card, ContextMenu } from "./ui";
+import { AnimatePresence, Avatar, Card, ContextMenu, ListItem } from "./ui";
 import { SwipeRow } from "./SwipeRow";
 import { AmountDial } from "./AmountDial";
 import { IconCheck, IconPlus, IconTrash, IconChevron } from "./icons";
@@ -26,7 +27,10 @@ export function ShoppingView({ focus = false }: { focus?: boolean }) {
   const done = items.filter((i) => i.done);
 
   const toggle = (it: Item) => run({ op: "item.toggle", id: it.id, done: !it.done });
-  const remove = (it: Item) => run({ op: "item.delete", id: it.id });
+  const remove = (it: Item) => {
+    void run({ op: "item.delete", id: it.id });
+    toast(`${it.name} entfernt`, { action: { label: "Rückgängig", onClick: () => void run({ op: "item.create", name: it.name, amount: it.amount, category: it.category }) } });
+  };
 
   const add = () => {
     if (!draft.trim()) return;
@@ -82,33 +86,33 @@ export function ShoppingView({ focus = false }: { focus?: boolean }) {
               {cat}
             </h2>
             <Card className="overflow-hidden">
-              {list.map((it, idx) => (
-                <SwipeRow
-                  key={it.id}
-                  leading={{ label: "Im Wagen", color: "var(--success)", icon: <IconCheck size={18} />, onTrigger: () => toggle(it) }}
-                  trailing={{ label: "Löschen", color: "var(--danger)", icon: <IconTrash size={18} />, onTrigger: () => remove(it) }}
-                  onLongPress={() => setMenu(it)}
-                >
-                  <div
-                    className={`flex items-center gap-3 px-4 py-3 ${it.id.startsWith("tmp-") ? "sheet-in" : ""}`}
-                    style={{ borderTop: idx ? "0.5px solid var(--separator)" : "none" }}
-                  >
-                    <button
-                      onClick={() => toggle(it)}
-                      className="h-[26px] w-[26px] shrink-0 rounded-full"
-                      style={{ border: "1.6px solid var(--label-3)" }}
-                      aria-label={`${it.name} abhaken`}
-                    />
-                    <button onClick={() => setDial(it)} className="flex min-w-0 flex-1 items-center gap-3 text-left" aria-label={`Menge für ${it.name} ändern`}>
-                      <span className="body min-w-0 flex-1 truncate">{it.name}</span>
-                      <span className="subhead tabular rounded-full px-2 py-0.5" style={{ color: it.amount ? "var(--label-2)" : "var(--label-3)", background: "color-mix(in oklab, var(--label) 6%, transparent)" }}>
-                        {it.amount ?? "Menge"}
-                      </span>
-                    </button>
-                    <Avatar person={person(it.addedBy)} size={20} />
-                  </div>
-                </SwipeRow>
-              ))}
+              <AnimatePresence initial={false}>
+                {list.map((it, idx) => (
+                  <ListItem key={it.id}>
+                    <SwipeRow
+                      leading={{ label: "Im Wagen", color: "var(--success)", icon: <IconCheck size={18} />, onTrigger: () => toggle(it) }}
+                      trailing={{ label: "Löschen", color: "var(--danger)", icon: <IconTrash size={18} />, onTrigger: () => remove(it) }}
+                      onLongPress={() => setMenu(it)}
+                    >
+                      <div className="flex items-center gap-3 px-4 py-3" style={{ borderTop: idx ? "0.5px solid var(--separator)" : "none" }}>
+                        <button
+                          onClick={() => toggle(it)}
+                          className="h-[26px] w-[26px] shrink-0 rounded-full"
+                          style={{ border: "1.6px solid var(--label-3)" }}
+                          aria-label={`${it.name} abhaken`}
+                        />
+                        <button onClick={() => setDial(it)} className="flex min-w-0 flex-1 items-center gap-3 text-left" aria-label={`Menge für ${it.name} ändern`}>
+                          <span className="body min-w-0 flex-1 truncate">{it.name}</span>
+                          <span className="subhead tabular rounded-full px-2 py-0.5" style={{ color: it.amount ? "var(--label-2)" : "var(--label-3)", background: "var(--fill)" }}>
+                            {it.amount ?? "Menge"}
+                          </span>
+                        </button>
+                        <Avatar person={person(it.addedBy)} size={20} />
+                      </div>
+                    </SwipeRow>
+                  </ListItem>
+                ))}
+              </AnimatePresence>
             </Card>
           </div>
         );
@@ -209,13 +213,7 @@ export function ShoppingView({ focus = false }: { focus?: boolean }) {
         open={!!moveFor}
         onClose={() => setMoveFor(null)}
         preview={moveFor && <p className="headline">„{moveFor.name}“ verschieben nach</p>}
-        actions={
-          moveFor
-            ? categories
-                .filter((c) => c !== moveFor.category)
-                .map((c) => ({ label: c, onSelect: () => run({ op: "item.move", id: moveFor.id, category: c }) }))
-            : []
-        }
+        actions={moveFor ? categories.filter((c) => c !== moveFor.category).map((c) => ({ label: c, onSelect: () => run({ op: "item.move", id: moveFor.id, category: c }) })) : []}
       />
     </div>
   );
