@@ -17,7 +17,7 @@ export async function loadPoints(): Promise<PointsInfo> {
       coalesce(sum(points), 0)::int as earned
     from points_ledger group by person_id`;
   const spent = await sql`select person_id, coalesce(sum(cost), 0)::int as spent from reward_claims where status in ('pending', 'approved') group by person_id`;
-  const rewards = await sql`select id, title, emoji, cost from rewards where active order by cost, title`;
+  const rewards = await sql`select id, title, emoji, cost, created_by from rewards where active order by cost, title`;
   const claims = await sql`
     select id, reward_id, title, person_id, cost, status, decided_by, created_at from reward_claims
     where status = 'pending' or created_at > now() - interval '30 days' order by created_at desc limit 60`;
@@ -34,7 +34,13 @@ export async function loadPoints(): Promise<PointsInfo> {
     week,
     month,
     balance,
-    rewards: rewards.map((r) => ({ id: r.id as string, title: r.title as string, emoji: (r.emoji as string) ?? null, cost: Number(r.cost) })),
+    rewards: rewards.map((r) => ({
+      id: r.id as string,
+      title: r.title as string,
+      emoji: (r.emoji as string) ?? null,
+      cost: Number(r.cost),
+      createdBy: (r.created_by as string) ?? null,
+    })),
     claims: claims.map((c) => ({
       id: c.id as string,
       rewardId: (c.reward_id as string) ?? null,
@@ -68,6 +74,15 @@ async function isParent(id: string | null) {
   return !!p?.is_parent;
 }
 
+/** Belohnung entfernen: Eltern, Selim als Verwalter oder wer sie angelegt hat */
+async function mayRemove(id: string, actor: string | null) {
+  if (!actor) return false;
+  const [r] = await db()`select
+      (select created_by from rewards where id = ${id}) as created_by,
+      (select is_parent or name = 'Selim' from people where id = ${actor}) as admin`;
+  return !!r?.admin || r?.created_by === actor;
+}
+
 export async function balanceOf(person: string) {
   const sql = db();
   const [e] = await sql`select coalesce(sum(points), 0)::int as n from points_ledger where person_id = ${person}`;
@@ -90,7 +105,7 @@ export async function mutatePoints(m: Mutation, actor: string | null): Promise<s
     }
     case "reward.delete":
       if (!isId(m.id)) throw new PointsInputError("Unbekannte Belohnung");
-      if (!(await isParent(actor))) throw new PointsInputError("Belohnungen entfernen können nur Samir oder Denise");
+      if (!(await mayRemove(m.id, actor))) throw new PointsInputError("Entfernen können Samir, Denise, Selim oder wer die Belohnung angelegt hat");
       await sql`update rewards set active = false where id = ${m.id}`;
       return "points";
     case "reward.claim": {

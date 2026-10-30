@@ -181,7 +181,7 @@ function optimistic(s: AppState, m: Mutation, me: string | null): AppState {
       return { ...s, attendance: m.present === null ? rest : [...rest, { day: m.day, personId: m.personId, present: m.present }] };
     }
     case "reward.create":
-      return { ...s, points: { ...s.points, rewards: [...s.points.rewards, { id: tmp, title: m.title, emoji: m.emoji ?? null, cost: m.cost }].sort((a, b) => a.cost - b.cost) } };
+      return { ...s, points: { ...s.points, rewards: [...s.points.rewards, { id: tmp, title: m.title, emoji: m.emoji ?? null, cost: m.cost, createdBy: me }].sort((a, b) => a.cost - b.cost) } };
     case "reward.delete":
       return { ...s, points: { ...s.points, rewards: s.points.rewards.filter((r) => r.id !== m.id) } };
     case "reward.claim": {

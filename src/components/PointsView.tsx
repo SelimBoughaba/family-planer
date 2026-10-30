@@ -1,5 +1,6 @@
 "use client";
 
+import { toast } from "sonner";
 import { useState } from "react";
 import { useFamily } from "@/lib/client/family";
 import type { Person, Reward, RewardClaim } from "@/lib/types";
@@ -37,6 +38,7 @@ export function PointsView() {
   const [newOpen, setNewOpen] = useState(false);
   const [claimFor, setClaimFor] = useState<Reward | null>(null);
   const [manage, setManage] = useState<Reward | null>(null);
+  const [editing, setEditing] = useState(false);
   const info = state?.points;
   const people = state?.people ?? [];
   if (!info || !me) return null;
@@ -50,6 +52,13 @@ export function PointsView() {
   const history = info.claims.filter((c) => c.status !== "pending").slice(0, 12);
   const isParent = me.isParent;
   const parents = people.filter((p) => p.isParent).map((p) => p.name);
+  const canRemove = (r: Reward) => isParent || me.name === "Selim" || r.createdBy === me.id;
+  const removable = info.rewards.some(canRemove);
+  const inEdit = editing && removable;
+  const remove = (r: Reward) => {
+    void run({ op: "reward.delete", id: r.id });
+    toast(`${r.title} entfernt`, { action: { label: "Rückgängig", onClick: () => void run({ op: "reward.create", title: r.title, emoji: r.emoji, cost: r.cost }) } });
+  };
 
   return (
     <>
@@ -123,9 +132,18 @@ export function PointsView() {
 
       <SectionTitle
         trailing={
-          <button onClick={() => setNewOpen(true)} className="subhead font-semibold" style={{ color: "var(--tint)" }}>
-            Neue
-          </button>
+          <span className="flex items-center gap-4">
+            {removable && (
+              <button onClick={() => setEditing((v) => !v)} className="subhead font-semibold" style={{ color: "var(--tint)" }} aria-pressed={inEdit}>
+                {inEdit ? "Fertig" : "Bearbeiten"}
+              </button>
+            )}
+            {!inEdit && (
+              <button onClick={() => setNewOpen(true)} className="subhead font-semibold" style={{ color: "var(--tint)" }}>
+                Neue
+              </button>
+            )}
+          </span>
         }
       >
         Belohnungen
@@ -158,7 +176,7 @@ export function PointsView() {
                 className="flex items-center gap-3 px-4 py-3"
                 style={{ borderTop: i ? "0.5px solid var(--separator)" : undefined }}
                 onContextMenu={(e) => {
-                  if (!isParent) return;
+                  if (!canRemove(r)) return;
                   e.preventDefault();
                   setManage(r);
                 }}
@@ -173,24 +191,41 @@ export function PointsView() {
                     {!enough && ` · noch ${r.cost - balance}`}
                   </p>
                 </div>
-                <button
-                  onClick={() => setClaimFor(r)}
-                  disabled={!enough}
-                  className="press subhead shrink-0 rounded-full px-3.5 py-1.5 font-semibold"
-                  style={{
-                    background: enough ? "var(--tint)" : "var(--fill)",
-                    color: enough ? "white" : "var(--label-3)",
-                  }}
-                >
-                  Einlösen
-                </button>
+                {inEdit ? (
+                  canRemove(r) ? (
+                    <button
+                      onClick={() => remove(r)}
+                      className="press subhead shrink-0 rounded-full px-3.5 py-1.5 font-semibold"
+                      style={{ background: "color-mix(in oklab, var(--danger) 12%, transparent)", color: "var(--danger)" }}
+                      aria-label={`${r.title} entfernen`}
+                    >
+                      Entfernen
+                    </button>
+                  ) : (
+                    <span className="caption shrink-0" style={{ color: "var(--label-3)" }}>
+                      nicht deine
+                    </span>
+                  )
+                ) : (
+                  <button
+                    onClick={() => setClaimFor(r)}
+                    disabled={!enough}
+                    className="press subhead shrink-0 rounded-full px-3.5 py-1.5 font-semibold"
+                    style={{
+                      background: enough ? "var(--tint)" : "var(--fill)",
+                      color: enough ? "white" : "var(--label-3)",
+                    }}
+                  >
+                    Einlösen
+                  </button>
+                )}
               </div>
             );
           })}
         </Card>
       )}
       <p className="caption mt-2 px-1" style={{ color: "var(--label-3)" }}>
-        Punkte gibt es beim Abhaken, für die Person, die zuständig war. Wie viele, steht in der Aufgabe. {isParent ? "Lange drücken auf eine Belohnung entfernt sie." : ""}
+        Punkte gibt es beim Abhaken, für die Person, die zuständig war. Wie viele, steht in der Aufgabe. {removable ? "Über „Bearbeiten“ entfernst du Belohnungen." : ""}
       </p>
 
       {history.length > 0 && (
@@ -247,7 +282,7 @@ export function PointsView() {
             label: "Belohnung entfernen",
             destructive: true,
             onSelect: () => {
-              if (manage) void run({ op: "reward.delete", id: manage.id });
+              if (manage) remove(manage);
             },
           },
         ]}

@@ -149,7 +149,7 @@ export type BoardItem = {
 };
 export type BoardItemPatch = Partial<Pick<BoardItem, "x" | "y" | "w" | "h" | "rot" | "z" | "color" | "text" | "ink" | "expires">>;
 
-export type Reward = { id: string; title: string; emoji: string | null; cost: number };
+export type Reward = { id: string; title: string; emoji: string | null; cost: number; createdBy: string | null };
 export type RewardClaim = {
   id: string;
   rewardId: string | null;
