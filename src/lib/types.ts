@@ -1,6 +1,6 @@
 // Gemeinsame Typen für Browser und Server
 
-export type NotifyPrefs = { invited: boolean; assigned: boolean };
+export type NotifyPrefs = { invited: boolean; assigned: boolean; weekly: boolean };
 
 export type Person = {
   id: string;
@@ -8,6 +8,7 @@ export type Person = {
   color: string | null;
   sort: number;
   notifyPrefs: NotifyPrefs;
+  isParent: boolean;
 };
 
 export type CalEvent = {
@@ -62,6 +63,7 @@ export type Task = {
   doneAt: string | null;
   remindTime: string | null; // HH:MM am Fälligkeitstag
   rotation: string[]; // Dienstplan: Personen, die sich reihum abwechseln
+  points: number;
 };
 
 /** Felder, die beim Anlegen und Bearbeiten einer Aufgabe gesendet werden */
@@ -73,6 +75,7 @@ export type TaskFields = {
   recurring: Recurrence | null;
   remindTime: string | null;
   rotation: string[];
+  points?: number;
 };
 
 /** Wer ist nach dieser Person im Dienstplan dran? */
@@ -146,6 +149,11 @@ export type BoardItem = {
 };
 export type BoardItemPatch = Partial<Pick<BoardItem, "x" | "y" | "w" | "h" | "rot" | "z" | "color" | "text" | "ink" | "expires">>;
 
+export type Reward = { id: string; title: string; emoji: string | null; cost: number };
+export type RewardClaim = { id: string; rewardId: string | null; title: string; personId: string; cost: number; status: "pending" | "approved" | "declined"; decidedBy: string | null; createdAt: string };
+/** Punktestand: Woche (ab Montag), Monat, Kontostand (verdient minus eingelöst und reserviert) */
+export type PointsInfo = { week: Record<string, number>; month: Record<string, number>; balance: Record<string, number>; rewards: Reward[]; claims: RewardClaim[] };
+
 /** Ausdrückliche Angabe, ob jemand an einem Tag zum Abendessen da ist; ohne Eintrag gilt „da“ */
 export type Attendance = { day: string; personId: string; present: boolean };
 
@@ -161,6 +169,7 @@ export type AppState = {
   meals: Meal[];
   attendance: Attendance[];
   boards: Board[];
+  points: PointsInfo;
   ai: AiInfo;
 };
 
@@ -187,6 +196,10 @@ export type Mutation =
   | { op: "meal.set"; day: string; recipeId: string | null; title: string; cook: string | null; note: string | null }
   | { op: "meal.clear"; day: string }
   | { op: "meal.attend"; day: string; personId: string; present: boolean | null }
+  | { op: "reward.create"; title: string; emoji: string | null; cost: number }
+  | { op: "reward.delete"; id: string }
+  | { op: "reward.claim"; rewardId: string }
+  | { op: "claim.decide"; id: string; approve: boolean }
   | { op: "board.create"; id?: string; name: string }
   | { op: "board.rename"; id: string; name: string }
   | { op: "board.delete"; id: string }

@@ -22,7 +22,10 @@ function Toggle({ label, hint, on, onChange, disabled }: { label: string; hint: 
           {hint}
         </span>
       </span>
-      <span className="relative h-[31px] w-[51px] shrink-0 rounded-full" style={{ background: on ? "var(--success)" : "color-mix(in oklab, var(--label) 14%, transparent)", transition: "background 200ms ease" }}>
+      <span
+        className="relative h-[31px] w-[51px] shrink-0 rounded-full"
+        style={{ background: on ? "var(--success)" : "color-mix(in oklab, var(--label) 14%, transparent)", transition: "background 200ms ease" }}
+      >
         <span
           className="absolute top-[2px] h-[27px] w-[27px] rounded-full bg-white"
           style={{ left: on ? 22 : 2, boxShadow: "0 3px 8px rgba(0,0,0,.15)", transition: "left 220ms cubic-bezier(0.3, 1.3, 0.5, 1)" }}
@@ -34,7 +37,8 @@ function Toggle({ label, hint, on, onChange, disabled }: { label: string; hint: 
 
 const statusText: Record<PushStatus, string> = {
   unsupported: "Dieser Browser unterstützt keine Mitteilungen für Web-Apps.",
-  "needs-install": "Auf dem iPhone gehen Mitteilungen nur, wenn die App auf dem Home-Bildschirm liegt: In Safari auf Teilen tippen, dann „Zum Home-Bildschirm“. Danach die App von dort öffnen und hier einschalten.",
+  "needs-install":
+    "Auf dem iPhone gehen Mitteilungen nur, wenn die App auf dem Home-Bildschirm liegt: In Safari auf Teilen tippen, dann „Zum Home-Bildschirm“. Danach die App von dort öffnen und hier einschalten.",
   denied: "Mitteilungen sind für diese App gesperrt. Du kannst sie in den Einstellungen deines Geräts unter Mitteilungen wieder erlauben.",
   off: "Auf diesem Gerät sind Mitteilungen aus.",
   on: "Auf diesem Gerät sind Mitteilungen an.",
@@ -85,7 +89,10 @@ export function NotifySheet({ open, onClose }: { open: boolean; onClose: () => v
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center" role="dialog" aria-modal aria-label="Mitteilungen">
       <button className="fade-in absolute inset-0" style={{ background: "rgba(0,0,0,.25)" }} onClick={onClose} aria-label="Schließen" />
-      <div className="sheet-in glass glass-strong relative max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-[30px] px-4 pt-2" style={{ paddingBottom: "calc(var(--safe-b) + 24px)" }}>
+      <div
+        className="sheet-in glass glass-strong relative max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-[30px] px-4 pt-2"
+        style={{ paddingBottom: "calc(var(--safe-b) + 24px)" }}
+      >
         <span className="mx-auto mb-2 block h-[5px] w-9 rounded-full" style={{ background: "var(--label-3)" }} aria-hidden />
         <div className="flex items-center justify-between py-1">
           <span className="w-16" />
@@ -103,15 +110,30 @@ export function NotifySheet({ open, onClose }: { open: boolean; onClose: () => v
           {(status === "off" || status === "on") && (
             <div className="mt-3 flex gap-2">
               {status === "off" ? (
-                <button onClick={() => void enable()} disabled={busy} className="press subhead flex-1 rounded-[12px] py-2.5 font-semibold text-white" style={{ background: "var(--tint)" }}>
+                <button
+                  onClick={() => void enable()}
+                  disabled={busy}
+                  className="press subhead flex-1 rounded-[12px] py-2.5 font-semibold text-white"
+                  style={{ background: "var(--tint)" }}
+                >
                   Mitteilungen einschalten
                 </button>
               ) : (
                 <>
-                  <button onClick={() => void test()} disabled={busy} className="press subhead flex-1 rounded-[12px] py-2.5 font-semibold text-white" style={{ background: "var(--tint)" }}>
+                  <button
+                    onClick={() => void test()}
+                    disabled={busy}
+                    className="press subhead flex-1 rounded-[12px] py-2.5 font-semibold text-white"
+                    style={{ background: "var(--tint)" }}
+                  >
                     Testnachricht senden
                   </button>
-                  <button onClick={() => void disable()} disabled={busy} className="press subhead rounded-[12px] px-3 py-2.5 font-semibold" style={{ background: "color-mix(in oklab, var(--label) 7%, transparent)" }}>
+                  <button
+                    onClick={() => void disable()}
+                    disabled={busy}
+                    className="press subhead rounded-[12px] px-3 py-2.5 font-semibold"
+                    style={{ background: "color-mix(in oklab, var(--label) 7%, transparent)" }}
+                  >
                     Ausschalten
                   </button>
                 </>
@@ -141,6 +163,13 @@ export function NotifySheet({ open, onClose }: { open: boolean; onClose: () => v
             hint="Wenn jemand dir eine Aufgabe zuweist"
             on={prefs.assigned}
             onChange={(v) => void run({ op: "person.setNotify", id: me.id, prefs: { ...prefs, assigned: v } })}
+          />
+          <div className="mx-4 h-px" style={{ background: "var(--separator)" }} />
+          <Toggle
+            label="die neue Woche ansteht"
+            hint="Sonntags um 18 Uhr: deine Termine, Aufgaben, Kochtage und Punkte"
+            on={prefs.weekly}
+            onChange={(v) => void run({ op: "person.setNotify", id: me.id, prefs: { ...prefs, weekly: v } })}
           />
         </Card>
         <p className="caption mt-3 px-1" style={{ color: "var(--label-3)" }}>

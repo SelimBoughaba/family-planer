@@ -21,7 +21,9 @@
 
 - Etappe 9: Pinnwand (Korkwand mit Zoomen und Verschieben, Zettel getippt oder mit Apple Pencil, freies Schreiben auf der Wand, Radierer, Fotos, PDFs mit Vorschau, mehrere Wände, Papierkorb 30 Tage, Ablaufdatum, Kachel in Heute)
 
+- Etappe 10: Punkte pro Aufgabe (Standard 1, Dienste 2), Rangliste mit Treppchen für Woche und Monat, Punktekonto, Belohnungen mit Bestätigung durch Samir oder Denise, Wochenvorschau sonntags 18 Uhr (abschaltbar), Punkte in der Sicherung
+
 ## Als Nächstes
-- Etappe 10: Punkte, Belohnungen (Bestätigung durch Samir oder Denise), Rangliste, Wochenvorschau sonntags 18 Uhr
+- Offline-Einkauf (Idee 9) und Geburtstage (Idee 11), bewusst zurückgestellt
 
 ## Vorgemerkt

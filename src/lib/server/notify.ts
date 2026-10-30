@@ -37,6 +37,23 @@ export async function planNotifications(m: Mutation, actor: string | null): Prom
     };
   }
 
+  // Belohnungen: Eltern erfahren von Wünschen, Kinder von der Entscheidung
+  if (m.op === "reward.claim") {
+    const [r] = await sql`select title, emoji, cost from rewards where id = ${m.rewardId}`;
+    const parents = (await sql`select id from people where is_parent and id <> ${actor ?? "00000000-0000-0000-0000-000000000000"}`).map((p) => p.id as string);
+    if (!r || !parents.length) return null;
+    return async () => {
+      await sendToPeople(parents, { title: "Belohnung einlösen?", body: `${name(actor)} möchte ${r.emoji ? `${r.emoji} ` : ""}„${r.title}“ für ${r.cost} Punkte`, url: "/" });
+    };
+  }
+  if (m.op === "claim.decide") {
+    const [c] = await sql`select person_id, title, status from reward_claims where id = ${m.id}`;
+    if (!c || c.status !== "pending" || c.person_id === actor) return null;
+    return async () => {
+      await sendToPeople([c.person_id as string], { title: m.approve ? "Belohnung bestätigt 🎉" : "Belohnung abgelehnt", body: `${name(actor)} hat „${c.title}“ ${m.approve ? "bestätigt" : "abgelehnt, die Punkte sind wieder gutgeschrieben"}`, url: "/" });
+    };
+  }
+
   // Wer isst mit: nach 16 Uhr erfährt der Koch Änderungen für heute
   if (m.op === "meal.attend" && m.present !== null) {
     const now = Date.now();

@@ -108,6 +108,7 @@ function TaskForm({ onClose, onEvent, task }: { onClose: () => void; onEvent?: (
   const [remindTime, setRemindTime] = useState(task?.remindTime ?? "08:00");
   const [rotating, setRotating] = useState((task?.rotation.length ?? 0) >= 2);
   const [rotation, setRotation] = useState<string[]>(task?.rotation ?? []);
+  const [points, setPoints] = useState<number | null>(task ? task.points : null);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [ignoreQuick, setIgnoreQuick] = useState(false);
@@ -197,6 +198,7 @@ function TaskForm({ onClose, onEvent, task }: { onClose: () => void; onEvent?: (
       recurring: rec === "none" ? null : rec,
       remindTime: reminder,
       rotation: plan ? rotation : [],
+      points: points ?? (plan ? 2 : 1),
     };
     const ok = await run(task ? { op: "task.update", id: task.id, ...fields } : { op: "task.create", ...fields });
     setBusy(false);
@@ -417,6 +419,13 @@ function TaskForm({ onClose, onEvent, task }: { onClose: () => void; onEvent?: (
 
             <Label>Bereich</Label>
             <Chips value={area} onChange={setArea} options={[...new Set([...(state?.lists.areas ?? []), area])].map((a) => ({ id: a, label: a }))} />
+
+            <Label>Punkte fürs Erledigen</Label>
+            <Chips
+              value={String(points ?? (plan ? 2 : 1))}
+              onChange={(v) => setPoints(Number(v))}
+              options={[0, 1, 2, 3, 5, 10].map((n) => ({ id: String(n), label: n === 0 ? "Keine" : `${n} ${n === 1 ? "Punkt" : "Punkte"}` }))}
+            />
 
             <Label>Erinnerung</Label>
             {when === "none" && rec === "none" ? (

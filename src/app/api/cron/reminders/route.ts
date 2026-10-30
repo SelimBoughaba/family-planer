@@ -6,6 +6,7 @@ import { logError } from "@/lib/server/log";
 import { healStuckQueries } from "@/lib/server/heal";
 import { dinnerHeadsUp } from "@/lib/server/dinner";
 import { boardCleanup } from "@/lib/server/board";
+import { weeklyPreview } from "@/lib/server/weekly";
 
 export const maxDuration = 55;
 
@@ -28,6 +29,7 @@ async function handle(req: NextRequest) {
       await logError("dinner", err);
       return 0;
     });
+    const weekly = await weeklyPreview(now).catch(async (err) => (await logError("weekly", err), 0));
     const backup = await maybeAutoBackup().catch(async (err) => {
       await logError("backup", err);
       return null;
@@ -36,7 +38,7 @@ async function handle(req: NextRequest) {
     const healed = new Date().getUTCMinutes() % 10 === 0 ? await healStuckQueries().catch(() => 0) : 0;
     // einmal pro Stunde den Papierkorb der Pinnwand leeren
     const purged = new Date().getUTCMinutes() === 37 ? await boardCleanup().catch(async (err) => (await logError("board", err), 0)) : 0;
-    return NextResponse.json({ ok: true, ...result, dinner, backup, healed, purged });
+    return NextResponse.json({ ok: true, ...result, dinner, weekly, backup, healed, purged });
   } catch (err) {
     await logError("reminders", err);
     return NextResponse.json({ ok: false }, { status: 500 });

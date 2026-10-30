@@ -6,13 +6,15 @@ import { localDay, recurrenceLabel, type Task } from "@/lib/types";
 import { Avatar, Card, PersonFilter, SectionTitle, useLongPress } from "./ui";
 import { TaskRow, dueLabel, useAssignDrop, useTaskMenus } from "./TaskRow";
 import { IconPlus } from "./icons";
+import { PointsView } from "./PointsView";
 
-type Mode = "zeit" | "bereich" | "dienstplan";
+type Mode = "zeit" | "bereich" | "dienstplan" | "punkte";
 
 const modes: { id: Mode; label: string }[] = [
-  { id: "zeit", label: "Nach Zeit" },
-  { id: "bereich", label: "Nach Bereich" },
-  { id: "dienstplan", label: "Dienstplan" },
+  { id: "zeit", label: "Zeit" },
+  { id: "bereich", label: "Bereich" },
+  { id: "dienstplan", label: "Dienste" },
+  { id: "punkte", label: "Punkte" },
 ];
 
 function addDaysStr(day: string, n: number) {
@@ -112,8 +114,8 @@ export function TasksView({
         <span
           className="absolute top-[2px] bottom-[2px] rounded-[8px]"
           style={{
-            left: `calc(2px + ${modes.findIndex((m) => m.id === mode)} * (100% - 4px) / 3)`,
-            width: "calc((100% - 4px) / 3)",
+            left: `calc(2px + ${modes.findIndex((m) => m.id === mode)} * (100% - 4px) / ${modes.length})`,
+            width: `calc((100% - 4px) / ${modes.length})`,
             background: "var(--glass-strong)",
             boxShadow: "0 3px 8px rgba(0,0,0,.12)",
             transition: "left 300ms cubic-bezier(0.25, 1.1, 0.4, 1)",
@@ -127,7 +129,9 @@ export function TasksView({
         ))}
       </div>
 
-      {mode === "dienstplan" ? (
+      {mode === "punkte" ? (
+        <PointsView />
+      ) : mode === "dienstplan" ? (
         <>
           {rotations.length === 0 ? (
             <Card className="mt-5 p-5 text-center">
@@ -293,7 +297,8 @@ export function TasksView({
             </>
           )}
           <p className="caption mt-2 px-1" style={{ color: "var(--label-3)" }}>
-            Nach rechts wischen erledigt, nach links verschiebt auf morgen, antippen bearbeitet, lange drücken zeigt mehr. Ein Profilbild oben lange drücken und auf eine Aufgabe ziehen gibt sie dieser Person.
+            Nach rechts wischen erledigt, nach links verschiebt auf morgen, antippen bearbeitet, lange drücken zeigt mehr. Ein Profilbild oben lange drücken und auf eine Aufgabe
+            ziehen gibt sie dieser Person.
           </p>
         </>
       )}

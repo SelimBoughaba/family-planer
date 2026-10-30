@@ -51,15 +51,44 @@ function optimistic(s: AppState, m: Mutation, me: string | null): AppState {
       return { ...s, people: s.people.map((p) => (p.id === m.id ? { ...p, notifyPrefs: m.prefs } : p)) };
     case "task.create": {
       const personId = m.rotation.length >= 2 && (!m.personId || !m.rotation.includes(m.personId)) ? m.rotation[0] : m.personId;
-      const t: Task = { id: tmp, title: m.title, area: m.area, personId, due: m.due, recurring: m.recurring, done: false, doneAt: null, remindTime: m.remindTime, rotation: m.rotation };
+      const t: Task = {
+        id: tmp,
+        title: m.title,
+        area: m.area,
+        personId,
+        due: m.due,
+        recurring: m.recurring,
+        done: false,
+        doneAt: null,
+        remindTime: m.remindTime,
+        rotation: m.rotation,
+        points: m.points ?? (m.rotation.length >= 2 ? 2 : 1),
+      };
       return { ...s, tasks: [...s.tasks, t] };
     }
     case "task.update": {
       const personId = m.rotation.length >= 2 && (!m.personId || !m.rotation.includes(m.personId)) ? m.rotation[0] : m.personId;
-      return { ...s, tasks: s.tasks.map((t) => (t.id === m.id ? { ...t, title: m.title, area: m.area, personId, due: m.due, recurring: m.recurring, remindTime: m.remindTime, rotation: m.rotation } : t)) };
+      return {
+        ...s,
+        tasks: s.tasks.map((t) =>
+          t.id === m.id
+            ? { ...t, title: m.title, area: m.area, personId, due: m.due, recurring: m.recurring, remindTime: m.remindTime, rotation: m.rotation, points: m.points ?? t.points }
+            : t,
+        ),
+      };
     }
-    case "task.toggle":
-      return { ...s, tasks: s.tasks.map((t) => (t.id === m.id ? { ...t, done: m.done, doneAt: m.done ? new Date().toISOString() : null } : t)) };
+    case "task.toggle": {
+      const task = s.tasks.find((t) => t.id === m.id);
+      const who = task?.personId ?? me;
+      let points = s.points;
+      // Punkte sofort mitzählen, der Server bestätigt beim nächsten Laden
+      if (task && who && task.done !== m.done && task.points > 0) {
+        const d = m.done ? task.points : -task.points;
+        const add = (r: Record<string, number>) => ({ ...r, [who]: Math.max(0, (r[who] ?? 0) + d) });
+        points = { ...points, week: add(points.week), month: add(points.month), balance: { ...points.balance, [who]: (points.balance[who] ?? 0) + d } };
+      }
+      return { ...s, points, tasks: s.tasks.map((t) => (t.id === m.id ? { ...t, done: m.done, doneAt: m.done ? new Date().toISOString() : null } : t)) };
+    }
     case "task.postpone": {
       const d = new Date();
       d.setDate(d.getDate() + 1);
@@ -89,16 +118,55 @@ function optimistic(s: AppState, m: Mutation, me: string | null): AppState {
       for (const it of m.items) {
         if (open.has(it.name.toLowerCase())) continue;
         open.add(it.name.toLowerCase());
-        add.push({ id: `tmp-${Math.random().toString(36).slice(2)}`, name: it.name, amount: it.amount, category: it.category, addedBy: me, done: false, createdAt: new Date().toISOString() });
+        add.push({
+          id: `tmp-${Math.random().toString(36).slice(2)}`,
+          name: it.name,
+          amount: it.amount,
+          category: it.category,
+          addedBy: me,
+          done: false,
+          createdAt: new Date().toISOString(),
+        });
       }
       return { ...s, items: [...add, ...s.items] };
     }
     case "recipe.create": {
-      const r: Recipe = { id: m.id ?? tmp, title: m.title, description: m.description, servings: m.servings, minutes: m.minutes, ingredients: m.ingredients, steps: m.steps, tags: m.tags, sourceUrl: m.sourceUrl, images: m.images ?? [], favorite: false, createdBy: me };
+      const r: Recipe = {
+        id: m.id ?? tmp,
+        title: m.title,
+        description: m.description,
+        servings: m.servings,
+        minutes: m.minutes,
+        ingredients: m.ingredients,
+        steps: m.steps,
+        tags: m.tags,
+        sourceUrl: m.sourceUrl,
+        images: m.images ?? [],
+        favorite: false,
+        createdBy: me,
+      };
       return { ...s, recipes: [...s.recipes, r] };
     }
     case "recipe.update":
-      return { ...s, recipes: s.recipes.map((r) => (r.id === m.id ? { ...r, title: m.title, description: m.description, servings: m.servings, minutes: m.minutes, ingredients: m.ingredients, steps: m.steps, tags: m.tags, sourceUrl: m.sourceUrl, images: m.images ?? r.images } : r)) };
+      return {
+        ...s,
+        recipes: s.recipes.map((r) =>
+          r.id === m.id
+            ? {
+                ...r,
+                title: m.title,
+                description: m.description,
+                servings: m.servings,
+                minutes: m.minutes,
+                ingredients: m.ingredients,
+                steps: m.steps,
+                tags: m.tags,
+                sourceUrl: m.sourceUrl,
+                images: m.images ?? r.images,
+              }
+            : r,
+        ),
+      };
     case "recipe.favorite":
       return { ...s, recipes: s.recipes.map((r) => (r.id === m.id ? { ...r, favorite: m.favorite } : r)) };
     case "recipe.delete":
@@ -110,6 +178,29 @@ function optimistic(s: AppState, m: Mutation, me: string | null): AppState {
     case "meal.attend": {
       const rest = s.attendance.filter((a) => !(a.day === m.day && a.personId === m.personId));
       return { ...s, attendance: m.present === null ? rest : [...rest, { day: m.day, personId: m.personId, present: m.present }] };
+    }
+    case "reward.create":
+      return { ...s, points: { ...s.points, rewards: [...s.points.rewards, { id: tmp, title: m.title, emoji: m.emoji ?? null, cost: m.cost }].sort((a, b) => a.cost - b.cost) } };
+    case "reward.delete":
+      return { ...s, points: { ...s.points, rewards: s.points.rewards.filter((r) => r.id !== m.id) } };
+    case "reward.claim": {
+      const r = s.points.rewards.find((x) => x.id === m.rewardId);
+      if (!r || !me) return s;
+      const claim = { id: tmp, rewardId: r.id, title: r.title, personId: me, cost: r.cost, status: "pending" as const, decidedBy: null, createdAt: new Date().toISOString() };
+      return { ...s, points: { ...s.points, claims: [claim, ...s.points.claims], balance: { ...s.points.balance, [me]: (s.points.balance[me] ?? 0) - r.cost } } };
+    }
+    case "claim.decide": {
+      const c = s.points.claims.find((x) => x.id === m.id);
+      if (!c) return s;
+      const balance = m.approve ? s.points.balance : { ...s.points.balance, [c.personId]: (s.points.balance[c.personId] ?? 0) + c.cost };
+      return {
+        ...s,
+        points: {
+          ...s.points,
+          balance,
+          claims: s.points.claims.map((x) => (x.id === m.id ? { ...x, status: m.approve ? ("approved" as const) : ("declined" as const), decidedBy: me } : x)),
+        },
+      };
     }
     case "board.create":
       return { ...s, boards: [...s.boards, { id: m.id ?? tmp, name: m.name, sort: s.boards.length + 1, count: 0, preview: [] }] };
@@ -126,14 +217,42 @@ function optimistic(s: AppState, m: Mutation, me: string | null): AppState {
     case "meal.clear":
       return { ...s, meals: s.meals.filter((x) => x.day !== m.day) };
     case "event.create": {
-      const e: CalEvent = { id: tmp, title: m.title, place: m.place, notes: null, startsAt: m.startsAt, endsAt: m.endsAt, allDay: m.allDay, people: m.people, createdBy: me, recurrence: m.recurrence, recurrenceUntil: m.recurrenceUntil, exdates: [], reminders: m.reminders };
+      const e: CalEvent = {
+        id: tmp,
+        title: m.title,
+        place: m.place,
+        notes: null,
+        startsAt: m.startsAt,
+        endsAt: m.endsAt,
+        allDay: m.allDay,
+        people: m.people,
+        createdBy: me,
+        recurrence: m.recurrence,
+        recurrenceUntil: m.recurrenceUntil,
+        exdates: [],
+        reminders: m.reminders,
+      };
       return { ...s, events: [...s.events, e] };
     }
     case "event.update":
       return {
         ...s,
         events: s.events.map((e) =>
-          e.id === m.id ? { ...e, title: m.title, place: m.place, startsAt: m.startsAt, endsAt: m.endsAt, allDay: m.allDay, people: m.people, recurrence: m.recurrence, recurrenceUntil: m.recurrenceUntil, exdates: m.recurrence ? e.exdates : [], reminders: m.reminders } : e,
+          e.id === m.id
+            ? {
+                ...e,
+                title: m.title,
+                place: m.place,
+                startsAt: m.startsAt,
+                endsAt: m.endsAt,
+                allDay: m.allDay,
+                people: m.people,
+                recurrence: m.recurrence,
+                recurrenceUntil: m.recurrenceUntil,
+                exdates: m.recurrence ? e.exdates : [],
+                reminders: m.reminders,
+              }
+            : e,
         ),
       };
     case "event.move":
@@ -146,7 +265,21 @@ function optimistic(s: AppState, m: Mutation, me: string | null): AppState {
         }),
       };
     case "event.detach": {
-      const copy: CalEvent = { id: tmp, title: m.title, place: m.place, notes: null, startsAt: m.startsAt, endsAt: m.endsAt, allDay: m.allDay, people: m.people, createdBy: me, recurrence: null, recurrenceUntil: null, exdates: [], reminders: m.reminders };
+      const copy: CalEvent = {
+        id: tmp,
+        title: m.title,
+        place: m.place,
+        notes: null,
+        startsAt: m.startsAt,
+        endsAt: m.endsAt,
+        allDay: m.allDay,
+        people: m.people,
+        createdBy: me,
+        recurrence: null,
+        recurrenceUntil: null,
+        exdates: [],
+        reminders: m.reminders,
+      };
       return { ...s, events: [...s.events.map((e) => (e.id === m.id ? { ...e, exdates: [...e.exdates, m.occurrence] } : e)), copy] };
     }
     case "event.delete":

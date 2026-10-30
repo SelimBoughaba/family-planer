@@ -44,10 +44,7 @@ export function TaskRow({
   const plan = t.rotation.length >= 2;
   const nextName = plan ? person(t.rotation[(t.rotation.indexOf(t.personId ?? "") + 1) % t.rotation.length])?.name : null;
 
-  const meta = [
-    overdue ? null : showDue ? dueLabel(t.due, today) : null,
-    showArea ? t.area : null,
-  ].filter(Boolean);
+  const meta = [overdue ? null : showDue ? dueLabel(t.due, today) : null, showArea ? t.area : null].filter(Boolean);
 
   return (
     <SwipeRow
@@ -55,7 +52,11 @@ export function TaskRow({
       trailing={t.done ? undefined : { label: "Morgen", color: "#FF9F0A", icon: <IconClock size={18} />, onTrigger: () => run({ op: "task.postpone", id: t.id, today }) }}
       onLongPress={() => onMenu(t)}
     >
-      <div data-task-id={t.id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: first ? "none" : "0.5px solid var(--separator)", transition: "background 150ms ease" }}>
+      <div
+        data-task-id={t.id}
+        className="flex items-center gap-3 px-4 py-3"
+        style={{ borderTop: first ? "none" : "0.5px solid var(--separator)", transition: "background 150ms ease" }}
+      >
         <button
           onClick={toggle}
           className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full"
@@ -74,6 +75,11 @@ export function TaskRow({
             {t.recurring && (
               <span className="flex items-center gap-1">
                 <IconRepeat /> {plan && !t.done && nextName ? `danach ${nextName}` : recurrenceLabel[t.recurring]}
+              </span>
+            )}
+            {!t.done && t.points > 0 && (
+              <span className="tabular" aria-label={`${t.points} Punkte`}>
+                ★ {t.points}
               </span>
             )}
             {t.remindTime && !t.done && (
@@ -119,7 +125,10 @@ export function useTaskMenus(onEdit: (t: Task) => void) {
                 <p className="footnote" style={{ color: "var(--label-2)" }}>
                   {menu.area}
                   {menu.rotation.length >= 2
-                    ? `, reihum: ${menu.rotation.map((id) => person(id)?.name).filter(Boolean).join(", ")}`
+                    ? `, reihum: ${menu.rotation
+                        .map((id) => person(id)?.name)
+                        .filter(Boolean)
+                        .join(", ")}`
                     : person(menu.personId)
                       ? `, zuständig: ${person(menu.personId)!.name}`
                       : ", noch niemand zuständig"}

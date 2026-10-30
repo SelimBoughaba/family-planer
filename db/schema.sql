@@ -220,3 +220,47 @@ create table if not exists board_items (
 );
 create index if not exists board_items_board_idx on board_items (board_id, deleted_at);
 alter table board_items enable row level security;
+
+-- Etappe 10: Punkte, Belohnungen, Rangliste
+alter table tasks add column if not exists points int not null default 1;
+alter table people add column if not exists is_parent boolean not null default false;
+-- einmalig: Samir und Denise bestätigen Belohnungen
+update people set is_parent = true where name in ('Samir', 'Denise') and not exists (select 1 from people where is_parent);
+
+create table if not exists points_ledger (
+  id bigint generated always as identity primary key,
+  person_id uuid not null references people(id) on delete cascade,
+  points int not null,
+  kind text not null default 'task', -- task, bonus
+  task_id uuid,
+  reason text,
+  created_at timestamptz not null default now()
+);
+create index if not exists points_ledger_person_idx on points_ledger (person_id, created_at);
+create index if not exists points_ledger_task_idx on points_ledger (task_id);
+alter table points_ledger enable row level security;
+
+create table if not exists rewards (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  emoji text,
+  cost int not null,
+  active boolean not null default true,
+  created_by uuid references people(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+alter table rewards enable row level security;
+
+create table if not exists reward_claims (
+  id uuid primary key default gen_random_uuid(),
+  reward_id uuid references rewards(id) on delete set null,
+  title text not null,
+  person_id uuid not null references people(id) on delete cascade,
+  cost int not null,
+  status text not null default 'pending', -- pending, approved, declined
+  decided_by uuid references people(id) on delete set null,
+  decided_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists reward_claims_person_idx on reward_claims (person_id, status);
+alter table reward_claims enable row level security;

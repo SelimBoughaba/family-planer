@@ -7,6 +7,7 @@ import { aiInfo } from "./ai";
 import { getLists } from "./lists";
 import { removeFiles } from "./storage";
 import { BoardInputError, loadBoards, mutateBoard } from "./board";
+import { bookTask, loadPoints, mutatePoints, PointsInputError } from "./points";
 import { personColors } from "@/lib/types";
 
 type Row = Record<string, unknown>;
@@ -25,7 +26,8 @@ const toPerson = (r: Row): Person => ({
   name: r.name as string,
   color: (r.color as string) ?? null,
   sort: r.sort as number,
-  notifyPrefs: { invited: true, assigned: true, ...((r.notify_prefs as object) ?? {}) },
+  notifyPrefs: { invited: true, assigned: true, weekly: true, ...((r.notify_prefs as object) ?? {}) },
+  isParent: !!r.is_parent,
 });
 const toEvent = (r: Row): CalEvent => ({
   id: r.id as string,
@@ -53,6 +55,7 @@ const toTask = (r: Row): Task => ({
   doneAt: iso(r.done_at),
   remindTime: r.remind_time ? String(r.remind_time).slice(0, 5) : null,
   rotation: (r.rotation as string[]) ?? [],
+  points: Number(r.points ?? 1),
 });
 const toRecipe = (r: Row): Recipe => ({
   id: r.id as string,
@@ -110,6 +113,7 @@ export async function loadState(from: Date, to: Date): Promise<AppState> {
     meals: meals.map(toMeal),
     attendance: attendance.map((r) => ({ day: String(r.day).slice(0, 10), personId: r.person_id as string, present: !!r.present })),
     boards: await loadBoards(),
+    points: await loadPoints(),
     ai: await aiInfo(),
   };
 }
@@ -192,7 +196,9 @@ async function taskFields(m: TaskFields) {
   let personId = uuid(m.personId, true);
   if (personId && !known.has(personId)) personId = null;
   if (valid.length && (!personId || !valid.includes(personId))) personId = valid[0];
-  return { title: str(m.title, 140)!, area, personId, due, recurring, remindTime, rotation: valid };
+  // Punkte: normal 1, Dienste reihum 2, höchstens 20
+  const points = Number.isInteger(m.points) && (m.points as number) >= 0 && (m.points as number) <= 20 ? (m.points as number) : valid.length ? 2 : 1;
+  return { title: str(m.title, 140)!, area, personId, due, recurring, remindTime, rotation: valid, points };
 }
 
 const eventRecurrences: EventRecurrence[] = ["daily", "weekly", "biweekly", "monthly", "yearly"];
@@ -220,6 +226,14 @@ function eventFields(m: EventFields) {
 
 /** Führt eine Änderung aus und gibt den betroffenen Bereich zurück */
 export async function mutate(m: Mutation, by: string | null): Promise<string> {
+  if (m.op.startsWith("reward.") || m.op.startsWith("claim.")) {
+    try {
+      return await mutatePoints(m, by && /^[0-9a-f-]{36}$/i.test(by) ? by : null);
+    } catch (err) {
+      if (err instanceof PointsInputError) throw new InvalidInput(err.message);
+      throw err;
+    }
+  }
   if (m.op.startsWith("board.") || m.op.startsWith("bitem.")) {
     try {
       return await mutateBoard(m, by && /^[0-9a-f-]{36}$/i.test(by) ? by : null);
@@ -239,20 +253,20 @@ export async function mutate(m: Mutation, by: string | null): Promise<string> {
       return "people";
     }
     case "person.setNotify": {
-      const prefs = { invited: !!m.prefs?.invited, assigned: !!m.prefs?.assigned };
+      const prefs = { invited: !!m.prefs?.invited, assigned: !!m.prefs?.assigned, weekly: m.prefs?.weekly !== false };
       await sql`update people set notify_prefs = ${sql.json(prefs)} where id = ${uuid(m.id)!}`;
       return "people";
     }
     case "task.create": {
       const f = await taskFields(m);
-      await sql`insert into tasks (title, area, person_id, due, recurring, remind_time, rotation, created_by)
-        values (${f.title}, ${f.area}, ${f.personId}, ${f.due}, ${f.recurring}, ${f.remindTime}, ${sql.array(f.rotation)}::uuid[], ${actor})`;
+      await sql`insert into tasks (title, area, person_id, due, recurring, remind_time, rotation, points, created_by)
+        values (${f.title}, ${f.area}, ${f.personId}, ${f.due}, ${f.recurring}, ${f.remindTime}, ${sql.array(f.rotation)}::uuid[], ${f.points}, ${actor})`;
       return "tasks";
     }
     case "task.update": {
       const f = await taskFields(m);
       await sql`update tasks set title = ${f.title}, area = ${f.area}, person_id = ${f.personId}, due = ${f.due}, recurring = ${f.recurring},
-        remind_time = ${f.remindTime}, rotation = ${sql.array(f.rotation)}::uuid[] where id = ${uuid(m.id)!}`;
+        remind_time = ${f.remindTime}, rotation = ${sql.array(f.rotation)}::uuid[], points = ${f.points} where id = ${uuid(m.id)!}`;
       return "tasks";
     }
     case "task.toggle": {
@@ -267,11 +281,13 @@ export async function mutate(m: Mutation, by: string | null): Promise<string> {
           const base = day(t.due) && day(t.due)! > today ? day(t.due)! : today;
           const rotation = (t.rotation as string[]) ?? [];
           const next = nextInRotation(rotation, (t.person_id as string) ?? null);
-          await sql`insert into tasks (title, area, person_id, due, recurring, remind_time, rotation, created_by)
-            values (${t.title}, ${t.area}, ${next}, ${nextDue(base, t.recurring as Recurrence)}, ${t.recurring}, ${t.remind_time}, ${sql.array(rotation)}::uuid[], ${t.created_by})`;
+          await sql`insert into tasks (title, area, person_id, due, recurring, remind_time, rotation, points, created_by)
+            values (${t.title}, ${t.area}, ${next}, ${nextDue(base, t.recurring as Recurrence)}, ${t.recurring}, ${t.remind_time}, ${sql.array(rotation)}::uuid[], ${t.points ?? 1}, ${t.created_by})`;
         }
+        if (!t.done) await bookTask({ id, title: t.title as string, person_id: (t.person_id as string) ?? null, points: Number(t.points ?? 1) }, true, actor);
       } else {
         await sql`update tasks set done = false, done_at = null where id = ${id}`;
+        await bookTask({ id, title: t.title as string, person_id: null, points: 0 }, false, actor);
       }
       return "tasks";
     }
