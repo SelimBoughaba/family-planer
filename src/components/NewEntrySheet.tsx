@@ -121,10 +121,8 @@ function TaskForm({ onClose, onEvent, task }: { onClose: () => void; onEvent?: (
       return;
     }
     if (quick && detected && quick.kind === "items") {
-      setBusy(true);
-      const ok = await run({ op: "item.createMany", items: quick.items });
-      setBusy(false);
-      if (ok) onClose();
+      void run({ op: "item.createMany", items: quick.items });
+      onClose();
       return;
     }
     setBusy(true);
@@ -148,15 +146,15 @@ function TaskForm({ onClose, onEvent, task }: { onClose: () => void; onEvent?: (
       rotation: plan ? rotation : [],
       points: points ?? (plan ? 2 : 1),
     };
-    const ok = await run(task ? { op: "task.update", id: task.id, ...fields } : { op: "task.create", ...fields });
-    setBusy(false);
-    if (ok) onClose();
+    void run(task ? { op: "task.update", id: task.id, ...fields } : { op: "task.create", ...fields });
+    onClose();
   };
 
   const remove = async () => {
     if (!task) return;
     if (!confirmDelete) return setConfirmDelete(true);
-    if (await run({ op: "task.delete", id: task.id })) onClose();
+    void run({ op: "task.delete", id: task.id });
+    onClose();
   };
 
   const canSave = !!title.trim() && !(plan && rotation.length < 2);

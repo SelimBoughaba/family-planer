@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { AnimatePresence, motion, useDragControls, useReducedMotion } from "motion/react";
+import { createPortal } from "react-dom";
+import { animate, AnimatePresence, motion, useDragControls, useIsPresent, useMotionValue, useReducedMotion } from "motion/react";
+import { pushSheet } from "@/lib/client/sheets";
+import { haptic } from "@/lib/client/haptics";
 import type { Person } from "@/lib/types";
 import { FALLBACK_COLOR } from "@/lib/types";
 import { useFamily } from "@/lib/client/family";
@@ -307,7 +310,9 @@ export function ContextMenu({ open, onClose, preview, actions }: { open: boolean
     exit: reduce ? { opacity: 0 } : { opacity: 0, transform: "scale(0.97)", transition: { duration: 0.14, ease: [0.23, 1, 0.32, 1] as const } },
     transition: { duration: 0.22, ease: [0.23, 1, 0.32, 1] as const, delay },
   });
-  return (
+  if (typeof document === "undefined") return null;
+  // im body, damit ein nach hinten gerückter Inhalt das Menü nicht mitnimmt
+  return createPortal(
     <AnimatePresence>
       {open && (
         <div key="menu" className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 px-6" role="dialog" aria-modal>
@@ -349,7 +354,8 @@ export function ContextMenu({ open, onClose, preview, actions }: { open: boolean
           </motion.div>
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }
 
@@ -363,9 +369,12 @@ export function useNow(intervalMs = 30000) {
 }
 
 /**
- * Rahmen für alle Blätter von unten: gleitet mit der iOS-Kurve herein und hinaus,
- * lässt sich am Kopf nach unten wegwischen (auch mit kurzem Schwung) und hält den Kopf beim Scrollen fest.
- * Für Ausblenden muss der Aufrufer ihn in AnimatePresence setzen, Sheet macht das selbst.
+ * Rahmen für alle Blätter von unten, gebaut wie ein iOS-Blatt:
+ * gleitet herein, schiebt den Hintergrund nach hinten, folgt dem Finger 1:1 beim Herunterziehen
+ * (am Kopf oder am Inhalt, wenn dieser ganz oben steht), schließt bei Schwung oder Strecke,
+ * und bleibt bei offener Tastatur im sichtbaren Bereich.
+ * Liegt per Portal direkt im body, damit der nach hinten gerückte Inhalt es nicht mitnimmt.
+ * Für Ausblenden muss der Aufrufer es in AnimatePresence setzen, Sheet macht das selbst.
  */
 export function SheetFrame({
   label,
@@ -383,54 +392,161 @@ export function SheetFrame({
   z?: number;
 }) {
   useEscape(true, onClose);
-  const controls = useDragControls();
   const reduce = useReducedMotion();
+  const present = useIsPresent();
+  const controls = useDragControls();
+  const dragY = useMotionValue(0);
+  const panel = useRef<HTMLDivElement>(null);
+  const body = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  useEffect(() => {
+    closeRef.current = onClose;
+  });
+
+  // Hintergrund nach hinten, solange das Blatt da ist; beim Schließen sofort zurück
+  const release = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    release.current = pushSheet();
+    return () => release.current?.();
+  }, []);
+  useEffect(() => {
+    if (!present) release.current?.();
+  }, [present]);
+
+  // Herunterziehen mit dem Finger, auch am Inhalt, wenn er ganz oben steht
+  useEffect(() => {
+    const el = panel.current;
+    const scroller = body.current;
+    if (!el || !scroller || reduce) return;
+    type G = { y: number; x: number; active: boolean; grip: boolean; samples: { y: number; t: number }[] } | null;
+    let g: G = null;
+    const start = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return (g = null);
+      const target = e.target as HTMLElement;
+      const grip = !!target.closest("[data-sheet-grip]");
+      // Zeichenflächen, Drehregler und Eingaben behalten ihre Gesten
+      if (!grip && target.closest(".touch-none, input, textarea, select, [contenteditable], [data-no-sheet-drag]")) return (g = null);
+      const t = e.touches[0];
+      g = { y: t.clientY, x: t.clientX, active: false, grip, samples: [] };
+    };
+    const move = (e: TouchEvent) => {
+      if (!g) return;
+      const t = e.touches[0];
+      const dy = t.clientY - g.y;
+      const dx = t.clientX - g.x;
+      if (!g.active) {
+        if (Math.abs(dx) > Math.abs(dy) + 2) return (g = null); // waagerecht: Chips dürfen scrollen
+        if (dy > 4 && (g.grip || scroller.scrollTop <= 0)) {
+          g.active = true;
+          g.y = t.clientY;
+        } else if (dy < -4 || (!g.grip && scroller.scrollTop > 0)) return (g = null);
+        else return;
+      }
+      e.preventDefault();
+      const off = t.clientY - g.y;
+      // nach oben nur mit Widerstand, nach unten 1:1
+      dragY.set(off > 0 ? off : -Math.sqrt(-off) * 2);
+      g.samples.push({ y: t.clientY, t: performance.now() });
+      if (g.samples.length > 5) g.samples.shift();
+    };
+    const end = () => {
+      if (!g?.active) return (g = null);
+      const s = g.samples;
+      const v = s.length > 1 ? (s[s.length - 1].y - s[0].y) / Math.max(1, s[s.length - 1].t - s[0].t) : 0; // px/ms
+      g = null;
+      const off = dragY.get();
+      if (off > 120 || (v > 0.45 && off > 20)) {
+        haptic();
+        closeRef.current();
+      } else void animate(dragY, 0, { type: "spring", bounce: 0.18, duration: 0.45, velocity: v * 1000 });
+    };
+    el.addEventListener("touchstart", start, { passive: true });
+    el.addEventListener("touchmove", move, { passive: false });
+    el.addEventListener("touchend", end);
+    el.addEventListener("touchcancel", end);
+    return () => {
+      el.removeEventListener("touchstart", start);
+      el.removeEventListener("touchmove", move);
+      el.removeEventListener("touchend", end);
+      el.removeEventListener("touchcancel", end);
+    };
+  }, [dragY, reduce]);
+
   const Panel = onSubmit ? motion.form : motion.div;
-  return (
-    <div className="fixed inset-0 flex items-end justify-center" style={{ zIndex: z }} role="dialog" aria-modal aria-label={label}>
+  const ease = [0.32, 0.72, 0, 1] as const;
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div
+      className="fixed inset-x-0 flex items-end justify-center"
+      // folgt dem sichtbaren Bereich über der Tastatur
+      style={{ zIndex: z, top: "var(--vvt, 0px)", height: "var(--vvh, 100dvh)" }}
+      role="dialog"
+      aria-modal
+      aria-label={label}
+    >
       <motion.button
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        exit={{ opacity: 0, transition: { duration: 0.2 } }}
-        transition={{ duration: 0.25 }}
-        className="absolute inset-0 cursor-default"
+        exit={{ opacity: 0, transition: { duration: 0.25 } }}
+        transition={{ duration: 0.3 }}
+        className="fixed inset-0 cursor-default"
         style={{ background: "var(--scrim)" }}
         onClick={onClose}
         aria-label="Schließen"
+        tabIndex={-1}
       />
-      <Panel
-        onSubmit={onSubmit as never}
+      <motion.div
+        className="relative flex max-h-[calc(100%-40px)] w-full max-w-md flex-col"
         initial={reduce ? { opacity: 0 } : { y: "100%" }}
         animate={reduce ? { opacity: 1 } : { y: 0 }}
-        exit={reduce ? { opacity: 0 } : { y: "100%", transition: { duration: 0.28, ease: [0.32, 0.72, 0, 1] } }}
-        transition={{ duration: 0.42, ease: [0.32, 0.72, 0, 1] }}
-        drag={reduce ? false : "y"}
-        dragControls={controls}
-        dragListener={false}
-        dragConstraints={{ top: 0, bottom: 0 }}
-        dragElastic={{ top: 0.04, bottom: 0.85 }}
-        dragMomentum={false}
-        onDragEnd={(_, info) => {
-          if (info.offset.y > 110 || info.velocity.y > 550) onClose();
-        }}
-        className="glass glass-strong relative flex max-h-[94dvh] w-full max-w-md flex-col rounded-t-[30px]"
+        exit={reduce ? { opacity: 0 } : { y: "105%", transition: { duration: 0.32, ease } }}
+        transition={{ duration: 0.46, ease }}
       >
-        <div
-          className="shrink-0 cursor-grab touch-none px-4 pt-2 pb-1 active:cursor-grabbing"
-          onPointerDown={(e) => {
-            // Knöpfe im Kopf bleiben Knöpfe
-            if ((e.target as HTMLElement).closest("button, input, a")) return;
-            controls.start(e);
+        <Panel
+          ref={panel as never}
+          onSubmit={onSubmit as never}
+          style={{ y: dragY }}
+          drag={reduce ? false : "y"}
+          dragControls={controls}
+          dragListener={false}
+          dragConstraints={{ top: 0, bottom: 0 }}
+          dragElastic={{ top: 0.04, bottom: 0.9 }}
+          dragMomentum={false}
+          onDragEnd={(_, info) => {
+            if (info.offset.y > 110 || info.velocity.y > 500) onClose();
           }}
+          className="glass glass-strong flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-t-[30px]"
         >
-          <span className="mx-auto mb-2 block h-[5px] w-9 rounded-full" style={{ background: "var(--label-3)" }} aria-hidden />
-          {header}
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4" style={{ paddingBottom: "calc(var(--safe-b) + 24px)" }}>
-          {children}
-        </div>
-      </Panel>
-    </div>
+          <div
+            data-sheet-grip
+            className="shrink-0 cursor-grab px-4 pt-2 pb-1 active:cursor-grabbing"
+            style={{ touchAction: "none" }}
+            onPointerDown={(e) => {
+              // Maus zieht über motion, Finger über die eigenen Touch-Gesten
+              if (e.pointerType !== "mouse" || (e.target as HTMLElement).closest("button, input, a")) return;
+              controls.start(e);
+            }}
+          >
+            <span className="mx-auto mb-2 block h-[5px] w-9 rounded-full" style={{ background: "var(--label-3)" }} aria-hidden />
+            {header}
+          </div>
+          <div
+            ref={body}
+            className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-4"
+            style={{ paddingBottom: "calc(var(--safe-b) + 24px)" }}
+            onFocus={(e) => {
+              // Feld nach dem Einblenden der Tastatur in die Mitte holen
+              const el = e.target as HTMLElement;
+              if (!el.matches("input, textarea, select")) return;
+              setTimeout(() => el.scrollIntoView({ block: "center", behavior: "smooth" }), 320);
+            }}
+          >
+            {children}
+          </div>
+        </Panel>
+      </motion.div>
+    </div>,
+    document.body,
   );
 }
 

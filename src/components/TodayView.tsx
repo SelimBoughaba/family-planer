@@ -271,7 +271,7 @@ export function TodayView({
                   )}
                   <button
                     onClick={() => onOpenEvent(o)}
-                    className="flex w-full items-center gap-3 py-3 text-left"
+                    className="row-press -mx-4 flex w-[calc(100%+2rem)] items-center gap-3 px-4 py-3 text-left"
                     style={{
                       opacity: past ? 0.42 : 1,
                       borderTop: i && i !== nowIndex ? "0.5px solid var(--separator)" : "none",

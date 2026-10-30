@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { motion, useScroll, useTransform } from "motion/react";
+import { trackVisualViewport, useSheetDepth } from "@/lib/client/sheets";
 import { Toaster, toast } from "sonner";
 import { FamilyProvider, useFamily } from "@/lib/client/family";
 import { Ambient, Avatar, ContextMenu, TabBar, useNow, type Tab } from "./ui";
@@ -69,9 +71,32 @@ function Main() {
   };
   const now = useNow();
 
+  // jeder Tab merkt sich, wie weit gescrollt war (wie in iOS)
+  const scrollPos = useRef<Partial<Record<Tab, number>>>({});
+  const tabRef = useRef(tab);
   useEffect(() => {
-    window.scrollTo({ top: 0 });
+    const save = () => (scrollPos.current[tabRef.current] = window.scrollY);
+    window.addEventListener("scroll", save, { passive: true });
+    return () => window.removeEventListener("scroll", save);
+  }, []);
+  useLayoutEffect(() => {
+    tabRef.current = tab;
+    window.scrollTo({ top: scrollPos.current[tab] ?? 0 });
   }, [tab]);
+
+  // Tastatur: sichtbaren Bereich verfolgen; :active auch auf dem iPhone sofort
+  useEffect(() => {
+    const stop = trackVisualViewport();
+    const noop = () => {};
+    document.addEventListener("touchstart", noop, { passive: true });
+    return () => {
+      stop();
+      document.removeEventListener("touchstart", noop);
+    };
+  }, []);
+
+  const content = useRef<HTMLElement>(null);
+  usePushBack(content);
 
   // Verwaltung nur auf Geräten anbieten, auf denen der Owner schon einmal entsperrt hat
   const [ownerDevice] = useState(() => {
@@ -132,36 +157,39 @@ function Main() {
   };
 
   return (
-    <main className="relative isolate min-h-dvh">
-      <Ambient colors={ambient.slice(0, 3)} />
+    <>
+      <main ref={content} className="relative isolate min-h-dvh" style={{ background: "var(--bg)" }}>
+        <Ambient colors={ambient.slice(0, 3)} />
 
-      {tab === "heute" && (
-        <TodayView
-          now={now}
-          filter={filter}
-          setFilter={setFilter}
-          onNew={() => setNewOpen(true)}
-          onQuick={() => setQuickMenu(true)}
-          onProfile={() => setProfileOpen(true)}
-          onOpenEvent={(occ) => setEditor({ mode: "edit", occ })}
-          onOpenFood={() => setTab("essen")}
-          onEditTask={setTaskEdit}
-          onOpenBoard={setBoardOpen}
-          onVault={() => setVault(true)}
-        />
-      )}
-      {tab === "kalender" && (
-        <CalendarView
-          now={now}
-          filter={filter}
-          setFilter={setFilter}
-          onOpen={(occ) => setEditor({ mode: "edit", occ })}
-          onNew={(start, allDay) => setEditor({ mode: "new", start, allDay })}
-        />
-      )}
-      {tab === "einkauf" && <ShoppingView focus={shopFocus} />}
-      {tab === "essen" && <FoodView key={foodDay ?? "plan"} initialDay={foodDay} />}
-      {tab === "aufgaben" && <TasksView filter={filter} setFilter={setFilter} onNew={() => setNewOpen(true)} onQuick={() => setQuickMenu(true)} onEdit={setTaskEdit} />}
+        {tab === "heute" && (
+          <TodayView
+            now={now}
+            filter={filter}
+            setFilter={setFilter}
+            onNew={() => setNewOpen(true)}
+            onQuick={() => setQuickMenu(true)}
+            onProfile={() => setProfileOpen(true)}
+            onOpenEvent={(occ) => setEditor({ mode: "edit", occ })}
+            onOpenFood={() => setTab("essen")}
+            onEditTask={setTaskEdit}
+            onOpenBoard={setBoardOpen}
+            onVault={() => setVault(true)}
+          />
+        )}
+        {tab === "kalender" && (
+          <CalendarView
+            now={now}
+            filter={filter}
+            setFilter={setFilter}
+            onOpen={(occ) => setEditor({ mode: "edit", occ })}
+            onNew={(start, allDay) => setEditor({ mode: "new", start, allDay })}
+          />
+        )}
+        {tab === "einkauf" && <ShoppingView focus={shopFocus} />}
+        {tab === "essen" && <FoodView key={foodDay ?? "plan"} initialDay={foodDay} />}
+        {tab === "aufgaben" && <TasksView filter={filter} setFilter={setFilter} onNew={() => setNewOpen(true)} onQuick={() => setQuickMenu(true)} onEdit={setTaskEdit} />}
+      </main>
+      <CompactTitle title={tabTitles[tab]} />
 
       <Toaster
         position="bottom-center"
@@ -173,6 +201,8 @@ function Main() {
       <TabBar
         tab={tab}
         onChange={(t) => {
+          // nochmal auf den aktiven Tab: weich nach oben
+          if (t === tab) return window.scrollTo({ top: 0, behavior: "smooth" });
           setShopFocus(false);
           setFoodDay(null);
           setTab(t);
@@ -294,6 +324,89 @@ function Main() {
           },
         ]}
       />
-    </main>
+    </>
   );
+}
+
+const tabTitles: Record<Tab, string> = { heute: "Heute", kalender: "Kalender", einkauf: "Einkauf", essen: "Essen", aufgaben: "Aufgaben" };
+
+/** Kleine Titelzeile, die erscheint, sobald der große Titel nach oben weggescrollt ist */
+function CompactTitle({ title }: { title: string }) {
+  const { scrollY } = useScroll();
+  const opacity = useTransform(scrollY, [34, 64], [0, 1]);
+  const y = useTransform(scrollY, [34, 64], [6, 0]);
+  return (
+    <motion.div className="pointer-events-none fixed inset-x-0 top-0 z-20" style={{ opacity }} aria-hidden>
+      <div
+        style={{
+          paddingTop: "env(safe-area-inset-top)",
+          background: "var(--glass-strong)",
+          WebkitBackdropFilter: "blur(24px) saturate(180%)",
+          backdropFilter: "blur(24px) saturate(180%)",
+          boxShadow: "0 0.5px 0 var(--separator)",
+        }}
+      >
+        <motion.p className="headline flex h-11 items-center justify-center" style={{ y }}>
+          {title}
+        </motion.p>
+      </div>
+    </motion.div>
+  );
+}
+
+/**
+ * Solange ein Blatt offen ist, rückt der Inhalt wie in iOS als Karte nach hinten:
+ * etwas kleiner, oben abgerundet, dahinter Schwarz. Die Tab-Leiste rückt mit.
+ */
+function usePushBack(content: React.RefObject<HTMLElement | null>) {
+  const depth = useSheetDepth();
+  const open = depth > 0;
+  useEffect(() => {
+    applyPushBack(content.current, open);
+  }, [open, content]);
+}
+
+function applyPushBack(el: HTMLElement | null, open: boolean) {
+  const bar = document.querySelector<HTMLElement>("nav.tabbar");
+  if (!el) return;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const root = document.documentElement;
+  const ease = "cubic-bezier(0.32, 0.72, 0, 1)";
+  if (open) {
+    const sy = window.scrollY;
+    const scale = 0.93;
+    el.style.transformOrigin = `50% ${sy}px`;
+    el.style.willChange = "transform";
+    root.classList.add("sheet-open");
+    el.animate(
+      [
+        { transform: "none", clipPath: `inset(${sy}px 0px 0px 0px round 0px)` },
+        { transform: `translateY(14px) scale(${scale})`, clipPath: `inset(${sy}px 0px 0px 0px round 18px)` },
+      ],
+      { duration: 460, easing: ease, fill: "forwards" },
+    );
+    if (bar) {
+      const top = bar.getBoundingClientRect().top;
+      bar.style.transformOrigin = `50% ${-top}px`;
+      bar.animate([{ transform: "none" }, { transform: `translateY(14px) scale(${scale})` }], { duration: 460, easing: ease, fill: "forwards" });
+    }
+    return;
+  }
+  // zurück: Animation umkehren und danach alle Stile entfernen, damit fixierte Kinder wieder normal stehen
+  const back = (node: HTMLElement | null) => {
+    if (!node) return;
+    const anims = node.getAnimations();
+    if (!anims.length) return;
+    const a = anims[anims.length - 1];
+    a.updatePlaybackRate(1.35);
+    a.reverse();
+    void a.finished.then(() => {
+      node.getAnimations().forEach((x) => x.cancel());
+      node.style.transformOrigin = "";
+      node.style.willChange = "";
+    });
+  };
+  back(el);
+  back(bar);
+  root.classList.remove("sheet-open");
 }

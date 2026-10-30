@@ -1,5 +1,7 @@
 "use client";
 
+import { haptic } from "@/lib/client/haptics";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useAnimate, useReducedMotion } from "motion/react";
 import { toast } from "sonner";
@@ -76,6 +78,8 @@ function Vault({ onClose }: { onClose: () => void }) {
 
   const send = async (m: VaultMutation) => {
     if (phase.kind !== "open") return false;
+    // sofort anzeigen, der Server bestätigt danach mit dem echten Stand
+    setPhase((p) => (p.kind === "open" ? { kind: "open", data: optimistic(p.data, m) } : p));
     const res = await fetch("/api/vault", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(m) }).catch(() => null);
     if (!res) {
       toast.error("Keine Verbindung, nicht gespeichert.");
@@ -117,6 +121,25 @@ function Vault({ onClose }: { onClose: () => void }) {
   );
 }
 
+function optimistic(d: VaultState, m: VaultMutation): VaultState {
+  switch (m.op) {
+    case "gift.status":
+      return { ...d, gifts: d.gifts.map((g) => (g.id === m.id ? { ...g, status: m.status } : g)) };
+    case "gift.delete":
+      return { ...d, gifts: d.gifts.filter((g) => g.id !== m.id) };
+    case "gift.save": {
+      const g: VaultGift = { id: m.id ?? `tmp-${d.gifts.length}`, title: m.title, forPerson: m.forPerson, price: m.price, link: m.link, note: m.note, status: m.status };
+      return { ...d, gifts: m.id && d.gifts.some((x) => x.id === m.id) ? d.gifts.map((x) => (x.id === m.id ? g : x)) : [...d.gifts, g] };
+    }
+    case "note.delete":
+      return { ...d, notes: d.notes.filter((n) => n.id !== m.id) };
+    case "note.save": {
+      const n: VaultNote = { id: m.id ?? `tmp-${d.notes.length}`, text: m.text, ink: m.ink, color: m.color, updatedAt: new Date().toISOString() };
+      return { ...d, notes: m.id && d.notes.some((x) => x.id === m.id) ? d.notes.map((x) => (x.id === m.id ? n : x)) : [n, ...d.notes] };
+    }
+  }
+}
+
 // --- PIN ---------------------------------------------------------------------
 
 function PinPad({ configured, onCancel, onUnlocked }: { configured: boolean; onCancel: () => void; onUnlocked: () => void }) {
@@ -134,6 +157,7 @@ function PinPad({ configured, onCancel, onUnlocked }: { configured: boolean; onC
     const b = res ? await res.json().catch(() => ({})) : {};
     setBusy(false);
     setWrong(true);
+    haptic();
     if (!reduce && scope.current) void animate(scope.current, { x: [0, -14, 12, -8, 6, -2, 0] }, { duration: 0.42, ease: "easeOut" });
     setTimeout(() => {
       setPin("");
@@ -221,7 +245,9 @@ function PinPad({ configured, onCancel, onUnlocked }: { configured: boolean; onC
               onPointerDown={(e) => {
                 // Antwort schon beim Aufsetzen, nicht erst beim Loslassen
                 e.preventDefault();
-                if (configured) press(k);
+                if (!configured) return;
+                haptic();
+                press(k);
               }}
               disabled={!configured}
               className="press glass mx-auto flex h-[76px] w-[76px] items-center justify-center rounded-full text-[32px] font-light tabular disabled:opacity-40"
@@ -257,8 +283,8 @@ function VaultContent({ data, send, onLock }: { data: VaultState; send: (m: Vaul
   };
 
   const saveNote = async (d: NoteDraft) => {
-    const ok = await send({ op: "note.save", id: note?.item?.id, text: d.text, ink: d.ink, color: d.color });
-    if (ok) setNote(null);
+    setNote(null);
+    void send({ op: "note.save", id: note?.item?.id ?? crypto.randomUUID(), text: d.text, ink: d.ink, color: d.color });
   };
 
   return (
@@ -392,12 +418,13 @@ function VaultContent({ data, send, onLock }: { data: VaultState; send: (m: Vaul
         draft={gift}
         onClose={() => setGift(null)}
         onSave={async (d) => {
-          if (await send({ op: "gift.save", ...d })) setGift(null);
+          setGift(null);
+          void send({ op: "gift.save", ...d, id: d.id ?? crypto.randomUUID() });
         }}
         onDelete={async (id) => {
           const g = data.gifts.find((x) => x.id === id);
-          if (!(await send({ op: "gift.delete", id }))) return;
           setGift(null);
+          if (!(await send({ op: "gift.delete", id }))) return;
           if (g)
             toast(`${g.title} gelöscht`, {
               action: {
@@ -420,7 +447,8 @@ function VaultContent({ data, send, onLock }: { data: VaultState; send: (m: Vaul
             note.item
               ? () => {
                   const id = note.item!.id;
-                  void send({ op: "note.delete", id }).then((ok) => ok && setNote(null));
+                  setNote(null);
+                  void send({ op: "note.delete", id });
                 }
               : undefined
           }

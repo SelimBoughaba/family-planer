@@ -45,7 +45,8 @@ function Inner({ day, onClose, onNewRecipe }: { day: string; onClose: () => void
   );
 
   const choose = async (title: string, recipeId: string | null) => {
-    if (await run({ op: "meal.set", day, recipeId, title, cook, note: null })) onClose();
+    void run({ op: "meal.set", day, recipeId, title, cook, note: null });
+    onClose();
   };
 
   const ask = async () => {
@@ -252,7 +253,10 @@ function Inner({ day, onClose, onNewRecipe }: { day: string; onClose: () => void
 
       {current && (
         <button
-          onClick={async () => (await run({ op: "meal.clear", day })) && onClose()}
+          onClick={() => {
+            void run({ op: "meal.clear", day });
+            onClose();
+          }}
           className="press body mt-7 w-full rounded-[14px] py-3 font-medium"
           style={{ color: "var(--danger)", background: "color-mix(in oklab, var(--danger) 10%, transparent)" }}
         >

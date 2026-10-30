@@ -78,18 +78,16 @@ function Editor({ target, onClose, onSaved }: { target: EditorTarget; onClose: (
     if (!data.title || busy) return;
     setBusy("save");
     if (target.mode === "edit") {
-      const ok = await run({ op: "recipe.update", id: target.recipe.id, ...data });
+      void run({ op: "recipe.update", id: target.recipe.id, ...data });
       setBusy(null);
-      if (ok) onClose();
+      onClose();
       return;
     }
     const id = crypto.randomUUID();
-    const ok = await run({ op: "recipe.create", id, ...data });
+    void run({ op: "recipe.create", id, ...data });
     setBusy(null);
-    if (ok) {
-      onSaved?.(id, data.title);
-      onClose();
-    }
+    onSaved?.(id, data.title);
+    onClose();
   };
 
   const doImport = async (body: Record<string, string>) => {

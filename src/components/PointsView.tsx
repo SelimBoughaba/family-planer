@@ -173,7 +173,7 @@ export function PointsView() {
             return (
               <div
                 key={r.id}
-                className="flex items-center gap-3 px-4 py-3"
+                className="row-press flex items-center gap-3 px-4 py-3"
                 style={{ borderTop: i ? "0.5px solid var(--separator)" : undefined }}
                 onContextMenu={(e) => {
                   if (!canRemove(r)) return;
@@ -380,14 +380,10 @@ function NewRewardSheet({ open, onClose }: { open: boolean; onClose: () => void 
 
   const save = async () => {
     if (!valid || busy) return;
-    setBusy(true);
-    const ok = await run({ op: "reward.create", title: title.trim(), emoji, cost: n });
-    setBusy(false);
-    if (ok) {
-      setTitle("");
-      setCost("20");
-      onClose();
-    }
+    void run({ op: "reward.create", title: title.trim(), emoji, cost: n });
+    setTitle("");
+    setCost("20");
+    onClose();
   };
 
   return (

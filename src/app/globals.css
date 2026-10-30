@@ -73,7 +73,35 @@ body {
   color: var(--label);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
-  overscroll-behavior-y: none;
+  /* seitlich verrutscht nichts, senkrecht federt die Seite wie in iOS */
+  overflow-x: clip;
+  overscroll-behavior-x: none;
+}
+
+/* hinter einem Blatt wird es dunkel, der Inhalt rückt als Karte nach hinten */
+html {
+  transition: background-color 300ms ease;
+  /* kein Doppeltipp-Zoom: jeder Tipp wirkt sofort */
+  touch-action: manipulation;
+}
+html.sheet-open {
+  background: #000;
+}
+
+/* Datum und Uhrzeit sind in Safari sonst breiter als ihr Platz */
+input[type="date"],
+input[type="time"] {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Zeilen hellen beim Antippen sofort auf und klingen weich aus, wie Listen in iOS */
+.row-press {
+  transition: background-color 280ms ease;
+}
+.row-press:active {
+  background-color: var(--fill);
+  transition: none;
 }
 
 body {

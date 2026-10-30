@@ -1,5 +1,7 @@
 "use client";
 
+import { haptic } from "@/lib/client/haptics";
+
 import { toast } from "sonner";
 import { useState } from "react";
 import { useFamily } from "@/lib/client/family";
@@ -53,13 +55,12 @@ export function TaskRow({
       trailing={t.done ? undefined : { label: "Morgen", color: "#FF9F0A", icon: <IconClock size={18} />, onTrigger: () => run({ op: "task.postpone", id: t.id, today }) }}
       onLongPress={() => onMenu(t)}
     >
-      <div
-        data-task-id={t.id}
-        className="flex items-center gap-3 px-4 py-3"
-        style={{ borderTop: first ? "none" : "0.5px solid var(--separator)", transition: "background 150ms ease" }}
-      >
+      <div data-task-id={t.id} className="row-press flex items-center gap-3 px-4 py-3" style={{ borderTop: first ? "none" : "0.5px solid var(--separator)" }}>
         <button
-          onClick={toggle}
+          onClick={() => {
+            haptic();
+            toggle();
+          }}
           className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full"
           style={{ border: t.done ? "none" : `1.6px solid ${c}`, background: t.done ? c : "transparent", color: "white" }}
           aria-label={t.done ? "Als offen markieren" : "Als erledigt markieren"}

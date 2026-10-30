@@ -1,5 +1,7 @@
 "use client";
 
+import { haptic } from "@/lib/client/haptics";
+
 import { useRef, useState, type ReactNode } from "react";
 
 type Action = {
@@ -82,8 +84,13 @@ export function SwipeRow({ children, leading, trailing, onLongPress, className }
   const end = () => {
     clearTimer();
     if (axis.current === "x") {
-      if (dx > THRESHOLD * 0.9 && leading) leading.onTrigger();
-      else if (dx < -THRESHOLD * 0.9 && trailing) trailing.onTrigger();
+      if (dx > THRESHOLD * 0.9 && leading) {
+        haptic();
+        leading.onTrigger();
+      } else if (dx < -THRESHOLD * 0.9 && trailing) {
+        haptic();
+        trailing.onTrigger();
+      }
     }
     start.current = null;
     axis.current = null;

@@ -1,5 +1,7 @@
 "use client";
 
+import { haptic } from "@/lib/client/haptics";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { animate, motion, useMotionValue, useReducedMotion, useTransform } from "motion/react";
 import { useFamily } from "@/lib/client/family";
@@ -54,6 +56,7 @@ export function CountdownStack({ onOpen }: { onOpen: (o: Occurrence) => void }) 
   const rotate = useTransform(x, [-300, 0, 300], [-6, 0, 6]);
 
   const go = (dir: 1 | -1, velocity = 0) => {
+    if (count > 1) haptic();
     if (count < 2) {
       void animate(x, 0, { type: "spring", bounce: 0.3, duration: 0.4, velocity });
       return;

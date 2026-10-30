@@ -1,5 +1,7 @@
 "use client";
 
+import { haptic } from "@/lib/client/haptics";
+
 import { toast } from "sonner";
 import { useState } from "react";
 import { useFamily } from "@/lib/client/family";
@@ -94,9 +96,12 @@ export function ShoppingView({ focus = false }: { focus?: boolean }) {
                       trailing={{ label: "Löschen", color: "var(--danger)", icon: <IconTrash size={18} />, onTrigger: () => remove(it) }}
                       onLongPress={() => setMenu(it)}
                     >
-                      <div className="flex items-center gap-3 px-4 py-3" style={{ borderTop: idx ? "0.5px solid var(--separator)" : "none" }}>
+                      <div className="row-press flex items-center gap-3 px-4 py-3" style={{ borderTop: idx ? "0.5px solid var(--separator)" : "none" }}>
                         <button
-                          onClick={() => toggle(it)}
+                          onClick={() => {
+                            haptic();
+                            toggle(it);
+                          }}
                           className="h-[26px] w-[26px] shrink-0 rounded-full"
                           style={{ border: "1.6px solid var(--label-3)" }}
                           aria-label={`${it.name} abhaken`}
@@ -142,7 +147,10 @@ export function ShoppingView({ focus = false }: { focus?: boolean }) {
               {done.map((it, idx) => (
                 <div key={it.id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: idx ? "0.5px solid var(--separator)" : "none" }}>
                   <button
-                    onClick={() => toggle(it)}
+                    onClick={() => {
+                      haptic();
+                      toggle(it);
+                    }}
                     className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full text-white"
                     style={{ background: "var(--success)" }}
                     aria-label={`${it.name} zurück auf die Liste`}

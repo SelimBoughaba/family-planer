@@ -113,32 +113,33 @@ function Editor({ target, onClose }: { target: EditorTarget; onClose: () => void
     };
   }, [f]);
 
-  const finish = (ok: boolean) => {
-    setBusy(false);
-    if (ok) onClose();
+  // sofort schließen: die Änderung steht schon in der App, gespeichert wird im Hintergrund
+  const finish = (p: Promise<boolean>) => {
+    void p;
+    onClose();
   };
 
   const save = async (mode?: "one" | "all") => {
     if (!fields.title || busy) return;
     if (recurringSource && !mode) return setScope("save");
     setBusy(true);
-    if (target.mode === "new") return finish(await run({ op: "event.create", ...fields }));
+    if (target.mode === "new") return finish(run({ op: "event.create", ...fields }));
     const { occ } = target;
-    if (mode === "one") return finish(await run({ op: "event.detach", id: occ.event.id, occurrence: occ.occurrence, ...fields }));
+    if (mode === "one") return finish(run({ op: "event.detach", id: occ.event.id, occurrence: occ.occurrence, ...fields }));
     if (occ.recurring) {
       // ganze Serie: Änderung am Vorkommen auf den Serienbeginn übertragen
       const delta = +new Date(fields.startsAt) - +occ.start;
       const base = new Date(+new Date(occ.event.startsAt) + delta);
       const dur = +new Date(fields.endsAt) - +new Date(fields.startsAt);
-      return finish(await run({ op: "event.update", id: occ.event.id, ...fields, startsAt: base.toISOString(), endsAt: new Date(+base + dur).toISOString() }));
+      return finish(run({ op: "event.update", id: occ.event.id, ...fields, startsAt: base.toISOString(), endsAt: new Date(+base + dur).toISOString() }));
     }
-    finish(await run({ op: "event.update", id: occ.event.id, ...fields }));
+    finish(run({ op: "event.update", id: occ.event.id, ...fields }));
   };
 
   const remove = async (mode: "all" | "one" | "following") => {
     if (target.mode !== "edit") return;
     setBusy(true);
-    finish(await run({ op: "event.delete", id: target.occ.event.id, mode, occurrence: target.occ.occurrence }));
+    finish(run({ op: "event.delete", id: target.occ.event.id, mode, occurrence: target.occ.occurrence }));
   };
 
   const togglePerson = (id: string) => set("people", f.people.includes(id) ? f.people.filter((x) => x !== id) : [...f.people, id]);
