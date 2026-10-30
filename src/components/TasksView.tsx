@@ -45,7 +45,8 @@ export function TasksView({
   const today = localDay();
 
   const all = state?.tasks ?? [];
-  const mine = all.filter((t) => !filter || t.personId === filter);
+  // Aufgaben für alle erscheinen bei jeder Person
+  const mine = all.filter((t) => !filter || t.personId === filter || (!t.personId && !t.done));
   const open = mine.filter((t) => !t.done).sort((a, b) => (a.due ?? "9999").localeCompare(b.due ?? "9999") || a.title.localeCompare(b.title));
   const done = mine.filter((t) => t.done).sort((a, b) => (b.doneAt ?? "").localeCompare(a.doneAt ?? ""));
 

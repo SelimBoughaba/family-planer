@@ -106,7 +106,7 @@ export function TodayView({
   // Heute: fällige und überfällige, dazu heute Erledigtes; „Irgendwann“ steht im Aufgaben-Tab. Andere Tage: was dann fällig ist
   const tasks = (state?.tasks ?? [])
     .filter((t) =>
-      !filter || t.personId === filter
+      !filter || t.personId === filter || (!t.personId && !t.done)
         ? sel === 0
           ? t.done
             ? !!t.doneAt && localDay(new Date(t.doneAt)) === today

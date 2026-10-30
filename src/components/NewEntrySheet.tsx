@@ -313,7 +313,26 @@ function TaskForm({ onClose, onEvent, task }: { onClose: () => void; onEvent?: (
               </button>
             )}
           </div>
-          <div className="flex gap-3">
+          <div className="no-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4">
+            {!plan && (
+              <button
+                type="button"
+                onClick={() => setWho(null)}
+                className="press relative flex shrink-0 flex-col items-center gap-1"
+                aria-pressed={who === null}
+                style={{ opacity: who === null ? 1 : 0.4, transition: "opacity 160ms ease" }}
+              >
+                <span className="flex h-10 w-10 items-center justify-center rounded-full" style={{ background: "var(--label)", color: "var(--bg)" }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <circle cx="9" cy="8" r="3.2" />
+                    <path d="M3 19c.6-3.2 3-5 6-5s5.4 1.8 6 5" />
+                    <circle cx="17" cy="9" r="2.6" />
+                    <path d="M16.5 14.2c2.3.2 4 1.7 4.5 4.8" />
+                  </svg>
+                </span>
+                <span className="caption">Alle</span>
+              </button>
+            )}
             {people.map((p) => {
               const pos = rotation.indexOf(p.id);
               const on = plan ? pos >= 0 : who === p.id;
@@ -322,7 +341,7 @@ function TaskForm({ onClose, onEvent, task }: { onClose: () => void; onEvent?: (
                   key={p.id}
                   type="button"
                   onClick={() => tapPerson(p.id)}
-                  className="press relative flex flex-col items-center gap-1"
+                  className="press relative flex shrink-0 flex-col items-center gap-1"
                   aria-pressed={on}
                   style={{
                     opacity: on ? 1 : 0.4,
@@ -343,6 +362,11 @@ function TaskForm({ onClose, onEvent, task }: { onClose: () => void; onEvent?: (
               );
             })}
           </div>
+          {!plan && who === null && (
+            <p className="footnote mt-3" style={{ color: "var(--label-2)" }}>
+              Für alle offen. Wer zuerst abhakt, bekommt die Punkte.
+            </p>
+          )}
           {plan && (
             <div className="mt-3">
               {rotation.length < 2 ? (

@@ -90,7 +90,17 @@ export function TaskRow({
             )}
           </p>
         </button>
-        <Avatar person={person(t.personId)} size={24} />
+        {t.personId ? (
+          <Avatar person={person(t.personId)} size={24} />
+        ) : (
+          <span
+            className="caption shrink-0 rounded-full px-2 py-0.5 font-semibold"
+            style={{ background: "var(--fill)", color: "var(--label-2)" }}
+            title="Für alle, wer zuerst abhakt, bekommt die Punkte"
+          >
+            Alle
+          </span>
+        )}
       </div>
     </SwipeRow>
   );
