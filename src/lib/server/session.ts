@@ -6,6 +6,8 @@ export const SESSION_COOKIE = "fp_session";
 export const SESSION_MAX_AGE = 60 * 60 * 24 * 365; // ein Jahr pro Gerät
 export const OWNER_COOKIE = "fp_owner";
 export const OWNER_MAX_AGE = 60 * 60 * 12; // Owner-Bereich: 12 Stunden
+export const VAULT_COOKIE = "fp_vault";
+export const VAULT_MAX_AGE = 60 * 10; // Tresor: 10 Minuten, verlängert sich bei jeder Nutzung
 
 function baseSecret() {
   const secret = process.env.SESSION_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
@@ -16,9 +18,11 @@ function baseSecret() {
 // eigene Ableitungsschlüssel, damit der Datenbank-Schlüssel nie direkt verwendet wird
 const familyKey = () => createHmac("sha256", baseSecret()).update("familienplaner-session-v1").digest();
 const ownerKey = () => createHmac("sha256", baseSecret()).update("familienplaner-owner-v1").digest();
+const vaultKey = () => createHmac("sha256", baseSecret()).update("familienplaner-vault-v1").digest();
 
 const password = () => process.env.FAMILY_PASSWORD ?? "";
 const ownerPassword = () => process.env.OWNER_PASSWORD ?? "";
+const vaultPin = () => (process.env.SECRET_PIN ?? "").trim();
 const fingerprint = (s: string) => createHash("sha256").update(s).digest("hex").slice(0, 16);
 
 const sign = (key: Buffer, payload: string) => createHmac("sha256", key).update(payload).digest("base64url");
@@ -121,6 +125,36 @@ export function verifyOwnerSession(token: string | undefined | null) {
   if (fp !== fingerprint(ownerPassword())) return false;
   try {
     return safeEqual(sig, sign(ownerKey(), `${v}.${exp}.${fp}`));
+  } catch {
+    return false;
+  }
+}
+
+// --- Tresor ----------------------------------------------------------------
+
+export function vaultConfigured() {
+  return /^\d{6}$/.test(vaultPin());
+}
+
+export function checkVaultPin(input: string) {
+  return vaultConfigured() && /^\d{6}$/.test(input) && matches(input, vaultPin());
+}
+
+export function createVaultSession() {
+  const exp = Math.floor(Date.now() / 1000) + VAULT_MAX_AGE;
+  const payload = `t1.${exp}.${fingerprint(vaultPin())}`;
+  return `${payload}.${sign(vaultKey(), payload)}`;
+}
+
+export function verifyVaultSession(token: string | undefined | null) {
+  if (!token || !vaultConfigured()) return false;
+  const parts = token.split(".");
+  if (parts.length !== 4 || parts[0] !== "t1") return false;
+  const [v, exp, fp, sig] = parts;
+  if (Number(exp) * 1000 < Date.now()) return false;
+  if (fp !== fingerprint(vaultPin())) return false;
+  try {
+    return safeEqual(sig, sign(vaultKey(), `${v}.${exp}.${fp}`));
   } catch {
     return false;
   }

@@ -23,6 +23,9 @@
 
 - Etappe 10: Punkte pro Aufgabe (Standard 1, Dienste 2), Rangliste mit Treppchen für Woche und Monat, Punktekonto, Belohnungen mit Bestätigung durch Samir oder Denise, Wochenvorschau sonntags 18 Uhr (abschaltbar), Punkte in der Sicherung
 
+- Design „Ruhig mit Liquid Glass“ (motion, Sonner, Rückgängig), Verwaltung aus der App, Belohnungen löschen, Aufgaben „für alle“
+- Countdowns in Heute (Schalter im Termin, Emoji, Stapel zum Wischen, live am letzten Tag, Konfetti), Tresor mit sechsstelliger PIN (Geschenkideen, geheime Notizen, eigene API, Sperre nach Fehlversuchen, schließt nach 10 Minuten und beim App-Wechsel)
+
 ## Als Nächstes
 - Offline-Einkauf (Idee 9) und Geburtstage (Idee 11), bewusst zurückgestellt
 

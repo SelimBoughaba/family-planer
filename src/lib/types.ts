@@ -25,6 +25,8 @@ export type CalEvent = {
   recurrenceUntil: string | null; // YYYY-MM-DD, einschließlich
   exdates: string[]; // ISO-Beginn ausgelassener Vorkommen
   reminders: number[]; // Minuten vor Beginn
+  countdown: boolean; // Countdown oben in Heute
+  countdownEmoji: string | null;
 };
 
 export type EventRecurrence = "daily" | "weekly" | "biweekly" | "monthly" | "yearly";
@@ -48,6 +50,8 @@ export type EventFields = {
   recurrence: EventRecurrence | null;
   recurrenceUntil: string | null;
   reminders: number[];
+  countdown?: boolean;
+  countdownEmoji?: string | null;
 };
 
 export type Recurrence = "daily" | "weekly" | "biweekly" | "monthly";
@@ -259,3 +263,23 @@ export const allDayReminderOptions = [
   { minutes: 300, label: "Am Vortag, 19 Uhr" },
   { minutes: -480, label: "Am Tag, 8 Uhr" },
 ];
+
+// --- Tresor (nur nach PIN, nie Teil von AppState) ---------------------------
+
+export type VaultGift = {
+  id: string;
+  forPerson: string | null;
+  title: string;
+  price: string | null;
+  link: string | null;
+  note: string | null;
+  status: "idee" | "gekauft" | "verpackt";
+};
+export type VaultNote = { id: string; text: string | null; ink: Stroke[] | null; color: string | null; updatedAt: string };
+export type VaultState = { gifts: VaultGift[]; notes: VaultNote[] };
+export type VaultMutation =
+  | { op: "gift.save"; id?: string; title: string; forPerson: string | null; price: string | null; link: string | null; note: string | null; status: VaultGift["status"] }
+  | { op: "gift.status"; id: string; status: VaultGift["status"] }
+  | { op: "gift.delete"; id: string }
+  | { op: "note.save"; id?: string; text: string | null; ink: Stroke[] | null; color: string | null }
+  | { op: "note.delete"; id: string };

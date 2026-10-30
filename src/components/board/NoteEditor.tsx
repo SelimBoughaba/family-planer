@@ -11,7 +11,24 @@ export type NoteDraft = { text: string | null; ink: Stroke[] | null; color: stri
 const NOTE = 180; // Seitenlänge eines Zettels auf der Wand
 
 /** Zettel schreiben: tippen oder mit Apple Pencil (oder Finger) direkt auf den Zettel */
-export function NoteEditor({ note, onClose, onSave, onDelete }: { note: BoardItem | null; onClose: () => void; onSave: (d: NoteDraft) => void; onDelete?: () => void }) {
+export function NoteEditor({
+  note,
+  onClose,
+  onSave,
+  onDelete,
+  expiry = true,
+  deleteLabel = "In den Papierkorb",
+  z = 80,
+}: {
+  note: Pick<BoardItem, "w" | "color" | "text" | "ink" | "expires"> | null;
+  onClose: () => void;
+  onSave: (d: NoteDraft) => void;
+  onDelete?: () => void;
+  /** Ablaufdatum anbieten (Pinnwand ja, Tresor nein) */
+  expiry?: boolean;
+  deleteLabel?: string;
+  z?: number;
+}) {
   const [color, setColor] = useState(() => note?.color ?? NOTE_COLORS[Math.floor(Math.random() * 5)]);
   const [text, setText] = useState(note?.text ?? "");
   const [mode, setMode] = useState<"tippen" | "schreiben">(note?.ink?.length && !note.text ? "schreiben" : "tippen");
@@ -75,7 +92,7 @@ export function NoteEditor({ note, onClose, onSave, onDelete }: { note: BoardIte
       open
       onClose={onClose}
       title={note ? "Zettel" : "Neuer Zettel"}
-      z={80}
+      z={z}
       leading={
         <button onClick={onClose} className="body" style={{ color: "var(--tint)" }}>
           Abbrechen
@@ -194,23 +211,25 @@ export function NoteEditor({ note, onClose, onSave, onDelete }: { note: BoardIte
         </p>
       )}
 
-      <div className="mt-5 flex items-center justify-between gap-3">
-        <button role="switch" aria-checked={withExpiry} onClick={() => setWithExpiry((v) => !v)} className="body flex items-center gap-3">
-          <span
-            className="relative h-[31px] w-[51px] shrink-0 rounded-full"
-            style={{ background: withExpiry ? "var(--success)" : "color-mix(in oklab, var(--label) 14%, transparent)", transition: "background 200ms ease" }}
-          >
+      {expiry && (
+        <div className="mt-5 flex items-center justify-between gap-3">
+          <button role="switch" aria-checked={withExpiry} onClick={() => setWithExpiry((v) => !v)} className="body flex items-center gap-3">
             <span
-              className="absolute top-[2px] h-[27px] w-[27px] rounded-full bg-white"
-              style={{ left: withExpiry ? 22 : 2, boxShadow: "0 3px 8px rgba(0,0,0,.15)", transition: "left 220ms ease" }}
-            />
-          </span>
-          Hängt sich selbst ab
-        </button>
-        {withExpiry && (
-          <input type="date" value={expires} onChange={(e) => setExpires(e.target.value)} className="body glass rounded-[12px] px-3 py-1.5" aria-label="Ablaufdatum" />
-        )}
-      </div>
+              className="relative h-[31px] w-[51px] shrink-0 rounded-full"
+              style={{ background: withExpiry ? "var(--success)" : "color-mix(in oklab, var(--label) 14%, transparent)", transition: "background 200ms ease" }}
+            >
+              <span
+                className="absolute top-[2px] h-[27px] w-[27px] rounded-full bg-white"
+                style={{ left: withExpiry ? 22 : 2, boxShadow: "0 3px 8px rgba(0,0,0,.15)", transition: "left 220ms ease" }}
+              />
+            </span>
+            Hängt sich selbst ab
+          </button>
+          {withExpiry && (
+            <input type="date" value={expires} onChange={(e) => setExpires(e.target.value)} className="body glass rounded-[12px] px-3 py-1.5" aria-label="Ablaufdatum" />
+          )}
+        </div>
+      )}
 
       {onDelete && (
         <button
@@ -218,7 +237,7 @@ export function NoteEditor({ note, onClose, onSave, onDelete }: { note: BoardIte
           className="press body mt-7 w-full rounded-[14px] py-3 font-semibold"
           style={{ background: "color-mix(in oklab, var(--danger) 10%, transparent)", color: "var(--danger)" }}
         >
-          {confirmDelete ? "Wirklich in den Papierkorb?" : "In den Papierkorb"}
+          {confirmDelete ? "Wirklich?" : deleteLabel}
         </button>
       )}
     </Sheet>

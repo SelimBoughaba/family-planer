@@ -334,7 +334,9 @@ textarea:focus-visible {
   border-radius: 18px;
   -webkit-backdrop-filter: blur(24px) saturate(180%);
   backdrop-filter: blur(24px) saturate(180%);
-  box-shadow: 0 0 0 0.5px var(--glass-outline), var(--glass-shadow);
+  box-shadow:
+    0 0 0 0.5px var(--glass-outline),
+    var(--glass-shadow);
   font-family: var(--font-sans);
   font-size: 15px;
   padding: 12px 12px 12px 16px;

@@ -264,3 +264,30 @@ create table if not exists reward_claims (
 );
 create index if not exists reward_claims_person_idx on reward_claims (person_id, status);
 alter table reward_claims enable row level security;
+
+-- Countdown in Heute für einzelne Termine
+alter table events add column if not exists countdown boolean not null default false;
+alter table events add column if not exists countdown_emoji text;
+
+-- Tresor: nur mit PIN erreichbar, Inhalte gehen nie in den normalen App-Zustand
+create table if not exists vault_gifts (
+  id uuid primary key default gen_random_uuid(),
+  for_person uuid references people(id) on delete set null,
+  title text not null,
+  price text,
+  link text,
+  note text,
+  status text not null default 'idee', -- idee, gekauft, verpackt
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create table if not exists vault_notes (
+  id uuid primary key default gen_random_uuid(),
+  text text,
+  ink jsonb,
+  color text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table vault_gifts enable row level security;
+alter table vault_notes enable row level security;

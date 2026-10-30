@@ -10,7 +10,7 @@ export function clientIp(req: NextRequest) {
 }
 
 /** Prüft die Sperre vor einem Anmeldeversuch */
-export async function checkLock(ip: string, kind: "family" | "owner") {
+export async function checkLock(ip: string, kind: "family" | "owner" | "vault") {
   const [{ device, total }] = await db()<{ device: number; total: number }[]>`
     select
       count(*) filter (where ip = ${ip} and created_at > now() - interval '15 minutes')::int as device,
@@ -22,7 +22,7 @@ export async function checkLock(ip: string, kind: "family" | "owner") {
   return { locked: null, minutes: 0, device };
 }
 
-export async function recordAttempt(ip: string, kind: "family" | "owner", success: boolean) {
+export async function recordAttempt(ip: string, kind: "family" | "owner" | "vault", success: boolean) {
   const sql = db();
   await sql`insert into login_attempts (ip, success, kind) values (${ip}, ${success}, ${kind})`;
   if (Math.random() < 0.05) await sql`delete from login_attempts where created_at < now() - interval '7 days'`;

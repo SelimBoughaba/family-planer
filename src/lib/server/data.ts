@@ -43,6 +43,8 @@ const toEvent = (r: Row): CalEvent => ({
   recurrenceUntil: day(r.recurrence_until),
   exdates: ((r.exdates as unknown[]) ?? []).map((x) => iso(x)!),
   reminders: (r.reminders as number[]) ?? [],
+  countdown: !!r.countdown,
+  countdownEmoji: (r.countdown_emoji as string) ?? null,
 });
 const toTask = (r: Row): Task => ({
   id: r.id as string,
@@ -96,6 +98,7 @@ export async function loadState(from: Date, to: Date): Promise<AppState> {
     sql`select * from events
       where (recurrence is null and ends_at > ${from} and starts_at < ${to})
          or (recurrence is not null and starts_at < ${to} and (recurrence_until is null or recurrence_until >= ${from}::date - 1))
+         or (countdown and (recurrence is not null or ends_at > now()))
       order by starts_at`,
     sql`select * from tasks where done = false or done_at > now() - interval '7 days' order by done, due nulls first, created_at`,
     sql`select * from shopping_items where done = false or done_at > now() - interval '1 day' order by created_at desc`,
@@ -225,6 +228,9 @@ function eventFields(m: EventFields) {
     recurrence,
     until: recurrence ? dateStr(m.recurrenceUntil, true) : null,
     reminders: Array.isArray(m.reminders) ? [...new Set(m.reminders.filter((x) => Number.isInteger(x) && x >= -1440 && x <= 10080))].slice(0, 3) : [],
+    countdown: !!m.countdown,
+    // ein Emoji oder ein kurzes Zeichen, mehr nicht
+    countdownEmoji: m.countdown && typeof m.countdownEmoji === "string" ? [...m.countdownEmoji.trim()].slice(0, 4).join("") || null : null,
   };
 }
 
@@ -404,15 +410,15 @@ export async function mutate(m: Mutation, by: string | null): Promise<string> {
 
     case "event.create": {
       const f = eventFields(m);
-      await sql`insert into events (title, place, starts_at, ends_at, all_day, people, recurrence, recurrence_until, reminders, created_by)
-        values (${f.title}, ${f.place}, ${f.start}, ${f.end}, ${f.allDay}, ${sql.array(f.people)}::uuid[], ${f.recurrence}, ${f.until}, ${sql.array(f.reminders)}::int[], ${actor})`;
+      await sql`insert into events (title, place, starts_at, ends_at, all_day, people, recurrence, recurrence_until, reminders, countdown, countdown_emoji, created_by)
+        values (${f.title}, ${f.place}, ${f.start}, ${f.end}, ${f.allDay}, ${sql.array(f.people)}::uuid[], ${f.recurrence}, ${f.until}, ${sql.array(f.reminders)}::int[], ${f.countdown}, ${f.countdownEmoji}, ${actor})`;
       return "events";
     }
     case "event.update": {
       const f = eventFields(m);
       await sql`update events set title = ${f.title}, place = ${f.place}, starts_at = ${f.start}, ends_at = ${f.end},
         all_day = ${f.allDay}, people = ${sql.array(f.people)}::uuid[], recurrence = ${f.recurrence}, recurrence_until = ${f.until},
-        reminders = ${sql.array(f.reminders)}::int[],
+        reminders = ${sql.array(f.reminders)}::int[], countdown = ${f.countdown}, countdown_emoji = ${f.countdownEmoji},
         exdates = case when ${f.recurrence}::text is null then '{}' else exdates end, updated_at = now()
         where id = ${uuid(m.id)!}`;
       return "events";
@@ -435,8 +441,8 @@ export async function mutate(m: Mutation, by: string | null): Promise<string> {
       const f = eventFields({ ...m, recurrence: null, recurrenceUntil: null });
       await sql.begin(async (tx) => {
         await tx`update events set exdates = array_append(exdates, ${occ}::timestamptz), updated_at = now() where id = ${id}`;
-        await tx`insert into events (title, place, starts_at, ends_at, all_day, people, reminders, created_by)
-          values (${f.title}, ${f.place}, ${f.start}, ${f.end}, ${f.allDay}, ${sql.array(f.people)}::uuid[], ${sql.array(f.reminders)}::int[], ${actor})`;
+        await tx`insert into events (title, place, starts_at, ends_at, all_day, people, reminders, countdown, countdown_emoji, created_by)
+          values (${f.title}, ${f.place}, ${f.start}, ${f.end}, ${f.allDay}, ${sql.array(f.people)}::uuid[], ${sql.array(f.reminders)}::int[], ${f.countdown}, ${f.countdownEmoji}, ${actor})`;
       });
       return "events";
     }

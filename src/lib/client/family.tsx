@@ -181,7 +181,10 @@ function optimistic(s: AppState, m: Mutation, me: string | null): AppState {
       return { ...s, attendance: m.present === null ? rest : [...rest, { day: m.day, personId: m.personId, present: m.present }] };
     }
     case "reward.create":
-      return { ...s, points: { ...s.points, rewards: [...s.points.rewards, { id: tmp, title: m.title, emoji: m.emoji ?? null, cost: m.cost, createdBy: me }].sort((a, b) => a.cost - b.cost) } };
+      return {
+        ...s,
+        points: { ...s.points, rewards: [...s.points.rewards, { id: tmp, title: m.title, emoji: m.emoji ?? null, cost: m.cost, createdBy: me }].sort((a, b) => a.cost - b.cost) },
+      };
     case "reward.delete":
       return { ...s, points: { ...s.points, rewards: s.points.rewards.filter((r) => r.id !== m.id) } };
     case "reward.claim": {
@@ -232,6 +235,8 @@ function optimistic(s: AppState, m: Mutation, me: string | null): AppState {
         recurrenceUntil: m.recurrenceUntil,
         exdates: [],
         reminders: m.reminders,
+        countdown: !!m.countdown,
+        countdownEmoji: m.countdownEmoji ?? null,
       };
       return { ...s, events: [...s.events, e] };
     }
@@ -252,6 +257,8 @@ function optimistic(s: AppState, m: Mutation, me: string | null): AppState {
                 recurrenceUntil: m.recurrenceUntil,
                 exdates: m.recurrence ? e.exdates : [],
                 reminders: m.reminders,
+                countdown: !!m.countdown,
+                countdownEmoji: m.countdownEmoji ?? null,
               }
             : e,
         ),
@@ -280,6 +287,8 @@ function optimistic(s: AppState, m: Mutation, me: string | null): AppState {
         recurrenceUntil: null,
         exdates: [],
         reminders: m.reminders,
+        countdown: !!m.countdown,
+        countdownEmoji: m.countdownEmoji ?? null,
       };
       return { ...s, events: [...s.events.map((e) => (e.id === m.id ? { ...e, exdates: [...e.exdates, m.occurrence] } : e)), copy] };
     }

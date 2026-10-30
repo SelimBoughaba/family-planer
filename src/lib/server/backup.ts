@@ -41,7 +41,7 @@ export async function snapshot(): Promise<Snapshot> {
   const events = await step(
     "Termine",
     () =>
-      sql`select id, title, place, notes, starts_at, ends_at, all_day, people, recurrence, recurrence_until::text as recurrence_until, exdates, reminders, created_by, created_at, updated_at from events`,
+      sql`select id, title, place, notes, starts_at, ends_at, all_day, people, recurrence, recurrence_until::text as recurrence_until, exdates, reminders, countdown, countdown_emoji, created_by, created_at, updated_at from events`,
   );
   const tasks = await step(
     "Aufgaben",
@@ -158,10 +158,10 @@ export async function restore(data: unknown) {
           is_parent = ${"is_parent" in p ? !!p.is_parent : tx`people.is_parent`}`;
     }
     for (const e of d.tables.events) {
-      await tx`insert into events (id, title, place, notes, starts_at, ends_at, all_day, people, recurrence, recurrence_until, exdates, reminders, created_by, created_at, updated_at)
+      await tx`insert into events (id, title, place, notes, starts_at, ends_at, all_day, people, recurrence, recurrence_until, exdates, reminders, countdown, countdown_emoji, created_by, created_at, updated_at)
         values (${e.id as string}, ${e.title as string}, ${(e.place as string) ?? null}, ${(e.notes as string) ?? null}, ${e.starts_at as string}, ${e.ends_at as string}, ${!!e.all_day},
           ${tx.array(((e.people as string[]) ?? []).filter((x) => ids.includes(x)))}::uuid[], ${(e.recurrence as string) ?? null}, ${(e.recurrence_until as string) ?? null},
-          ${tx.array(((e.exdates as string[]) ?? []).map((x) => new Date(x).toISOString()))}::timestamptz[], ${tx.array((e.reminders as number[]) ?? [])}::int[],
+          ${tx.array(((e.exdates as string[]) ?? []).map((x) => new Date(x).toISOString()))}::timestamptz[], ${tx.array((e.reminders as number[]) ?? [])}::int[], ${!!e.countdown}, ${(e.countdown_emoji as string) ?? null},
           ${ids.includes(e.created_by as string) ? (e.created_by as string) : null}, ${(e.created_at as string) ?? new Date().toISOString()}, now())`;
     }
     for (const t of d.tables.tasks) {

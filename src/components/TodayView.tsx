@@ -8,6 +8,7 @@ import { recipeEmoji } from "@/lib/recipes";
 import { AnimatePresence, Avatar, AvatarStack, Card, ListItem, PersonFilter, SectionTitle, useLongPress } from "./ui";
 import { TaskRow, useAssignDrop, useTaskMenus } from "./TaskRow";
 import { BoardTile } from "./board/BoardTile";
+import { CountdownStack } from "./CountdownStack";
 import { AttendanceRow, MaybeHint, eatersLabel, usePresence } from "./food/Attendance";
 import { IconPin, IconPlus } from "./icons";
 
@@ -72,6 +73,7 @@ export function TodayView({
   onOpenFood,
   onEditTask,
   onOpenBoard,
+  onVault,
 }: {
   now: Date;
   filter: string | null;
@@ -83,9 +85,12 @@ export function TodayView({
   onOpenFood: () => void;
   onEditTask: (t: Task) => void;
   onOpenBoard: (boardId: string) => void;
+  /** lang auf „Heute“ drücken öffnet den Tresor */
+  onVault: () => void;
 }) {
   const { state, person, color, me } = useFamily();
   const plusPress = useLongPress(onQuick, onNew);
+  const titlePress = useLongPress(onVault, () => {}, 650);
   const assignDrop = useAssignDrop();
   const { openMenu, menus } = useTaskMenus(onEditTask);
   const today = localDay(now);
@@ -136,7 +141,9 @@ export function TodayView({
           <p className="footnote font-medium" style={{ color: "var(--label-2)" }}>
             {dateLabel}
           </p>
-          <h1 className="large-title">Heute</h1>
+          <h1 {...titlePress} className="large-title select-none" style={{ WebkitTouchCallout: "none" }}>
+            Heute
+          </h1>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={onProfile} className="press rounded-full" aria-label="Profil">
@@ -154,6 +161,8 @@ export function TodayView({
       </header>
 
       <PersonFilter selected={filter} onToggle={(id) => setFilter(filter === id ? null : id)} onDrop={assignDrop} />
+
+      <CountdownStack onOpen={onOpenEvent} />
 
       <div className="no-scrollbar -mx-4 mt-4 flex gap-1 overflow-x-auto px-4" role="tablist" aria-label="Tage">
         {strip.map((d, k) => {

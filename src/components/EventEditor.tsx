@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useFamily } from "@/lib/client/family";
 import { allDayReminderOptions, eventRecurrenceLabel, FALLBACK_COLOR, localDay, timedReminderOptions, type EventFields, type EventRecurrence } from "@/lib/types";
 import type { Occurrence } from "@/lib/recurrence";
+import { COUNTDOWN_EMOJIS, suggestEmoji } from "@/lib/countdown";
 import { AnimatePresence, Avatar, Chips, ContextMenu, SheetFrame, Switch, type MenuAction } from "./ui";
 import { TimeDial, durationLabel } from "./TimeDial";
 import { IconRepeat, IconTrash } from "./icons";
@@ -45,6 +46,8 @@ function initial(target: EditorTarget, me: string | null) {
       recurrence: (e.recurrence ?? "none") as EventRecurrence | "none",
       until: e.recurrenceUntil ?? "",
       reminder: e.reminders.length ? String(e.reminders[0]) : "none",
+      countdown: e.countdown,
+      emoji: e.countdownEmoji,
     };
   }
   return {
@@ -59,6 +62,8 @@ function initial(target: EditorTarget, me: string | null) {
     recurrence: "none" as EventRecurrence | "none",
     until: "",
     reminder: "none",
+    countdown: false,
+    emoji: null as string | null,
   };
 }
 
@@ -103,6 +108,8 @@ function Editor({ target, onClose }: { target: EditorTarget; onClose: () => void
       recurrence,
       recurrenceUntil: recurrence && f.until ? f.until : null,
       reminders: reminderValid(f.reminder, f.allDay) ? [Number(f.reminder)] : [],
+      countdown: f.countdown,
+      countdownEmoji: f.countdown ? (f.emoji ?? suggestEmoji(f.title)) : null,
     };
   }, [f]);
 
@@ -282,6 +289,47 @@ function Editor({ target, onClose }: { target: EditorTarget; onClose: () => void
           <p className="caption mt-1" style={{ color: "var(--label-3)" }}>
             Ohne Enddatum läuft die Serie unbegrenzt.
           </p>
+        )}
+
+        <Label>Countdown</Label>
+        <button
+          type="button"
+          onClick={() => set("countdown", !f.countdown)}
+          className="flex w-full items-center justify-between gap-3 text-left"
+          role="switch"
+          aria-checked={f.countdown}
+        >
+          <span className="min-w-0">
+            <span className="body block">Countdown in Heute zeigen</span>
+            <span className="footnote block" style={{ color: "var(--label-2)" }}>
+              Alle sehen oben in Heute, wie lange es noch dauert.
+            </span>
+          </span>
+          <Switch on={f.countdown} />
+        </button>
+        {f.countdown && (
+          <div className="no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4" role="radiogroup" aria-label="Emoji für den Countdown">
+            {[...new Set([f.emoji ?? suggestEmoji(f.title), ...COUNTDOWN_EMOJIS])].map((e) => {
+              const on = (f.emoji ?? suggestEmoji(f.title)) === e;
+              return (
+                <button
+                  key={e}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => set("emoji", e)}
+                  className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] text-[22px]"
+                  style={{
+                    background: on ? "color-mix(in oklab, var(--tint) 16%, transparent)" : "var(--fill)",
+                    boxShadow: on ? "inset 0 0 0 1.5px var(--tint)" : "none",
+                    transition: "background-color 160ms ease, box-shadow 160ms ease",
+                  }}
+                >
+                  {e}
+                </button>
+              );
+            })}
+          </div>
         )}
 
         {editing && (
