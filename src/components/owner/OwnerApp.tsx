@@ -197,6 +197,11 @@ export function OwnerGate({ state }: { state: "family" | "missing" | "login" }) 
             Das Owner-Passwort ist noch nicht eingerichtet. Es wird in Vercel als Umgebungsvariable OWNER_PASSWORD hinterlegt, mindestens 10 Zeichen.
           </p>
         )}
+        {state === "missing" && (
+          <Link href="/" className="subhead mt-5 block text-center" style={{ color: "var(--tint)" }}>
+            Zurück zur App
+          </Link>
+        )}
         {state === "login" && (
           <form
             className="mt-6"

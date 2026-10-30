@@ -272,7 +272,8 @@ function Main() {
             icon: <IconPerson size={18} />,
             onSelect: () => setMe(null),
           },
-          ...(ownerDevice
+          // Verwaltung für Selims Profil und für Geräte, auf denen der Owner schon entsperrt hat; hinein nur mit Owner-Passwort
+          ...(ownerDevice || me?.name === "Selim"
             ? [
                 {
                   label: "Verwaltung",
