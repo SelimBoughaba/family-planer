@@ -6,8 +6,9 @@ import { addPoint, hitsStroke, INK_COLORS, INK_SIZES, strokePath } from "@/lib/c
 import { fileUrl, prepareFile, uploadFile } from "@/lib/client/upload";
 import { pdfThumbnail } from "@/lib/client/pdf-thumb";
 import type { BoardItem, BoardItemPatch, Stroke } from "@/lib/types";
-import { ContextMenu, Sheet, type MenuAction } from "../ui";
+import { ContextMenu, Sheet, Switch, type MenuAction } from "../ui";
 import { BoardItemView } from "./BoardItemView";
+import { BoardPicker } from "./BoardPicker";
 import { NoteEditor, type NoteDraft } from "./NoteEditor";
 
 type Mode = "hand" | "pen" | "eraser";
@@ -33,7 +34,8 @@ export function BoardScreen({ boardId, onClose }: { boardId: string | null; onCl
 }
 
 function Board({ initial, onClose }: { initial: string; onClose: () => void }) {
-  const { state, run, tick } = useFamily();
+  const { state, run, tick, me } = useFamily();
+  const meId = me?.id ?? null;
   const [boardId, setBoardId] = useState(initial);
   const board = state?.boards.find((b) => b.id === boardId) ?? state?.boards[0] ?? null;
   const [items, setItems] = useState<BoardItem[]>([]);
@@ -48,7 +50,7 @@ function Board({ initial, onClose }: { initial: string; onClose: () => void }) {
   const [note, setNote] = useState<{ item: BoardItem | null } | null>(null);
   const [viewer, setViewer] = useState<BoardItem | null>(null);
   const [boardMenu, setBoardMenu] = useState(false);
-  const [nameSheet, setNameSheet] = useState<{ mode: "new" | "rename"; value: string } | null>(null);
+  const [nameSheet, setNameSheet] = useState<{ mode: "new" | "rename"; value: string; private?: boolean } | null>(null);
   const [showTrash, setShowTrash] = useState(false);
   const [confirmBoardDelete, setConfirmBoardDelete] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -79,13 +81,13 @@ function Board({ initial, onClose }: { initial: string; onClose: () => void }) {
   const load = useCallback(async () => {
     // nicht mitten in einer Geste oder solange eine Zeichnung noch gespeichert wird
     if (action.current || inkSave.current) return;
-    const res = await fetch(`/api/board?id=${boardId}`, { cache: "no-store" }).catch(() => null);
+    const res = await fetch(`/api/board?id=${boardId}${meId ? `&me=${meId}` : ""}`, { cache: "no-store" }).catch(() => null);
     if (!res?.ok) return;
     const d = (await res.json()) as { items: BoardItem[]; trash: BoardItem[] };
     setItems(d.items);
     setTrash(d.trash);
     setLoaded(true);
-  }, [boardId]);
+  }, [boardId, meId]);
 
   useEffect(() => {
     const t = setTimeout(load, 0);
@@ -622,8 +624,16 @@ function Board({ initial, onClose }: { initial: string; onClose: () => void }) {
         <button onClick={onClose} className="press glass glass-strong pointer-events-auto rounded-full px-4 py-2 font-semibold" style={{ color: "var(--tint)" }}>
           Fertig
         </button>
-        <button onClick={() => setBoardMenu(true)} className="press glass glass-strong headline pointer-events-auto max-w-[50%] truncate rounded-full px-4 py-2">
-          {board?.name ?? "Pinnwand"} ▾
+        <button
+          onClick={() => setBoardMenu(true)}
+          className="press glass glass-strong headline pointer-events-auto flex max-w-[56%] items-center gap-1.5 rounded-full px-4 py-2"
+          aria-label="Pinnwände wechseln oder hinzufügen"
+        >
+          {board?.owner && <span aria-label="privat">🔒</span>}
+          <span className="truncate">{board?.name ?? "Pinnwand"}</span>
+          <span className="text-[12px]" style={{ color: "var(--label-2)" }} aria-hidden>
+            ▼
+          </span>
         </button>
         <button onClick={fit} className="press glass glass-strong pointer-events-auto rounded-full px-3.5 py-2 font-semibold" aria-label="Alles zeigen">
           ⤢
@@ -772,32 +782,38 @@ function Board({ initial, onClose }: { initial: string; onClose: () => void }) {
         </div>
       )}
 
-      <ContextMenu
+      <BoardPicker
         open={boardMenu}
         onClose={() => setBoardMenu(false)}
-        preview={<p className="headline">Pinnwände</p>}
-        actions={[
-          ...boards.map((b) => ({
-            label: `${b.id === boardId ? "✓ " : ""}${b.name}${b.count ? ` (${b.count})` : ""}`,
-            onSelect: () => {
-              if (b.id === boardId) return;
-              setLoaded(false);
-              setItems([]);
-              session.current = null;
-              setBoardId(b.id);
-            },
-          })),
-          { label: "Neue Pinnwand", onSelect: () => setTimeout(() => setNameSheet({ mode: "new", value: "" }), 50) },
-          { label: "Umbenennen", onSelect: () => setTimeout(() => setNameSheet({ mode: "rename", value: board?.name ?? "" }), 50) },
-          { label: `Papierkorb${trash.length ? ` (${trash.length})` : ""}`, onSelect: () => setTimeout(() => setShowTrash(true), 50) },
-          ...(boards.length > 1 ? [{ label: "Diese Pinnwand löschen", destructive: true, onSelect: () => setTimeout(() => setConfirmBoardDelete(true), 50) }] : []),
-        ]}
+        boards={boards}
+        current={boardId}
+        meId={meId}
+        trashCount={trash.length}
+        onPick={(id) => {
+          setBoardMenu(false);
+          if (id === boardId) return;
+          setLoaded(false);
+          setItems([]);
+          session.current = null;
+          setBoardId(id);
+        }}
+        onNew={() => setNameSheet({ mode: "new", value: "", private: false })}
+        onRename={() => setNameSheet({ mode: "rename", value: board?.name ?? "" })}
+        onTrash={() => {
+          setBoardMenu(false);
+          setTimeout(() => setShowTrash(true), 50);
+        }}
+        onDelete={() => {
+          setBoardMenu(false);
+          setTimeout(() => setConfirmBoardDelete(true), 50);
+        }}
+        onPrivacy={(priv) => void run({ op: "board.privacy", id: boardId, private: priv })}
       />
 
       {nameSheet && (
         <Sheet
           open
-          z={80}
+          z={85}
           onClose={() => setNameSheet(null)}
           title={nameSheet.mode === "new" ? "Neue Pinnwand" : "Umbenennen"}
           trailing={
@@ -808,12 +824,13 @@ function Board({ initial, onClose }: { initial: string; onClose: () => void }) {
                 setNameSheet(null);
                 if (nameSheet.mode === "rename") return void run({ op: "board.rename", id: boardId, name });
                 const id = uuid();
-                void run({ op: "board.create", id, name }).then((ok) => {
-                  if (!ok) return;
-                  setLoaded(false);
-                  setItems([]);
-                  setBoardId(id);
-                });
+                // sofort hinüber, gespeichert wird im Hintergrund
+                setBoardMenu(false);
+                void run({ op: "board.create", id, name, private: !!nameSheet.private });
+                setLoaded(false);
+                setItems([]);
+                session.current = null;
+                setBoardId(id);
               }}
               className="body font-semibold"
               style={{ color: nameSheet.value.trim() ? "var(--tint)" : "var(--label-3)" }}
@@ -831,6 +848,23 @@ function Board({ initial, onClose }: { initial: string; onClose: () => void }) {
             className="body glass mt-3 w-full rounded-[14px] px-3 py-2.5"
             aria-label="Name"
           />
+          {nameSheet.mode === "new" && meId && (
+            <button
+              type="button"
+              onClick={() => setNameSheet({ ...nameSheet, private: !nameSheet.private })}
+              className="mt-4 flex w-full items-center justify-between gap-3 text-left"
+              role="switch"
+              aria-checked={!!nameSheet.private}
+            >
+              <span className="min-w-0">
+                <span className="body block">Privat, nur für mich</span>
+                <span className="footnote block" style={{ color: "var(--label-2)" }}>
+                  Andere Profile sehen sie nicht. Für echte Geheimnisse ist der Tresor da.
+                </span>
+              </span>
+              <Switch on={!!nameSheet.private} />
+            </button>
+          )}
         </Sheet>
       )}
 

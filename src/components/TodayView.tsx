@@ -1,5 +1,6 @@
 "use client";
 
+import { MapsLink } from "./PlaceField";
 import { useMemo, useState } from "react";
 import { useFamily } from "@/lib/client/family";
 import { localDay, type Task } from "@/lib/types";
@@ -226,7 +227,8 @@ export function TodayView({
                 borderColor: "var(--separator)",
               }}
             >
-              <IconPin /> {next.event.place}
+              <IconPin /> <span className="min-w-0 flex-1 truncate">{next.event.place}</span>
+              <MapsLink place={next.event.place} lat={next.event.placeLat} lon={next.event.placeLon} compact />
             </p>
           )}
         </Card>
@@ -288,8 +290,8 @@ export function TodayView({
                     <div className="min-w-0 flex-1">
                       <p className="body truncate font-medium">{e.title}</p>
                       {e.place && (
-                        <p className="footnote truncate" style={{ color: "var(--label-2)" }}>
-                          {e.place}
+                        <p className="footnote flex items-center gap-1" style={{ color: "var(--label-2)" }}>
+                          <IconPin size={12} /> <span className="truncate">{e.place}</span>
                         </p>
                       )}
                     </div>

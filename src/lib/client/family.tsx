@@ -64,6 +64,10 @@ function optimistic(s: AppState, m: Mutation, me: string | null): AppState {
         remindTime: m.remindTime,
         rotation: m.rotation,
         points: m.points ?? (m.rotation.length >= 2 ? 2 : 1),
+        inCalendar: !!m.inCalendar && !!m.due,
+        place: m.place ?? null,
+        placeLat: m.placeLat ?? null,
+        placeLon: m.placeLon ?? null,
       };
       return { ...s, tasks: [...s.tasks, t] };
     }
@@ -73,7 +77,21 @@ function optimistic(s: AppState, m: Mutation, me: string | null): AppState {
         ...s,
         tasks: s.tasks.map((t) =>
           t.id === m.id
-            ? { ...t, title: m.title, area: m.area, personId, due: m.due, recurring: m.recurring, remindTime: m.remindTime, rotation: m.rotation, points: m.points ?? t.points }
+            ? {
+                ...t,
+                title: m.title,
+                area: m.area,
+                personId,
+                due: m.due,
+                recurring: m.recurring,
+                remindTime: m.remindTime,
+                rotation: m.rotation,
+                points: m.points ?? t.points,
+                inCalendar: !!m.inCalendar && !!m.due,
+                place: m.place ?? null,
+                placeLat: m.placeLat ?? null,
+                placeLon: m.placeLon ?? null,
+              }
             : t,
         ),
       };
@@ -207,7 +225,9 @@ function optimistic(s: AppState, m: Mutation, me: string | null): AppState {
       };
     }
     case "board.create":
-      return { ...s, boards: [...s.boards, { id: m.id ?? tmp, name: m.name, sort: s.boards.length + 1, count: 0, preview: [] }] };
+      return { ...s, boards: [...s.boards, { id: m.id ?? tmp, name: m.name, sort: s.boards.length + 1, count: 0, preview: [], owner: m.private ? me : null }] };
+    case "board.privacy":
+      return { ...s, boards: s.boards.map((b) => (b.id === m.id ? { ...b, owner: m.private ? me : null } : b)) };
     case "board.rename":
       return { ...s, boards: s.boards.map((b) => (b.id === m.id ? { ...b, name: m.name } : b)) };
     case "board.delete":
@@ -225,6 +245,8 @@ function optimistic(s: AppState, m: Mutation, me: string | null): AppState {
         id: tmp,
         title: m.title,
         place: m.place,
+        placeLat: m.placeLat ?? null,
+        placeLon: m.placeLon ?? null,
         notes: null,
         startsAt: m.startsAt,
         endsAt: m.endsAt,
@@ -249,6 +271,8 @@ function optimistic(s: AppState, m: Mutation, me: string | null): AppState {
                 ...e,
                 title: m.title,
                 place: m.place,
+                placeLat: m.placeLat ?? null,
+                placeLon: m.placeLon ?? null,
                 startsAt: m.startsAt,
                 endsAt: m.endsAt,
                 allDay: m.allDay,
@@ -277,6 +301,8 @@ function optimistic(s: AppState, m: Mutation, me: string | null): AppState {
         id: tmp,
         title: m.title,
         place: m.place,
+        placeLat: m.placeLat ?? null,
+        placeLon: m.placeLon ?? null,
         notes: null,
         startsAt: m.startsAt,
         endsAt: m.endsAt,
@@ -318,10 +344,13 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
   const pending = useRef(0);
   const win = useRef(initialWindow());
 
+  // gewähltes Profil für private Pinnwände; als Ref, damit refresh stabil bleibt
+  const meRef = useRef<string | null>(null);
   const refresh = useCallback(async () => {
     const { from, to } = win.current;
     try {
-      const res = await fetch(`/api/state?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`, { cache: "no-store" });
+      const who = meRef.current ? `&me=${meRef.current}` : "";
+      const res = await fetch(`/api/state?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}${who}`, { cache: "no-store" });
       if (res.status === 401) {
         window.location.reload();
         return;
@@ -389,6 +418,11 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
   const people = state?.people;
   const person = useCallback((id: string | null | undefined) => people?.find((p) => p.id === id), [people]);
   const color = useCallback((id: string | null | undefined) => person(id)?.color ?? FALLBACK_COLOR, [person]);
+  useEffect(() => {
+    meRef.current = meId;
+    void refresh();
+  }, [meId, refresh]);
+
   const me = (meId && person(meId)) || null;
 
   const setMe = useCallback((id: string | null) => {

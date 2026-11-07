@@ -6,6 +6,7 @@ import { useFamily } from "@/lib/client/family";
 import { localDay, recurrenceLabel, type Recurrence, type Task } from "@/lib/types";
 import { AnimatePresence, Avatar, Chips, Segmented, SheetFrame, Switch } from "./ui";
 import { IconTrash } from "./icons";
+import { PlaceField, type PlaceValue } from "./PlaceField";
 
 type Kind = "task" | "event";
 
@@ -57,6 +58,8 @@ function TaskForm({ onClose, onEvent, task }: { onClose: () => void; onEvent?: (
   const [rotating, setRotating] = useState((task?.rotation.length ?? 0) >= 2);
   const [rotation, setRotation] = useState<string[]>(task?.rotation ?? []);
   const [points, setPoints] = useState<number | null>(task ? task.points : null);
+  const [inCalendar, setInCalendar] = useState(task?.inCalendar ?? false);
+  const [place, setPlace] = useState<PlaceValue>({ place: task?.place ?? "", lat: task?.placeLat ?? null, lon: task?.placeLon ?? null });
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [ignoreQuick, setIgnoreQuick] = useState(false);
@@ -145,6 +148,10 @@ function TaskForm({ onClose, onEvent, task }: { onClose: () => void; onEvent?: (
       remindTime: reminder,
       rotation: plan ? rotation : [],
       points: points ?? (plan ? 2 : 1),
+      inCalendar,
+      place: place.place.trim() || null,
+      placeLat: place.place.trim() ? place.lat : null,
+      placeLon: place.place.trim() ? place.lon : null,
     };
     void run(task ? { op: "task.update", id: task.id, ...fields } : { op: "task.create", ...fields });
     onClose();
@@ -388,6 +395,25 @@ function TaskForm({ onClose, onEvent, task }: { onClose: () => void; onEvent?: (
           <Label>Bereich</Label>
           <Chips value={area} onChange={setArea} options={[...new Set([...(state?.lists.areas ?? []), area])].map((a) => ({ id: a, label: a }))} />
 
+          <Label>Kalender</Label>
+          <button
+            type="button"
+            onClick={() => setInCalendar((v) => !v)}
+            className="flex w-full items-center justify-between gap-3 text-left"
+            role="switch"
+            aria-checked={inCalendar}
+            disabled={when === "none" && rec === "none"}
+            style={{ opacity: when === "none" && rec === "none" ? 0.45 : 1 }}
+          >
+            <span className="min-w-0">
+              <span className="body block">Im Kalender zeigen</span>
+              <span className="footnote block" style={{ color: "var(--label-2)" }}>
+                {when === "none" && rec === "none" ? "Dafür braucht die Aufgabe einen Tag." : "Erscheint am fälligen Tag im Kalender, dort auch abhakbar."}
+              </span>
+            </span>
+            <Switch on={inCalendar && !(when === "none" && rec === "none")} />
+          </button>
+
           <Label>Punkte fürs Erledigen</Label>
           <Chips
             value={String(points ?? (plan ? 2 : 1))}
@@ -418,6 +444,9 @@ function TaskForm({ onClose, onEvent, task }: { onClose: () => void; onEvent?: (
               )}
             </div>
           )}
+
+          <Label>Ort</Label>
+          <PlaceField value={place} onChange={setPlace} />
         </>
       )}
 

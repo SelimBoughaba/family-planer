@@ -2,7 +2,9 @@ import "server-only";
 import { db } from "./db";
 import { wall } from "./berlin";
 
-export const BACKUP_VERSION = 5;
+export const BACKUP_VERSION = 6;
+
+const coord = (v: unknown) => (v == null || !Number.isFinite(Number(v)) ? null : Number(v));
 const KEEP_AUTO = 14;
 
 export type Snapshot = {
@@ -41,11 +43,12 @@ export async function snapshot(): Promise<Snapshot> {
   const events = await step(
     "Termine",
     () =>
-      sql`select id, title, place, notes, starts_at, ends_at, all_day, people, recurrence, recurrence_until::text as recurrence_until, exdates, reminders, countdown, countdown_emoji, created_by, created_at, updated_at from events`,
+      sql`select id, title, place, place_lat, place_lon, notes, starts_at, ends_at, all_day, people, recurrence, recurrence_until::text as recurrence_until, exdates, reminders, countdown, countdown_emoji, created_by, created_at, updated_at from events`,
   );
   const tasks = await step(
     "Aufgaben",
-    () => sql`select id, title, area, person_id, due::text as due, recurring, remind_time::text as remind_time, rotation, points, done, done_at, created_by, created_at from tasks`,
+    () =>
+      sql`select id, title, area, person_id, due::text as due, recurring, remind_time::text as remind_time, rotation, points, in_calendar, place, place_lat, place_lon, done, done_at, created_by, created_at from tasks`,
   );
   const items = await step("Einkauf", () => sql`select id, name, amount, category, added_by, done, done_at, created_at from shopping_items`);
   const lists = await step("Listen", () => sql`select value from app_meta where key = 'lists'`);
@@ -54,7 +57,7 @@ export async function snapshot(): Promise<Snapshot> {
     () => sql`select id, title, description, servings, minutes, ingredients, steps, tags, source_url, images, favorite, created_by, created_at, updated_at from recipes`,
   );
   const meals = await step("Wochenplan", () => sql`select id, day::text as day, recipe_id, title, cook, note, created_by, created_at from meal_plan`);
-  const boards = await step("Pinnwände", () => sql`select id, name, sort, created_at from boards`);
+  const boards = await step("Pinnwände", () => sql`select id, name, sort, owner, created_at from boards`);
   const boardItems = await step("Pinnwand", () => sql`select * from board_items where deleted_at is null`);
   const ledger = await step("Punkte", () => sql`select person_id, points, kind, task_id, reason, created_at from points_ledger`);
   const rewards = await step("Belohnungen", () => sql`select id, title, emoji, cost, active, created_by, created_at from rewards`);
@@ -158,16 +161,16 @@ export async function restore(data: unknown) {
           is_parent = ${"is_parent" in p ? !!p.is_parent : tx`people.is_parent`}`;
     }
     for (const e of d.tables.events) {
-      await tx`insert into events (id, title, place, notes, starts_at, ends_at, all_day, people, recurrence, recurrence_until, exdates, reminders, countdown, countdown_emoji, created_by, created_at, updated_at)
-        values (${e.id as string}, ${e.title as string}, ${(e.place as string) ?? null}, ${(e.notes as string) ?? null}, ${e.starts_at as string}, ${e.ends_at as string}, ${!!e.all_day},
+      await tx`insert into events (id, title, place, place_lat, place_lon, notes, starts_at, ends_at, all_day, people, recurrence, recurrence_until, exdates, reminders, countdown, countdown_emoji, created_by, created_at, updated_at)
+        values (${e.id as string}, ${e.title as string}, ${(e.place as string) ?? null}, ${coord(e.place_lat)}, ${coord(e.place_lon)}, ${(e.notes as string) ?? null}, ${e.starts_at as string}, ${e.ends_at as string}, ${!!e.all_day},
           ${tx.array(((e.people as string[]) ?? []).filter((x) => ids.includes(x)))}::uuid[], ${(e.recurrence as string) ?? null}, ${(e.recurrence_until as string) ?? null},
           ${tx.array(((e.exdates as string[]) ?? []).map((x) => new Date(x).toISOString()))}::timestamptz[], ${tx.array((e.reminders as number[]) ?? [])}::int[], ${!!e.countdown}, ${(e.countdown_emoji as string) ?? null},
           ${ids.includes(e.created_by as string) ? (e.created_by as string) : null}, ${(e.created_at as string) ?? new Date().toISOString()}, now())`;
     }
     for (const t of d.tables.tasks) {
-      await tx`insert into tasks (id, title, area, person_id, due, recurring, remind_time, rotation, points, done, done_at, created_by, created_at)
+      await tx`insert into tasks (id, title, area, person_id, due, recurring, remind_time, rotation, points, in_calendar, place, place_lat, place_lon, done, done_at, created_by, created_at)
         values (${t.id as string}, ${t.title as string}, ${(t.area as string) ?? "Haushalt"}, ${ids.includes(t.person_id as string) ? (t.person_id as string) : null}, ${(t.due as string) ?? null},
-          ${(t.recurring as string) ?? null}, ${(t.remind_time as string) ?? null}, ${tx.array(((t.rotation as string[]) ?? []).filter((x) => ids.includes(x)))}::uuid[], ${Number(t.points ?? 1)}, ${!!t.done}, ${(t.done_at as string) ?? null}, ${ids.includes(t.created_by as string) ? (t.created_by as string) : null}, ${(t.created_at as string) ?? new Date().toISOString()})`;
+          ${(t.recurring as string) ?? null}, ${(t.remind_time as string) ?? null}, ${tx.array(((t.rotation as string[]) ?? []).filter((x) => ids.includes(x)))}::uuid[], ${Number(t.points ?? 1)}, ${!!t.in_calendar}, ${(t.place as string) ?? null}, ${coord(t.place_lat)}, ${coord(t.place_lon)}, ${!!t.done}, ${(t.done_at as string) ?? null}, ${ids.includes(t.created_by as string) ? (t.created_by as string) : null}, ${(t.created_at as string) ?? new Date().toISOString()})`;
     }
     for (const i of d.tables.shopping_items) {
       await tx`insert into shopping_items (id, name, amount, category, added_by, done, done_at, created_at)
@@ -193,7 +196,7 @@ export async function restore(data: unknown) {
     if (Array.isArray(d.tables.boards) && d.tables.boards.length) {
       await tx`delete from boards`;
       for (const b of d.tables.boards)
-        await tx`insert into boards (id, name, sort, created_at) values (${b.id as string}, ${b.name as string}, ${Number(b.sort) || 0}, ${(b.created_at as string) ?? new Date().toISOString()})`;
+        await tx`insert into boards (id, name, sort, owner, created_at) values (${b.id as string}, ${b.name as string}, ${Number(b.sort) || 0}, ${ids.includes(b.owner as string) ? (b.owner as string) : null}, ${(b.created_at as string) ?? new Date().toISOString()})`;
       for (const i of d.tables.board_items ?? []) {
         await tx`insert into board_items (id, board_id, kind, x, y, w, h, rot, z, color, text, ink, file, thumb, file_name, expires, created_by, created_at, updated_at)
           values (${i.id as string}, ${i.board_id as string}, ${i.kind as string}, ${Number(i.x)}, ${Number(i.y)}, ${Number(i.w)}, ${Number(i.h)}, ${Number(i.rot)}, ${Number(i.z)},

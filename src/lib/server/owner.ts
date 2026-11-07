@@ -65,6 +65,40 @@ export async function ownerStatus() {
     failedLogins: failed.map((f) => ({ ip: maskIp(String(f.ip)), kind: f.kind, at: f.created_at })),
     lists: await getLists(),
     ai: { configured: !!process.env.ANTHROPIC_API_KEY, model: AI_MODEL, limitUsd: await aiLimit(), month: await monthUsage() },
+    points: await pointsOverview(),
+  };
+}
+
+/** Punktestand je Person und die letzten Buchungen, für die Verwaltung */
+async function pointsOverview() {
+  const sql = db();
+  const sums = await sql`
+    select p.id, p.name, p.color, p.is_parent,
+      coalesce((select sum(points) from points_ledger l where l.person_id = p.id), 0)::int as earned,
+      coalesce((select sum(points) from points_ledger l where l.person_id = p.id
+        and l.created_at >= date_trunc('week', now() at time zone 'Europe/Berlin') at time zone 'Europe/Berlin'), 0)::int as week,
+      coalesce((select sum(cost) from reward_claims c where c.person_id = p.id and c.status in ('pending', 'approved')), 0)::int as spent
+    from people p order by p.sort, p.name`;
+  const entries = await sql`
+    select l.id, l.person_id, l.points, l.kind, l.reason, l.created_at from points_ledger l order by l.created_at desc limit 80`;
+  return {
+    people: sums.map((r) => ({
+      id: r.id as string,
+      name: r.name as string,
+      color: (r.color as string) ?? null,
+      isParent: !!r.is_parent,
+      earned: Number(r.earned),
+      week: Number(r.week),
+      balance: Number(r.earned) - Number(r.spent),
+    })),
+    entries: entries.map((e) => ({
+      id: Number(e.id),
+      personId: e.person_id as string,
+      points: Number(e.points),
+      kind: e.kind as string,
+      reason: (e.reason as string) ?? null,
+      at: e.created_at,
+    })),
   };
 }
 
@@ -87,7 +121,11 @@ export type OwnerAction =
   | { op: "backup.create" }
   | { op: "backup.delete"; id: string }
   | { op: "backup.restore"; id: string }
-  | { op: "ai.setLimit"; usd: number };
+  | { op: "ai.setLimit"; usd: number }
+  | { op: "points.adjust"; personId: string; points: number; reason?: string }
+  | { op: "points.entryDelete"; id: number }
+  | { op: "points.reset"; personId: string }
+  | { op: "person.setParent"; id: string; isParent: boolean };
 
 export class OwnerInputError extends Error {}
 
@@ -205,6 +243,36 @@ export async function ownerAction(a: OwnerAction): Promise<Record<string, unknow
       const v = Number(a.usd);
       if (!isFinite(v) || v < 0 || v > 20) throw new OwnerInputError("Das Limit muss zwischen 0 und 20 Dollar liegen.");
       return { limitUsd: await setAiLimit(v) };
+    }
+    case "points.adjust": {
+      const n = Math.round(Number(a.points));
+      if (!isId(a.personId) || !Number.isFinite(n) || n === 0 || Math.abs(n) > 1000) throw new OwnerInputError("Bitte eine Zahl zwischen −1000 und 1000 eingeben, nicht 0.");
+      const reason =
+        String(a.reason ?? "")
+          .trim()
+          .slice(0, 140) || (n > 0 ? "Gutschrift aus der Verwaltung" : "Abzug aus der Verwaltung");
+      await sql`insert into points_ledger (person_id, points, kind, reason) values (${a.personId}, ${n}, 'manual', ${reason})`;
+      return {};
+    }
+    case "points.entryDelete": {
+      const id = Number(a.id);
+      if (!Number.isInteger(id)) throw new OwnerInputError("Unbekannter Eintrag.");
+      await sql`delete from points_ledger where id = ${id}`;
+      return {};
+    }
+    case "points.reset": {
+      // alles auf null: Punkte und offene wie eingelöste Belohnungen dieser Person
+      if (!isId(a.personId)) throw new OwnerInputError("Unbekannte Person.");
+      await sql.begin(async (tx) => {
+        await tx`delete from points_ledger where person_id = ${a.personId}`;
+        await tx`delete from reward_claims where person_id = ${a.personId}`;
+      });
+      return {};
+    }
+    case "person.setParent": {
+      if (!isId(a.id)) throw new OwnerInputError("Unbekannte Person.");
+      await sql`update people set is_parent = ${!!a.isParent} where id = ${a.id}`;
+      return {};
     }
     default:
       throw new OwnerInputError("Unbekannte Aktion.");

@@ -38,9 +38,10 @@ export const toItem = (r: Row): BoardItem => ({
 });
 
 /** Wände mit Anzahl und kleiner Vorschau für die Kachel in „Heute“ */
-export async function loadBoards(): Promise<Board[]> {
+/** Pinnwände für eine Person: alle gemeinsamen und ihre eigenen privaten */
+export async function loadBoards(me: string | null = null): Promise<Board[]> {
   const sql = db();
-  const boards = await sql`select id, name, sort from boards order by sort, created_at`;
+  const boards = await sql`select id, name, sort, owner from boards where owner is null or owner = ${isId(me) ? me : null} order by sort, created_at`;
   const counts = await sql`
     select board_id, count(*)::int as n from board_items
     where deleted_at is null and (expires is null or expires >= current_date) group by board_id`;
@@ -53,6 +54,7 @@ export async function loadBoards(): Promise<Board[]> {
     id: b.id as string,
     name: b.name as string,
     sort: Number(b.sort),
+    owner: (b.owner as string) ?? null,
     count: (counts.find((c) => c.board_id === b.id)?.n as number) ?? 0,
     preview: preview
       .filter((p) => p.board_id === b.id)
@@ -61,9 +63,11 @@ export async function loadBoards(): Promise<Board[]> {
 }
 
 /** Inhalt einer Wand und ihr Papierkorb (30 Tage) */
-export async function loadBoard(id: string) {
+export async function loadBoard(id: string, me: string | null = null) {
   if (!isId(id)) throw new BoardInputError("Unbekannte Pinnwand.");
   const sql = db();
+  const [own] = await sql`select owner from boards where id = ${id}`;
+  if (own?.owner && own.owner !== me) throw new BoardInputError("Diese Pinnwand ist privat.");
   const rows = await sql`
     select * from board_items where board_id = ${id}
       and (deleted_at is null or deleted_at > now() - interval '30 days')
@@ -113,7 +117,21 @@ export async function mutateBoard(m: Mutation, actor: string | null): Promise<st
         .slice(0, 40);
       if (!name) throw new BoardInputError("Bitte einen Namen angeben.");
       const id = isId(m.id) ? m.id : randomUUID();
-      await sql`insert into boards (id, name, sort) values (${id}, ${name}, (select coalesce(max(sort), 0) + 1 from boards)) on conflict (id) do nothing`;
+      const owner = m.private && isId(actor) ? actor : null;
+      await sql`insert into boards (id, name, sort, owner) values (${id}, ${name}, (select coalesce(max(sort), 0) + 1 from boards), ${owner}) on conflict (id) do nothing`;
+      return "boards";
+    }
+    case "board.privacy": {
+      if (!isId(m.id) || !isId(actor)) throw new BoardInputError("Bitte zuerst ein Profil wählen.");
+      const [b] = await sql`select owner from boards where id = ${m.id}`;
+      if (!b) throw new BoardInputError("Unbekannte Pinnwand.");
+      if (b.owner && b.owner !== actor) throw new BoardInputError("Nur wer die Pinnwand angelegt hat, kann das ändern.");
+      if (m.private) {
+        // die letzte gemeinsame Wand bleibt für alle
+        const [n] = await sql`select count(*)::int as n from boards where owner is null and id <> ${m.id}`;
+        if (!b.owner && !n.n) throw new BoardInputError("Eine gemeinsame Pinnwand muss bleiben.");
+      }
+      await sql`update boards set owner = ${m.private ? actor : null} where id = ${m.id}`;
       return "boards";
     }
     case "board.rename": {
@@ -126,8 +144,11 @@ export async function mutateBoard(m: Mutation, actor: string | null): Promise<st
     }
     case "board.delete": {
       if (!isId(m.id)) throw new BoardInputError("Unbekannte Pinnwand.");
-      const [{ n }] = await sql`select count(*)::int as n from boards`;
-      if (n <= 1) throw new BoardInputError("Die letzte Pinnwand bleibt erhalten.");
+      const [b] = await sql`select owner from boards where id = ${m.id}`;
+      if (!b) return "boards";
+      if (b.owner && b.owner !== actor) throw new BoardInputError("Diese Pinnwand gehört jemand anderem.");
+      const [{ n }] = await sql`select count(*)::int as n from boards where owner is null and id <> ${m.id}`;
+      if (!b.owner && n < 1) throw new BoardInputError("Die letzte gemeinsame Pinnwand bleibt erhalten.");
       const files = await sql`select file, thumb from board_items where board_id = ${m.id}`;
       await sql`delete from boards where id = ${m.id}`;
       await removeFiles(files.flatMap((f) => [f.file as string, f.thumb as string]).filter(Boolean)).catch(() => {});

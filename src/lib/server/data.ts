@@ -29,10 +29,13 @@ const toPerson = (r: Row): Person => ({
   notifyPrefs: { invited: true, assigned: true, weekly: true, ...((r.notify_prefs as object) ?? {}) },
   isParent: !!r.is_parent,
 });
+const num = (v: unknown) => (v == null ? null : Number(v));
 const toEvent = (r: Row): CalEvent => ({
   id: r.id as string,
   title: r.title as string,
   place: (r.place as string) ?? null,
+  placeLat: num(r.place_lat),
+  placeLon: num(r.place_lon),
   notes: (r.notes as string) ?? null,
   startsAt: iso(r.starts_at)!,
   endsAt: iso(r.ends_at)!,
@@ -58,6 +61,10 @@ const toTask = (r: Row): Task => ({
   remindTime: r.remind_time ? String(r.remind_time).slice(0, 5) : null,
   rotation: (r.rotation as string[]) ?? [],
   points: Number(r.points ?? 1),
+  inCalendar: !!r.in_calendar,
+  place: (r.place as string) ?? null,
+  placeLat: num(r.place_lat),
+  placeLon: num(r.place_lon),
 });
 const toRecipe = (r: Row): Recipe => ({
   id: r.id as string,
@@ -91,7 +98,7 @@ const toItem = (r: Row): Item => ({
   createdAt: iso(r.created_at)!,
 });
 
-export async function loadState(from: Date, to: Date): Promise<AppState> {
+export async function loadState(from: Date, to: Date, me: string | null = null): Promise<AppState> {
   const sql = db();
   const [people, events, tasks, items, recipes, meals, attendance] = await Promise.all([
     sql`select * from people order by sort, name`,
@@ -115,7 +122,7 @@ export async function loadState(from: Date, to: Date): Promise<AppState> {
     recipes: recipes.map(toRecipe),
     meals: meals.map(toMeal),
     attendance: attendance.map((r) => ({ day: String(r.day).slice(0, 10), personId: r.person_id as string, present: !!r.present })),
-    boards: await loadBoards(),
+    boards: await loadBoards(me),
     points: await loadPoints(),
     ai: await aiInfo(),
   };
@@ -207,7 +214,17 @@ async function taskFields(m: TaskFields) {
   if (valid.length && (!personId || !valid.includes(personId))) personId = valid[0];
   // Punkte: normal 1, Dienste reihum 2, höchstens 20
   const points = Number.isInteger(m.points) && (m.points as number) >= 0 && (m.points as number) <= 20 ? (m.points as number) : valid.length ? 2 : 1;
-  return { title: str(m.title, 140)!, area, personId, due, recurring, remindTime, rotation: valid, points };
+  // im Kalender nur, wenn es einen Tag gibt
+  const inCalendar = !!m.inCalendar && !!due;
+  return { title: str(m.title, 140)!, area, personId, due, recurring, remindTime, rotation: valid, points, inCalendar, ...placeFields(m) };
+}
+
+/** Ort als Text, Koordinaten nur, wenn sie gültig sind und ein Ort dasteht */
+function placeFields(m: { place?: unknown; placeLat?: unknown; placeLon?: unknown }) {
+  const place = str(m.place, 200, true);
+  const lat = typeof m.placeLat === "number" && Number.isFinite(m.placeLat) && Math.abs(m.placeLat) <= 90 ? m.placeLat : null;
+  const lon = typeof m.placeLon === "number" && Number.isFinite(m.placeLon) && Math.abs(m.placeLon) <= 180 ? m.placeLon : null;
+  return place && lat != null && lon != null ? { place, placeLat: lat, placeLon: lon } : { place, placeLat: null, placeLon: null };
 }
 
 const eventRecurrences: EventRecurrence[] = ["daily", "weekly", "biweekly", "monthly", "yearly"];
@@ -220,7 +237,7 @@ function eventFields(m: EventFields) {
   const recurrence = m.recurrence && eventRecurrences.includes(m.recurrence) ? m.recurrence : null;
   return {
     title: str(m.title, 140)!,
-    place: str(m.place, 140, true),
+    ...placeFields(m),
     start,
     end,
     allDay: !!m.allDay,
@@ -270,15 +287,17 @@ export async function mutate(m: Mutation, by: string | null): Promise<string> {
     case "task.create": {
       const f = await taskFields(m);
       // die ID kommt vom Gerät, damit die Zeile beim Nachladen dieselbe bleibt
-      await sql`insert into tasks (id, title, area, person_id, due, recurring, remind_time, rotation, points, created_by)
-        values (coalesce(${uuid(m.id, true)}::uuid, gen_random_uuid()), ${f.title}, ${f.area}, ${f.personId}, ${f.due}, ${f.recurring}, ${f.remindTime}, ${sql.array(f.rotation)}::uuid[], ${f.points}, ${actor})
+      await sql`insert into tasks (id, title, area, person_id, due, recurring, remind_time, rotation, points, in_calendar, place, place_lat, place_lon, created_by)
+        values (coalesce(${uuid(m.id, true)}::uuid, gen_random_uuid()), ${f.title}, ${f.area}, ${f.personId}, ${f.due}, ${f.recurring}, ${f.remindTime}, ${sql.array(f.rotation)}::uuid[], ${f.points}, ${f.inCalendar},
+          ${f.place}, ${f.placeLat}, ${f.placeLon}, ${actor})
         on conflict (id) do nothing`;
       return "tasks";
     }
     case "task.update": {
       const f = await taskFields(m);
       await sql`update tasks set title = ${f.title}, area = ${f.area}, person_id = ${f.personId}, due = ${f.due}, recurring = ${f.recurring},
-        remind_time = ${f.remindTime}, rotation = ${sql.array(f.rotation)}::uuid[], points = ${f.points} where id = ${uuid(m.id)!}`;
+        remind_time = ${f.remindTime}, rotation = ${sql.array(f.rotation)}::uuid[], points = ${f.points}, in_calendar = ${f.inCalendar},
+        place = ${f.place}, place_lat = ${f.placeLat}, place_lon = ${f.placeLon} where id = ${uuid(m.id)!}`;
       return "tasks";
     }
     case "task.toggle": {
@@ -293,8 +312,9 @@ export async function mutate(m: Mutation, by: string | null): Promise<string> {
           const base = day(t.due) && day(t.due)! > today ? day(t.due)! : today;
           const rotation = (t.rotation as string[]) ?? [];
           const next = nextInRotation(rotation, (t.person_id as string) ?? null);
-          await sql`insert into tasks (title, area, person_id, due, recurring, remind_time, rotation, points, created_by)
-            values (${t.title}, ${t.area}, ${next}, ${nextDue(base, t.recurring as Recurrence)}, ${t.recurring}, ${t.remind_time}, ${sql.array(rotation)}::uuid[], ${t.points ?? 1}, ${t.created_by})`;
+          await sql`insert into tasks (title, area, person_id, due, recurring, remind_time, rotation, points, in_calendar, place, place_lat, place_lon, created_by)
+            values (${t.title}, ${t.area}, ${next}, ${nextDue(base, t.recurring as Recurrence)}, ${t.recurring}, ${t.remind_time}, ${sql.array(rotation)}::uuid[], ${t.points ?? 1}, ${!!t.in_calendar},
+              ${t.place ?? null}, ${t.place_lat ?? null}, ${t.place_lon ?? null}, ${t.created_by})`;
         }
         if (!t.done) await bookTask({ id, title: t.title as string, person_id: (t.person_id as string) ?? null, points: Number(t.points ?? 1) }, true, actor);
       } else {
@@ -410,13 +430,13 @@ export async function mutate(m: Mutation, by: string | null): Promise<string> {
 
     case "event.create": {
       const f = eventFields(m);
-      await sql`insert into events (title, place, starts_at, ends_at, all_day, people, recurrence, recurrence_until, reminders, countdown, countdown_emoji, created_by)
-        values (${f.title}, ${f.place}, ${f.start}, ${f.end}, ${f.allDay}, ${sql.array(f.people)}::uuid[], ${f.recurrence}, ${f.until}, ${sql.array(f.reminders)}::int[], ${f.countdown}, ${f.countdownEmoji}, ${actor})`;
+      await sql`insert into events (title, place, place_lat, place_lon, starts_at, ends_at, all_day, people, recurrence, recurrence_until, reminders, countdown, countdown_emoji, created_by)
+        values (${f.title}, ${f.place}, ${f.placeLat}, ${f.placeLon}, ${f.start}, ${f.end}, ${f.allDay}, ${sql.array(f.people)}::uuid[], ${f.recurrence}, ${f.until}, ${sql.array(f.reminders)}::int[], ${f.countdown}, ${f.countdownEmoji}, ${actor})`;
       return "events";
     }
     case "event.update": {
       const f = eventFields(m);
-      await sql`update events set title = ${f.title}, place = ${f.place}, starts_at = ${f.start}, ends_at = ${f.end},
+      await sql`update events set title = ${f.title}, place = ${f.place}, place_lat = ${f.placeLat}, place_lon = ${f.placeLon}, starts_at = ${f.start}, ends_at = ${f.end},
         all_day = ${f.allDay}, people = ${sql.array(f.people)}::uuid[], recurrence = ${f.recurrence}, recurrence_until = ${f.until},
         reminders = ${sql.array(f.reminders)}::int[], countdown = ${f.countdown}, countdown_emoji = ${f.countdownEmoji},
         exdates = case when ${f.recurrence}::text is null then '{}' else exdates end, updated_at = now()
@@ -441,8 +461,8 @@ export async function mutate(m: Mutation, by: string | null): Promise<string> {
       const f = eventFields({ ...m, recurrence: null, recurrenceUntil: null });
       await sql.begin(async (tx) => {
         await tx`update events set exdates = array_append(exdates, ${occ}::timestamptz), updated_at = now() where id = ${id}`;
-        await tx`insert into events (title, place, starts_at, ends_at, all_day, people, reminders, countdown, countdown_emoji, created_by)
-          values (${f.title}, ${f.place}, ${f.start}, ${f.end}, ${f.allDay}, ${sql.array(f.people)}::uuid[], ${sql.array(f.reminders)}::int[], ${f.countdown}, ${f.countdownEmoji}, ${actor})`;
+        await tx`insert into events (title, place, place_lat, place_lon, starts_at, ends_at, all_day, people, reminders, countdown, countdown_emoji, created_by)
+          values (${f.title}, ${f.place}, ${f.placeLat}, ${f.placeLon}, ${f.start}, ${f.end}, ${f.allDay}, ${sql.array(f.people)}::uuid[], ${sql.array(f.reminders)}::int[], ${f.countdown}, ${f.countdownEmoji}, ${actor})`;
       });
       return "events";
     }

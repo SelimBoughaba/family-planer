@@ -5,10 +5,10 @@ import { haptic } from "@/lib/client/haptics";
 import { toast } from "sonner";
 import { useState } from "react";
 import { useFamily } from "@/lib/client/family";
-import { localDay, recurrenceLabel, type Task } from "@/lib/types";
+import { localDay, mapsUrl, recurrenceLabel, type Task } from "@/lib/types";
 import { Avatar, ContextMenu, type MenuAction } from "./ui";
 import { SwipeRow } from "./SwipeRow";
-import { IconCheck, IconClock, IconPencil, IconPerson, IconRepeat, IconTrash } from "./icons";
+import { IconCheck, IconClock, IconPencil, IconPerson, IconPin, IconRepeat, IconTrash } from "./icons";
 
 export function dueLabel(due: string | null, today: string) {
   if (!due) return null;
@@ -89,6 +89,11 @@ export function TaskRow({
                 <IconClock size={12} /> {t.remindTime}
               </span>
             )}
+            {t.place && !t.done && (
+              <span className="flex min-w-0 items-center gap-1">
+                <IconPin size={12} /> <span className="max-w-[160px] truncate">{t.place.split(",")[0]}</span>
+              </span>
+            )}
           </p>
         </button>
         {t.personId ? (
@@ -128,6 +133,7 @@ export function useTaskMenus(onEdit: (t: Task) => void) {
     { label: t.done ? "Wieder öffnen" : "Erledigt", icon: <IconCheck size={18} />, onSelect: () => toggleTask(run, t, today) },
     ...(t.done ? [] : [{ label: "Auf morgen", icon: <IconClock size={18} />, onSelect: () => run({ op: "task.postpone", id: t.id, today }) }]),
     { label: "Bearbeiten", icon: <IconPencil size={18} />, onSelect: () => setTimeout(() => onEdit(t), 50) },
+    ...(t.place ? [{ label: "In Karten öffnen", icon: <IconPin size={18} />, onSelect: () => window.open(mapsUrl(t.place!, t.placeLat, t.placeLon), "_blank", "noopener") }] : []),
     ...(t.rotation.length >= 2 ? [] : [{ label: "Jemand anderem geben", icon: <IconPerson size={18} />, onSelect: () => setTimeout(() => setAssign(t), 50) }]),
     {
       label: "Löschen",
@@ -149,6 +155,10 @@ export function useTaskMenus(onEdit: (t: Task) => void) {
                 remindTime: t.remindTime,
                 rotation: t.rotation,
                 points: t.points,
+                inCalendar: t.inCalendar,
+                place: t.place,
+                placeLat: t.placeLat,
+                placeLon: t.placeLon,
               }),
           },
         });

@@ -291,3 +291,14 @@ create table if not exists vault_notes (
 );
 alter table vault_gifts enable row level security;
 alter table vault_notes enable row level security;
+
+-- private Pinnwände: nur für die Person sichtbar, die sie angelegt hat
+alter table boards add column if not exists owner uuid references people(id) on delete cascade;
+-- Aufgaben auf Wunsch im Kalender zeigen
+alter table tasks add column if not exists in_calendar boolean not null default false;
+-- Orte mit Koordinaten, damit Karten den genauen Punkt öffnen
+alter table events add column if not exists place_lat double precision;
+alter table events add column if not exists place_lon double precision;
+alter table tasks add column if not exists place text;
+alter table tasks add column if not exists place_lat double precision;
+alter table tasks add column if not exists place_lon double precision;

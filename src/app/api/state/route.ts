@@ -16,6 +16,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "invalid_range" }, { status: 400 });
   }
 
-  const state = await loadState(from, to);
+  // welche Person fragt: private Pinnwände nur für sie (Sichtschutz, keine Sicherheitsgrenze)
+  const me = p.get("me");
+  const state = await loadState(from, to, me && /^[0-9a-f-]{36}$/i.test(me) ? me : null);
   return NextResponse.json(state, { headers: { "Cache-Control": "no-store" } });
 }

@@ -15,6 +15,8 @@ export type CalEvent = {
   id: string;
   title: string;
   place: string | null;
+  placeLat: number | null;
+  placeLon: number | null;
   notes: string | null;
   startsAt: string;
   endsAt: string;
@@ -43,6 +45,8 @@ export const eventRecurrenceLabel: Record<EventRecurrence, string> = {
 export type EventFields = {
   title: string;
   place: string | null;
+  placeLat?: number | null;
+  placeLon?: number | null;
   startsAt: string;
   endsAt: string;
   allDay: boolean;
@@ -68,6 +72,10 @@ export type Task = {
   remindTime: string | null; // HH:MM am Fälligkeitstag
   rotation: string[]; // Dienstplan: Personen, die sich reihum abwechseln
   points: number;
+  inCalendar: boolean; // auch im Kalender zeigen
+  place: string | null;
+  placeLat: number | null;
+  placeLon: number | null;
 };
 
 /** Felder, die beim Anlegen und Bearbeiten einer Aufgabe gesendet werden */
@@ -80,7 +88,20 @@ export type TaskFields = {
   remindTime: string | null;
   rotation: string[];
   points?: number;
+  inCalendar?: boolean;
+  place?: string | null;
+  placeLat?: number | null;
+  placeLon?: number | null;
 };
+
+/** Ein Ort aus der Kartensuche */
+export type PlaceHit = { label: string; detail: string; lat: number; lon: number };
+
+/** Link, der Apple Karten öffnet (auf anderen Geräten die Webkarte) */
+export function mapsUrl(place: string, lat?: number | null, lon?: number | null) {
+  if (lat != null && lon != null) return `https://maps.apple.com/place?coordinate=${lat},${lon}&name=${encodeURIComponent(place)}`;
+  return `https://maps.apple.com/search?query=${encodeURIComponent(place)}`;
+}
 
 /** Wer ist nach dieser Person im Dienstplan dran? */
 export function nextInRotation(rotation: string[], current: string | null) {
@@ -125,7 +146,7 @@ export type Meal = {
   note: string | null;
 };
 
-export type Board = { id: string; name: string; sort: number; count: number; preview: BoardPreview[] };
+export type Board = { id: string; name: string; sort: number; count: number; preview: BoardPreview[]; owner: string | null };
 export type BoardPreview = { kind: BoardItemKind; color: string | null; text: string | null; thumb: string | null };
 export type BoardItemKind = "note" | "photo" | "pdf" | "ink";
 /** Strich: Farbe, Stärke, Punkte als flache Liste x, y, Druck */
@@ -213,7 +234,8 @@ export type Mutation =
   | { op: "reward.delete"; id: string }
   | { op: "reward.claim"; rewardId: string }
   | { op: "claim.decide"; id: string; approve: boolean }
-  | { op: "board.create"; id?: string; name: string }
+  | { op: "board.create"; id?: string; name: string; private?: boolean }
+  | { op: "board.privacy"; id: string; private: boolean }
   | { op: "board.rename"; id: string; name: string }
   | { op: "board.delete"; id: string }
   | ({ op: "bitem.create"; id: string; boardId: string; kind: BoardItemKind } & BoardItemPatch & { file?: string | null; thumb?: string | null; fileName?: string | null })

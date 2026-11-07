@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
   const denied = await unauthorized(req);
   if (denied) return denied;
   try {
-    return NextResponse.json(await loadBoard(req.nextUrl.searchParams.get("id") ?? ""), { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json(await loadBoard(req.nextUrl.searchParams.get("id") ?? "", req.nextUrl.searchParams.get("me")), { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
     if (err instanceof BoardInputError) return NextResponse.json({ error: "invalid_input", message: err.message }, { status: 400 });
     throw err;

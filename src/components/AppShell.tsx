@@ -183,6 +183,7 @@ function Main() {
             setFilter={setFilter}
             onOpen={(occ) => setEditor({ mode: "edit", occ })}
             onNew={(start, allDay) => setEditor({ mode: "new", start, allDay })}
+            onEditTask={setTaskEdit}
           />
         )}
         {tab === "einkauf" && <ShoppingView focus={shopFocus} />}

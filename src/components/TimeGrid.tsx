@@ -1,5 +1,7 @@
 "use client";
 
+import type { Task } from "@/lib/types";
+import { CalTaskChip, tasksOn } from "./CalendarTask";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useFamily } from "@/lib/client/family";
 import { addDays, sameDay, startOfDay, type Occurrence } from "@/lib/recurrence";
@@ -75,6 +77,8 @@ const fmt = (d: Date) => d.toLocaleTimeString("de-DE", { hour: "2-digit", minute
 export function TimeGrid({
   days,
   occurrences,
+  tasks = [],
+  onEditTask,
   now,
   onTapSlot,
   onTapEvent,
@@ -83,6 +87,8 @@ export function TimeGrid({
 }: {
   days: Date[];
   occurrences: Occurrence[];
+  tasks?: Task[];
+  onEditTask?: (t: Task) => void;
   now: Date;
   onTapSlot: (start: Date) => void;
   onTapEvent: (occ: Occurrence) => void;
@@ -308,7 +314,7 @@ export function TimeGrid({
       </div>
 
       {/* Ganztägig */}
-      {allDay.length > 0 && (
+      {(allDay.length > 0 || days.some((d) => tasksOn(tasks, d).length > 0)) && (
         <div className="flex border-y pl-11" style={{ borderColor: "var(--separator)" }}>
           {days.map((d) => {
             const s = startOfDay(d);
@@ -328,6 +334,16 @@ export function TimeGrid({
                 {list.length > 3 && (
                   <span className="caption px-1" style={{ color: "var(--label-2)" }}>
                     +{list.length - 3}
+                  </span>
+                )}
+                {tasksOn(tasks, d)
+                  .slice(0, compact ? 3 : 6)
+                  .map((t) => (
+                    <CalTaskChip key={t.id} task={t} onOpen={(x) => onEditTask?.(x)} />
+                  ))}
+                {tasksOn(tasks, d).length > (compact ? 3 : 6) && (
+                  <span className="caption px-1" style={{ color: "var(--label-2)" }}>
+                    +{tasksOn(tasks, d).length - (compact ? 3 : 6)} Aufg.
                   </span>
                 )}
               </div>

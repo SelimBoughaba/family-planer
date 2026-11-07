@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { PlaceField } from "./PlaceField";
 import { useFamily } from "@/lib/client/family";
 import { allDayReminderOptions, eventRecurrenceLabel, FALLBACK_COLOR, localDay, timedReminderOptions, type EventFields, type EventRecurrence } from "@/lib/types";
 import type { Occurrence } from "@/lib/recurrence";
@@ -37,6 +38,8 @@ function initial(target: EditorTarget, me: string | null) {
     return {
       title: e.title,
       place: e.place ?? "",
+      lat: e.placeLat,
+      lon: e.placeLon,
       people: e.people,
       date: localDay(occ.start),
       allDay: e.allDay,
@@ -53,6 +56,8 @@ function initial(target: EditorTarget, me: string | null) {
   return {
     title: target.title ?? "",
     place: "",
+    lat: null as number | null,
+    lon: null as number | null,
     people: target.people?.length ? target.people : me ? [me] : [],
     date: localDay(target.start),
     allDay: !!target.allDay,
@@ -101,6 +106,8 @@ function Editor({ target, onClose }: { target: EditorTarget; onClose: () => void
     return {
       title: f.title.trim(),
       place: f.place.trim() || null,
+      placeLat: f.place.trim() ? f.lat : null,
+      placeLon: f.place.trim() ? f.lon : null,
       startsAt: start.toISOString(),
       endsAt: end.toISOString(),
       allDay: f.allDay,
@@ -188,14 +195,7 @@ function Editor({ target, onClose }: { target: EditorTarget; onClose: () => void
           maxLength={140}
           aria-label="Titel"
         />
-        <input
-          value={f.place}
-          onChange={(e) => set("place", e.target.value)}
-          placeholder="Ort (optional)"
-          className="body mt-2 w-full bg-transparent outline-none placeholder:text-[var(--label-3)]"
-          maxLength={140}
-          aria-label="Ort"
-        />
+        <PlaceField inline value={{ place: f.place, lat: f.lat, lon: f.lon }} onChange={(v) => setF((x) => ({ ...x, place: v.place, lat: v.lat, lon: v.lon }))} />
         {recurringSource && (
           <p className="footnote mt-2 flex items-center gap-1.5" style={{ color: "var(--label-2)" }}>
             <IconRepeat /> Teil einer Serie: {eventRecurrenceLabel[target.occ.event.recurrence!]}

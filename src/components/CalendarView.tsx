@@ -1,5 +1,7 @@
 "use client";
 
+import type { Task } from "@/lib/types";
+import { CalTaskRow, tasksOn } from "./CalendarTask";
 import { useEffect, useMemo, useState } from "react";
 import { useFamily } from "@/lib/client/family";
 import { addDays, occurrences, sameDay, startOfDay, startOfWeek, type Occurrence } from "@/lib/recurrence";
@@ -29,12 +31,14 @@ export function CalendarView({
   setFilter,
   onOpen,
   onNew,
+  onEditTask,
 }: {
   now: Date;
   filter: string | null;
   setFilter: (id: string | null) => void;
   onOpen: (occ: Occurrence) => void;
   onNew: (start: Date, allDay?: boolean) => void;
+  onEditTask: (t: Task) => void;
 }) {
   const { state, color, run, ensureRange } = useFamily();
   const [mode, setMode] = useState<Mode>("woche");
@@ -59,6 +63,8 @@ export function CalendarView({
   }, [range, ensureRange]);
 
   const occ = useMemo(() => occurrences(state?.events ?? [], range.from, range.to, filter), [state?.events, range, filter]);
+  // Aufgaben mit „Im Kalender zeigen“; Aufgaben für alle erscheinen bei jeder Person
+  const calTasks = useMemo(() => (state?.tasks ?? []).filter((t) => t.inCalendar && t.due && (!filter || t.personId === filter || !t.personId)), [state?.tasks, filter]);
 
   const step = (dir: 1 | -1) => {
     if (mode === "tag") setAnchor((a) => addDays(a, dir));
@@ -93,6 +99,8 @@ export function CalendarView({
   const fieldsOf = (o: Occurrence, start: Date, end: Date) => ({
     title: o.event.title,
     place: o.event.place,
+    placeLat: o.event.placeLat,
+    placeLon: o.event.placeLon,
     startsAt: start.toISOString(),
     endsAt: end.toISOString(),
     allDay: o.event.allDay,
@@ -171,6 +179,8 @@ export function CalendarView({
           onSelect={(d) => setSelected(d)}
           onSwipe={step}
           list={dayList}
+          tasks={calTasks}
+          onEditTask={onEditTask}
           onOpen={onOpen}
           onNew={() => {
             const s = new Date(selected);
@@ -180,7 +190,18 @@ export function CalendarView({
         />
       ) : (
         <Card className="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden pt-2">
-          <TimeGrid key={`${mode}-${+days[0]}`} days={days} occurrences={occ} now={now} onTapSlot={onNew} onTapEvent={onOpen} onCommit={commit} onSwipe={step} />
+          <TimeGrid
+            key={`${mode}-${+days[0]}`}
+            days={days}
+            occurrences={occ}
+            tasks={calTasks}
+            onEditTask={onEditTask}
+            now={now}
+            onTapSlot={onNew}
+            onTapEvent={onOpen}
+            onCommit={commit}
+            onSwipe={step}
+          />
         </Card>
       )}
 
@@ -240,9 +261,13 @@ function MonthGrid({
   onSelect,
   onSwipe,
   list,
+  tasks,
+  onEditTask,
   onOpen,
   onNew,
 }: {
+  tasks: Task[];
+  onEditTask: (t: Task) => void;
   grid: Date[];
   anchor: Date;
   now: Date;
@@ -310,6 +335,16 @@ function MonthGrid({
                     {dots(d).map((o) => (
                       <span key={o.key} className="h-1.5 w-1.5 rounded-full" style={{ background: color(o.event.people[0]), opacity: inMonth ? 1 : 0.4 }} />
                     ))}
+                    {/* Aufgaben als Ring statt Punkt */}
+                    {tasksOn(tasks, d)
+                      .slice(0, 2)
+                      .map((t) => (
+                        <span
+                          key={t.id}
+                          className="h-1.5 w-1.5 rounded-full"
+                          style={{ boxShadow: `inset 0 0 0 1.2px ${t.personId ? color(t.personId) : "var(--label-2)"}`, opacity: inMonth ? 1 : 0.4 }}
+                        />
+                      ))}
                   </span>
                 </button>
               );
@@ -325,17 +360,20 @@ function MonthGrid({
         </button>
       </div>
       <Card className="overflow-hidden">
-        {list.length === 0 && (
+        {list.length === 0 && tasksOn(tasks, selected).length === 0 && (
           <p className="subhead px-4 py-4" style={{ color: "var(--label-2)" }}>
             Keine Termine an diesem Tag.
           </p>
         )}
+        {tasksOn(tasks, selected).map((t, i) => (
+          <CalTaskRow key={t.id} task={t} first={i === 0} onOpen={onEditTask} />
+        ))}
         {list.map((o, i) => (
           <button
             key={o.key}
             onClick={() => onOpen(o)}
             className="flex w-full items-center gap-3 px-4 py-3 text-left"
-            style={{ borderTop: i ? "0.5px solid var(--separator)" : "none" }}
+            style={{ borderTop: i || tasksOn(tasks, selected).length ? "0.5px solid var(--separator)" : "none" }}
           >
             <span className="subhead tabular w-12 shrink-0 font-medium" style={{ color: "var(--label-2)" }}>
               {o.event.allDay ? "Ganzt." : fmtTime(o.start)}

@@ -125,6 +125,7 @@ export function buildCalendar(opts: { name: string; color?: string | null; event
     }
     lines.push(`SUMMARY:${esc(e.title)}`);
     if (e.place) lines.push(`LOCATION:${esc(e.place)}`);
+    if (e.place && e.placeLat != null && e.placeLon != null) lines.push(`GEO:${e.placeLat.toFixed(6)};${e.placeLon.toFixed(6)}`);
     const who = e.people.map((id) => names.get(id)).filter(Boolean);
     if (who.length) lines.push(`DESCRIPTION:${esc(`Mit: ${who.join(", ")}`)}`);
     lines.push("END:VEVENT");

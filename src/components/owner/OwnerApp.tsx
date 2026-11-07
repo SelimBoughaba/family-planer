@@ -27,6 +27,10 @@ type Status = {
   failedLogins: { ip: string; kind: string; at: string }[];
   lists: { categories: string[]; areas: string[] };
   ai: { configured: boolean; model: string; limitUsd: number; month: { usd: number; calls: number; input: number; output: number } };
+  points: {
+    people: { id: string; name: string; color: string | null; isParent: boolean; earned: number; week: number; balance: number }[];
+    entries: { id: number; personId: string; points: number; kind: string; reason: string | null; at: string }[];
+  };
 };
 
 const fmt = (iso: string | null | undefined, withTime = true) =>
@@ -245,10 +249,11 @@ export function OwnerGate({ state }: { state: "family" | "missing" | "login" }) 
 
 // --- Owner-Bereich ------------------------------------------------------------
 
-type Tab = "status" | "personen" | "daten" | "listen" | "protokoll";
+type Tab = "status" | "personen" | "punkte" | "daten" | "listen" | "protokoll";
 const tabs: { id: Tab; label: string }[] = [
   { id: "status", label: "Status" },
   { id: "personen", label: "Personen" },
+  { id: "punkte", label: "Punkte" },
   { id: "daten", label: "Daten" },
   { id: "listen", label: "Listen" },
   { id: "protokoll", label: "Protokoll" },
@@ -328,6 +333,7 @@ export function OwnerApp() {
           <>
             {tab === "status" && <StatusTab s={s} act={act} setConfirm={setConfirm} />}
             {tab === "personen" && <PeopleTab s={s} act={act} setConfirm={setConfirm} />}
+            {tab === "punkte" && <PointsTab s={s} act={act} setConfirm={setConfirm} />}
             {tab === "daten" && <DataTab s={s} act={act} setConfirm={setConfirm} say={say} reload={load} />}
             {tab === "listen" && <ListsTab s={s} act={act} />}
             {tab === "protokoll" && <LogTab s={s} act={act} setConfirm={setConfirm} />}
@@ -973,5 +979,156 @@ function AiSection({ s, act }: Omit<TabProps, "setConfirm">) {
         <ActionButton onClick={() => {}}>Sichern</ActionButton>
       </form>
     </Section>
+  );
+}
+
+// --- Punkte -----------------------------------------------------------------
+
+function PointsTab({ s, act, setConfirm }: TabProps) {
+  const [open, setOpen] = useState<string | null>(null);
+  const [amount, setAmount] = useState("5");
+  const [reason, setReason] = useState("");
+  const [filter, setFilter] = useState<string | null>(null);
+  const people = s.points.people;
+  const name = (id: string) => people.find((p) => p.id === id)?.name ?? "Unbekannt";
+  const entries = s.points.entries.filter((e) => !filter || e.personId === filter);
+
+  const adjust = async (personId: string, sign: 1 | -1) => {
+    const n = Math.abs(Math.round(Number(amount)));
+    if (!n) return;
+    if (await act({ op: "points.adjust", personId, points: sign * n, reason }, `${sign > 0 ? "+" : "−"}${n} für ${name(personId)}.`)) setReason("");
+  };
+
+  return (
+    <>
+      <Section title="Punktestand" hint="Kontostand ist, was zum Einlösen übrig ist: verdient minus offene und eingelöste Belohnungen. Die Rangliste zählt nur Verdientes.">
+        {people.map((p, i) => (
+          <div key={p.id} style={{ borderBottom: i === people.length - 1 ? "none" : "0.5px solid var(--separator)" }}>
+            <button onClick={() => setOpen(open === p.id ? null : p.id)} className="row-press flex w-full items-center gap-3 px-4 py-3 text-left" aria-expanded={open === p.id}>
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full font-semibold text-white" style={{ background: p.color ?? "#8E8E93" }}>
+                {p.name.slice(0, 1)}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="body block truncate">{p.name}</span>
+                <span className="footnote block tabular" style={{ color: "var(--label-2)" }}>
+                  Konto {p.balance} · Woche {p.week} · gesamt {p.earned}
+                </span>
+              </span>
+              <IconChevron size={14} className={open === p.id ? "rotate-90" : ""} />
+            </button>
+            {open === p.id && (
+              <div className="px-4 pb-4">
+                <div className="flex items-center gap-2">
+                  <input
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, "").slice(0, 4))}
+                    inputMode="numeric"
+                    className="body glass tabular w-20 rounded-[12px] px-3 py-2 text-center"
+                    aria-label="Anzahl Punkte"
+                  />
+                  <input
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="Grund (optional)"
+                    maxLength={140}
+                    className="body glass min-w-0 flex-1 rounded-[12px] px-3 py-2"
+                  />
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <ActionButton onClick={() => void adjust(p.id, 1)}>+ Gutschreiben</ActionButton>
+                  <ActionButton onClick={() => void adjust(p.id, -1)}>− Abziehen</ActionButton>
+                  <ActionButton
+                    destructive
+                    onClick={() =>
+                      setConfirm({
+                        title: `Punkte von ${p.name} zurücksetzen?`,
+                        text: "Alle Punkte und alle Einlösungen dieser Person werden gelöscht. Das lässt sich nicht rückgängig machen, außer über eine Sicherung.",
+                        action: "Zurücksetzen",
+                        destructive: true,
+                        run: async () => void (await act({ op: "points.reset", personId: p.id }, `${p.name} steht wieder bei 0.`)),
+                      })
+                    }
+                  >
+                    Auf 0 setzen
+                  </ActionButton>
+                </div>
+                <button
+                  onClick={() =>
+                    void act({ op: "person.setParent", id: p.id, isParent: !p.isParent }, p.isParent ? `${p.name} bestätigt nicht mehr.` : `${p.name} darf jetzt bestätigen.`)
+                  }
+                  className="mt-4 flex w-full items-center justify-between gap-3 text-left"
+                  role="switch"
+                  aria-checked={p.isParent}
+                >
+                  <span className="min-w-0">
+                    <span className="subhead block font-medium">Darf Belohnungen bestätigen</span>
+                    <span className="footnote block" style={{ color: "var(--label-2)" }}>
+                      Bekommt Einlösungen zur Bestätigung und kann Belohnungen entfernen.
+                    </span>
+                  </span>
+                  <span
+                    className="relative h-[31px] w-[51px] shrink-0 rounded-full"
+                    style={{ background: p.isParent ? "var(--success)" : "var(--fill)", transition: "background-color 200ms ease" }}
+                  >
+                    <span
+                      className="absolute top-[2px] left-[2px] h-[27px] w-[27px] rounded-full bg-white"
+                      style={{ transform: `translateX(${p.isParent ? 20 : 0}px)`, boxShadow: "0 3px 8px rgba(0,0,0,.15)", transition: "transform 240ms var(--ease-out)" }}
+                    />
+                  </span>
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </Section>
+
+      <section className="mt-7">
+        <div className="mb-2 flex items-center justify-between gap-2 px-1">
+          <h2 className="footnote font-semibold" style={{ color: "var(--label-2)" }}>
+            Letzte Buchungen
+          </h2>
+          <select value={filter ?? ""} onChange={(e) => setFilter(e.target.value || null)} className="footnote glass rounded-full px-2.5 py-1" aria-label="Nach Person filtern">
+            <option value="">Alle</option>
+            {people.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <Card className="overflow-hidden">
+          {entries.length === 0 && (
+            <p className="subhead px-4 py-4" style={{ color: "var(--label-2)" }}>
+              Noch keine Buchungen.
+            </p>
+          )}
+          {entries.map((e, i) => (
+            <Row key={e.id} last={i === entries.length - 1}>
+              <span className="subhead tabular w-12 shrink-0 font-semibold" style={{ color: e.points < 0 ? "var(--danger)" : "var(--success)" }}>
+                {e.points > 0 ? `+${e.points}` : `−${Math.abs(e.points)}`}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="subhead block truncate">{e.reason ?? (e.kind === "task" ? "Aufgabe" : "Buchung")}</span>
+                <span className="caption block" style={{ color: "var(--label-2)" }}>
+                  {name(e.personId)} · {fmt(e.at)}
+                  {e.kind === "manual" ? " · von Hand" : ""}
+                </span>
+              </span>
+              <button
+                onClick={() => void act({ op: "points.entryDelete", id: e.id }, "Buchung gelöscht.")}
+                className="press p-1.5"
+                aria-label="Buchung löschen"
+                style={{ color: "var(--danger)" }}
+              >
+                <IconTrash size={16} />
+              </button>
+            </Row>
+          ))}
+        </Card>
+        <p className="caption mt-2 px-1" style={{ color: "var(--label-3)" }}>
+          Eine gelöschte Aufgabenbuchung kommt nicht zurück, wenn die Aufgabe abgehakt bleibt.
+        </p>
+      </section>
+    </>
   );
 }
