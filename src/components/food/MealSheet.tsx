@@ -70,7 +70,7 @@ function Inner({ day, onClose, onNewRecipe }: { day: string; onClose: () => void
   };
 
   return (
-    <Sheet open onClose={onClose} title={dayLabel(day)}>
+    <Sheet open large onClose={onClose} title={dayLabel(day)}>
       <FieldLabel>Wer kocht?</FieldLabel>
       <div className="no-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4">
         {(state?.people ?? []).map((p) => (

@@ -130,6 +130,7 @@ function Editor({ target, onClose, onSaved }: { target: EditorTarget; onClose: (
 
   return (
     <Sheet
+      large
       open
       onClose={onClose}
       title={target.mode === "edit" ? "Rezept bearbeiten" : "Neues Rezept"}

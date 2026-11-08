@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { animate, AnimatePresence, motion, useDragControls, useIsPresent, useMotionValue, useReducedMotion } from "motion/react";
-import { pushSheet } from "@/lib/client/sheets";
+import { pushSheet, recentHandoff } from "@/lib/client/sheets";
 import { haptic } from "@/lib/client/haptics";
 import type { Person } from "@/lib/types";
 import { FALLBACK_COLOR } from "@/lib/types";
@@ -89,7 +89,7 @@ export function TabBar({ tab, onChange, badge }: { tab: Tab; onChange: (t: Tab) 
   const index = tabs.findIndex((t) => t.id === tab);
   return (
     <nav className="tabbar fixed inset-x-0 z-30 px-3" aria-label="Bereiche">
-      <div className="glass glass-strong relative mx-auto flex w-full max-w-md rounded-[30px] p-1.5">
+      <div className="glass glass-strong glass-live relative mx-auto flex w-full max-w-md rounded-[30px] p-1.5">
         {/* Linse unter dem aktiven Tab, gleitet per transform */}
         <span
           className="absolute top-1.5 bottom-1.5 left-1.5 rounded-[24px]"
@@ -383,6 +383,7 @@ export function SheetFrame({
   children,
   onSubmit,
   z = 40,
+  large = false,
 }: {
   label: string;
   onClose: () => void;
@@ -390,10 +391,14 @@ export function SheetFrame({
   children: ReactNode;
   onSubmit?: (e: FormEvent<HTMLFormElement>) => void;
   z?: number;
+  /** volle Höhe wie ein großes iOS-Blatt: springt nicht, wenn sich der Inhalt beim Tippen ändert */
+  large?: boolean;
 }) {
   useEscape(true, onClose);
   const reduce = useReducedMotion();
   const present = useIsPresent();
+  // kommt dieses Blatt aus einer Übergabe, steht es sofort da und blendet nur ein
+  const [handoff] = useState(recentHandoff);
   const controls = useDragControls();
   const dragY = useMotionValue(0);
   const panel = useRef<HTMLDivElement>(null);
@@ -485,9 +490,10 @@ export function SheetFrame({
       aria-label={label}
     >
       <motion.button
-        initial={{ opacity: 0 }}
+        initial={handoff ? { opacity: 1 } : { opacity: 0 }}
         animate={{ opacity: 1 }}
-        exit={{ opacity: 0, transition: { duration: 0.25 } }}
+        exit="exit"
+        variants={{ exit: () => ({ opacity: 0, transition: { duration: recentHandoff() ? 0 : 0.25 } }) }}
         transition={{ duration: 0.3 }}
         className="fixed inset-0 cursor-default"
         style={{ background: "var(--scrim)" }}
@@ -496,11 +502,17 @@ export function SheetFrame({
         tabIndex={-1}
       />
       <motion.div
-        className="relative flex max-h-[calc(100%-40px)] w-full max-w-md flex-col"
-        initial={reduce ? { opacity: 0 } : { y: "100%" }}
-        animate={reduce ? { opacity: 1 } : { y: 0 }}
-        exit={reduce ? { opacity: 0 } : { y: "105%", transition: { duration: 0.32, ease } }}
-        transition={{ duration: 0.46, ease }}
+        className={`relative flex w-full max-w-md flex-col ${large ? "h-[calc(100%-40px)]" : "max-h-[calc(100%-40px)]"}`}
+        // ganzes transform statt y: läuft auf der Grafikeinheit weiter, auch wenn der Inhalt gerade aufgebaut wird
+        initial={reduce ? { opacity: 0 } : handoff ? { opacity: 0, transform: "translateY(0%)" } : { opacity: 1, transform: "translateY(100%)" }}
+        animate={reduce ? { opacity: 1 } : { opacity: 1, transform: "translateY(0%)" }}
+        exit="exit"
+        variants={{
+          // erst beim Schließen entschieden: bei Übergabe nur ausblenden, sonst nach unten gleiten
+          exit: () =>
+            reduce || recentHandoff() ? { opacity: 0, transition: { duration: 0.26, ease: "easeOut" } } : { transform: "translateY(105%)", transition: { duration: 0.34, ease } },
+        }}
+        transition={{ duration: handoff ? 0.16 : 0.5, ease }}
       >
         <Panel
           ref={panel as never}
@@ -515,7 +527,7 @@ export function SheetFrame({
           onDragEnd={(_, info) => {
             if (info.offset.y > 110 || info.velocity.y > 500) onClose();
           }}
-          className="glass glass-strong flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-t-[30px]"
+          className="sheet-panel flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-t-[30px]"
         >
           <div
             data-sheet-grip
@@ -570,6 +582,7 @@ export function Sheet({
   trailing,
   children,
   z = 40,
+  large,
 }: {
   open: boolean;
   onClose: () => void;
@@ -578,6 +591,7 @@ export function Sheet({
   trailing?: ReactNode;
   children: ReactNode;
   z?: number;
+  large?: boolean;
 }) {
   return (
     <AnimatePresence>
@@ -587,6 +601,7 @@ export function Sheet({
           label={title}
           onClose={onClose}
           z={z}
+          large={large}
           header={
             <SheetHeader
               title={title}

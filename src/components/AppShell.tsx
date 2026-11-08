@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Activity, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { motion, useScroll, useTransform } from "motion/react";
 import { trackVisualViewport, useSheetDepth } from "@/lib/client/sheets";
 import { Toaster, toast } from "sonner";
@@ -161,7 +161,7 @@ function Main() {
       <main ref={content} className="relative isolate min-h-dvh" style={{ background: "var(--bg)" }}>
         <Ambient colors={ambient.slice(0, 3)} />
 
-        {tab === "heute" && (
+        <Keep tab="heute" current={tab}>
           <TodayView
             now={now}
             filter={filter}
@@ -175,8 +175,8 @@ function Main() {
             onOpenBoard={setBoardOpen}
             onVault={() => setVault(true)}
           />
-        )}
-        {tab === "kalender" && (
+        </Keep>
+        <Keep tab="kalender" current={tab}>
           <CalendarView
             now={now}
             filter={filter}
@@ -185,10 +185,17 @@ function Main() {
             onNew={(start, allDay) => setEditor({ mode: "new", start, allDay })}
             onEditTask={setTaskEdit}
           />
-        )}
-        {tab === "einkauf" && <ShoppingView focus={shopFocus} />}
-        {tab === "essen" && <FoodView key={foodDay ?? "plan"} initialDay={foodDay} />}
-        {tab === "aufgaben" && <TasksView filter={filter} setFilter={setFilter} onNew={() => setNewOpen(true)} onQuick={() => setQuickMenu(true)} onEdit={setTaskEdit} />}
+        </Keep>
+        <Keep tab="einkauf" current={tab}>
+          {/* neuer Schlüssel, wenn das Eingabefeld gleich den Fokus bekommen soll */}
+          <ShoppingView key={shopFocus ? "focus" : "list"} focus={shopFocus} />
+        </Keep>
+        <Keep tab="essen" current={tab}>
+          <FoodView key={foodDay ?? "plan"} initialDay={foodDay} />
+        </Keep>
+        <Keep tab="aufgaben" current={tab}>
+          <TasksView filter={filter} setFilter={setFilter} onNew={() => setNewOpen(true)} onQuick={() => setQuickMenu(true)} onEdit={setTaskEdit} />
+        </Keep>
       </main>
       <CompactTitle title={tabTitles[tab]} />
 
@@ -359,6 +366,17 @@ function CompactTitle({ title }: { title: string }) {
  * Solange ein Blatt offen ist, rückt der Inhalt wie in iOS als Karte nach hinten:
  * etwas kleiner, oben abgerundet, dahinter Schwarz. Die Tab-Leiste rückt mit.
  */
+/**
+ * Tabs bleiben nach dem ersten Besuch erhalten (versteckt, Effekte pausiert),
+ * damit ein Wechsel sofort da ist und nichts neu aufgebaut werden muss.
+ */
+const visited = new Set<Tab>();
+function Keep({ tab, current, children }: { tab: Tab; current: Tab; children: ReactNode }) {
+  if (tab === current) visited.add(tab);
+  if (!visited.has(tab)) return null;
+  return <Activity mode={tab === current ? "visible" : "hidden"}>{children}</Activity>;
+}
+
 function usePushBack(content: React.RefObject<HTMLElement | null>) {
   const depth = useSheetDepth();
   const open = depth > 0;
@@ -379,17 +397,13 @@ function applyPushBack(el: HTMLElement | null, open: boolean) {
     el.style.transformOrigin = `50% ${sy}px`;
     el.style.willChange = "transform";
     root.classList.add("sheet-open");
-    el.animate(
-      [
-        { transform: "none", clipPath: `inset(${sy}px 0px 0px 0px round 0px)` },
-        { transform: `translateY(14px) scale(${scale})`, clipPath: `inset(${sy}px 0px 0px 0px round 18px)` },
-      ],
-      { duration: 460, easing: ease, fill: "forwards" },
-    );
+    // Ecken fest abrunden und nur transform animieren: clip-path würde jedes Bild neu malen
+    el.style.clipPath = `inset(${sy}px 0px 0px 0px round 18px)`;
+    el.animate([{ transform: "none" }, { transform: `translateY(14px) scale(${scale})` }], { duration: 500, easing: ease, fill: "forwards" });
     if (bar) {
       const top = bar.getBoundingClientRect().top;
       bar.style.transformOrigin = `50% ${-top}px`;
-      bar.animate([{ transform: "none" }, { transform: `translateY(14px) scale(${scale})` }], { duration: 460, easing: ease, fill: "forwards" });
+      bar.animate([{ transform: "none" }, { transform: `translateY(14px) scale(${scale})` }], { duration: 500, easing: ease, fill: "forwards" });
     }
     return;
   }
@@ -402,9 +416,12 @@ function applyPushBack(el: HTMLElement | null, open: boolean) {
     a.updatePlaybackRate(1.35);
     a.reverse();
     void a.finished.then(() => {
+      // schon wieder ein Blatt offen: nichts abräumen
+      if (root.classList.contains("sheet-open")) return;
       node.getAnimations().forEach((x) => x.cancel());
       node.style.transformOrigin = "";
       node.style.willChange = "";
+      node.style.clipPath = "";
     });
   };
   back(el);

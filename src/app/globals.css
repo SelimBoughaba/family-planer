@@ -22,6 +22,7 @@
   --glass-shadow: 0 1px 2px rgba(20, 24, 40, 0.04), 0 10px 28px -12px rgba(20, 24, 40, 0.16);
   --blob-opacity: 0.07;
   --row-solid: rgba(255, 255, 255, 0.97);
+  --sheet-bg: #f7f8fa;
   --scrim: rgba(12, 14, 20, 0.28);
 
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
@@ -48,6 +49,7 @@
     --glass-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.7);
     --blob-opacity: 0.1;
     --row-solid: rgba(26, 27, 33, 0.97);
+    --sheet-bg: #1b1c21;
     --scrim: rgba(0, 0, 0, 0.5);
   }
 }
@@ -110,11 +112,10 @@ body {
 
 /* Liquid Glass: Brechung durch Blur und Sättigung, Lichtkante oben links, feine Kontur, weicher Schatten */
 @layer components {
+  /* Glas ohne Live-Unschärfe: sieht gleich aus, kostet beim Scrollen und Bewegen fast nichts */
   .glass {
     position: relative;
     background: var(--glass);
-    -webkit-backdrop-filter: blur(24px) saturate(180%);
-    backdrop-filter: blur(24px) saturate(180%);
     box-shadow:
       0 0 0 0.5px var(--glass-outline),
       inset 0 -1px 0 0 var(--glass-shade),
@@ -138,6 +139,18 @@ body {
   .glass-strong {
     background: var(--glass-strong);
   }
+  /* echtes Milchglas nur für Leisten, die über bewegtem Inhalt schweben */
+  .glass-live {
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+  }
+  /* Fläche von Blättern: fest, damit das Hereingleiten nichts neu berechnen muss */
+  .sheet-panel {
+    background: var(--sheet-bg);
+    box-shadow:
+      0 0 0 0.5px var(--glass-outline),
+      0 -12px 40px -16px rgba(0, 0, 0, 0.35);
+  }
   /* feste Fläche für Zeilen in Listen, wenn Glas zu unruhig wäre */
   .surface {
     background: var(--row-solid);
@@ -146,7 +159,7 @@ body {
 
 /* Fallback für Geräte ohne backdrop-filter */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .glass {
+  .glass-live {
     background: var(--glass-strong);
   }
 }
@@ -232,25 +245,13 @@ a {
   border-radius: 10px;
 }
 
-/* Hintergrundlicht: ruhig und langsam, gibt dem Glas etwas zum Brechen */
-@keyframes drift {
-  0% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  50% {
-    transform: translate3d(5vw, -3vh, 0) scale(1.08);
-  }
-  100% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-}
-
 .blob {
   position: absolute;
   border-radius: 9999px;
-  filter: blur(70px);
+  /* weiches Licht als Verlauf statt Filter: wird einmal gemalt und steht dann still */
   opacity: var(--blob-opacity);
-  animation: drift 40s ease-in-out infinite;
+  -webkit-mask-image: radial-gradient(closest-side, #000 0%, rgba(0, 0, 0, 0.55) 45%, transparent 100%);
+  mask-image: radial-gradient(closest-side, #000 0%, rgba(0, 0, 0, 0.55) 45%, transparent 100%);
   transition: background-color 900ms ease;
 }
 

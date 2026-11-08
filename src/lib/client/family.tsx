@@ -343,6 +343,11 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
   const [tick, setTick] = useState(0);
   const pending = useRef(0);
   const win = useRef(initialWindow());
+  const serverSnap = useRef<{ text: string; state: AppState } | null>(null);
+  const stateRef = useRef<AppState | null>(null);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   // gewähltes Profil für private Pinnwände; als Ref, damit refresh stabil bleibt
   const meRef = useRef<string | null>(null);
@@ -356,9 +361,17 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (!res.ok) throw new Error(String(res.status));
-      const data = (await res.json()) as AppState;
+      const text = await res.text();
       // während eigene Änderungen unterwegs sind, nicht mit älterem Stand überschreiben
-      if (pending.current === 0) setState(data);
+      if (pending.current === 0) {
+        // unveränderter Stand: nichts neu zeichnen, damit Scrollen und Tippen ungestört bleiben
+        const snap = serverSnap.current;
+        if (!(snap && snap.text === text && stateRef.current === snap.state)) {
+          const data = JSON.parse(text) as AppState;
+          serverSnap.current = { text, state: data };
+          setState(data);
+        }
+      }
       setError(null);
     } catch {
       setError("Keine Verbindung. Änderungen werden angezeigt, sobald das Netz wieder da ist.");

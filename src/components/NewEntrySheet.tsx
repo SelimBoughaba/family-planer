@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { describeWhen, parseQuick, quickStart } from "@/lib/quick";
 import { useFamily } from "@/lib/client/family";
+import { handOffSheet } from "@/lib/client/sheets";
 import { localDay, recurrenceLabel, type Recurrence, type Task } from "@/lib/types";
 import { AnimatePresence, Avatar, Chips, Segmented, SheetFrame, Switch } from "./ui";
 import { IconTrash } from "./icons";
@@ -113,6 +114,7 @@ function TaskForm({ onClose, onEvent, task }: { onClose: () => void; onEvent?: (
     // erkannte Termine und Einkäufe direkt dorthin
     if (quick && detected && quick.kind === "event" && onEvent) {
       const { start, allDay, duration } = quickStart(quick);
+      handOffSheet();
       onClose();
       onEvent({
         title: quick.title || title.trim(),
@@ -168,6 +170,7 @@ function TaskForm({ onClose, onEvent, task }: { onClose: () => void; onEvent?: (
 
   return (
     <SheetFrame
+      large
       label={editing ? "Aufgabe bearbeiten" : "Neuer Eintrag"}
       onClose={onClose}
       onSubmit={(e) => {
@@ -193,6 +196,7 @@ function TaskForm({ onClose, onEvent, task }: { onClose: () => void; onEvent?: (
             onChange={(k) => {
               if (k === "event") {
                 const t = quick?.title || title;
+                handOffSheet();
                 onClose();
                 if (quick && (quick.day || quick.time)) {
                   const { start, allDay, duration } = quickStart(quick);

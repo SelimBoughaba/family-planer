@@ -168,6 +168,7 @@ function Editor({ target, onClose }: { target: EditorTarget; onClose: () => void
   return (
     <>
       <SheetFrame
+        large
         label={editing ? "Termin bearbeiten" : "Neuer Termin"}
         onClose={onClose}
         onSubmit={(e) => {

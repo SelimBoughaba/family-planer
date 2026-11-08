@@ -19,6 +19,18 @@ export function pushSheet() {
   };
 }
 
+/**
+ * Übergabe von einem Blatt an das nächste (Aufgabe zu Termin): das neue steht sofort da,
+ * das alte blendet dahinter aus, statt dass zwei Blätter aneinander vorbeifahren.
+ */
+let handoffAt = -1e9;
+export function handOffSheet() {
+  handoffAt = performance.now();
+}
+export function recentHandoff() {
+  return typeof performance !== "undefined" && performance.now() - handoffAt < 500;
+}
+
 export function useSheetDepth() {
   return useSyncExternalStore(
     (cb) => {
