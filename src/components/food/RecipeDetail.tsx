@@ -33,7 +33,8 @@ export function RecipeDetail({ recipe, onClose, onEdit, forDay = null }: { recip
 }
 
 function Detail({ recipe, onClose, onEdit, forDay }: { recipe: Recipe; onClose: () => void; onEdit: (r: Recipe) => void; forDay: string | null }) {
-  const { state, run } = useFamily();
+  const { state, run, me } = useFamily();
+  const canDelete = me?.canDelete !== false;
   const addToShopping = useAddToShopping();
   // aus dem Wochenplan geöffnet: so viele Portionen, wie an dem Tag mitessen
   const [eatersCount] = useState(() => (forDay ? eaters(presenceFor(forDay, state?.people ?? [], state?.attendance ?? [], state?.events ?? [])) : null));
@@ -210,13 +211,15 @@ function Detail({ recipe, onClose, onEdit, forDay }: { recipe: Recipe; onClose: 
         </a>
       )}
 
-      <button
-        onClick={() => setConfirmDelete(true)}
-        className="press body mt-8 flex w-full items-center justify-center gap-2 rounded-[14px] py-3 font-medium"
-        style={{ color: "var(--danger)", background: "color-mix(in oklab, var(--danger) 10%, transparent)" }}
-      >
-        <IconTrash size={18} /> Rezept löschen
-      </button>
+      {canDelete && (
+        <button
+          onClick={() => setConfirmDelete(true)}
+          className="press body mt-8 flex w-full items-center justify-center gap-2 rounded-[14px] py-3 font-medium"
+          style={{ color: "var(--danger)", background: "color-mix(in oklab, var(--danger) 10%, transparent)" }}
+        >
+          <IconTrash size={18} /> Rezept löschen
+        </button>
+      )}
 
       <ContextMenu
         open={plan}

@@ -9,7 +9,22 @@ export type Person = {
   sort: number;
   notifyPrefs: NotifyPrefs;
   isParent: boolean;
+  canDelete: boolean;
 };
+
+/** Operationen, die etwas löschen; brauchen das Löschrecht der Person */
+export const DELETE_OPS = new Set<Mutation["op"]>([
+  "task.delete",
+  "event.delete",
+  "item.delete",
+  "recipe.delete",
+  "meal.clear",
+  "reward.delete",
+  "board.delete",
+  "bitem.delete",
+  "bitem.purge",
+]);
+export const NO_DELETE_MESSAGE = "Löschen ist für dein Profil ausgeschaltet";
 
 export type CalEvent = {
   id: string;

@@ -115,7 +115,8 @@ export function TaskRow({
 /** Abhaken mit Meldung und Rückgängig; Wieder-Öffnen ohne Meldung */
 export function toggleTask(run: ReturnType<typeof useFamily>["run"], t: Task, today: string) {
   void run({ op: "task.toggle", id: t.id, done: !t.done, today });
-  if (t.done) return;
+  // ohne Netz wird nichts gespeichert, dann keine Erfolgsmeldung
+  if (t.done || (typeof navigator !== "undefined" && navigator.onLine === false)) return;
   toast(`${t.title} erledigt`, {
     description: t.points > 0 ? `+${t.points} ${t.points === 1 ? "Punkt" : "Punkte"}` : undefined,
     action: { label: "Rückgängig", onClick: () => void run({ op: "task.toggle", id: t.id, done: false, today }) },
@@ -124,7 +125,8 @@ export function toggleTask(run: ReturnType<typeof useFamily>["run"], t: Task, to
 
 /** Menü bei langem Druck und Auswahl, wer übernimmt */
 export function useTaskMenus(onEdit: (t: Task) => void) {
-  const { state, run, person } = useFamily();
+  const { state, run, person, me } = useFamily();
+  const canDelete = me?.canDelete !== false;
   const [menu, setMenu] = useState<Task | null>(null);
   const [assign, setAssign] = useState<Task | null>(null);
   const today = localDay();
@@ -139,6 +141,7 @@ export function useTaskMenus(onEdit: (t: Task) => void) {
       label: "Löschen",
       icon: <IconTrash size={18} />,
       destructive: true,
+      hidden: !canDelete,
       onSelect: () => {
         void run({ op: "task.delete", id: t.id });
         toast(`${t.title} gelöscht`, {

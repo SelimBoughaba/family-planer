@@ -24,7 +24,7 @@ const maskIp = (ip: string) => (ip.includes(".") ? ip.split(".").slice(0, 2).joi
 export async function ownerStatus() {
   const sql = db();
   const [people, subs, counts, backups, errors, failed, lastOk, heartbeat] = await Promise.all([
-    sql`select id, name, color, sort, calendar_token is not null as calendar_active from people order by sort, name`,
+    sql`select id, name, color, sort, can_delete, calendar_token is not null as calendar_active from people order by sort, name`,
     sql`select id, person_id, user_agent, created_at, last_success from push_subscriptions order by created_at`,
     sql`select
       (select count(*) from events)::int as events,
@@ -56,6 +56,7 @@ export async function ownerStatus() {
       color: p.color,
       sort: p.sort,
       calendarActive: p.calendar_active,
+      canDelete: p.can_delete !== false,
       devices: subs
         .filter((s) => s.person_id === p.id)
         .map((s) => ({ id: s.id, label: deviceLabel(s.user_agent as string | null), createdAt: s.created_at, lastSuccess: s.last_success })),
@@ -125,7 +126,8 @@ export type OwnerAction =
   | { op: "points.adjust"; personId: string; points: number; reason?: string }
   | { op: "points.entryDelete"; id: number }
   | { op: "points.reset"; personId: string }
-  | { op: "person.setParent"; id: string; isParent: boolean };
+  | { op: "person.setParent"; id: string; isParent: boolean }
+  | { op: "person.setCanDelete"; id: string; canDelete: boolean };
 
 export class OwnerInputError extends Error {}
 
@@ -272,6 +274,11 @@ export async function ownerAction(a: OwnerAction): Promise<Record<string, unknow
     case "person.setParent": {
       if (!isId(a.id)) throw new OwnerInputError("Unbekannte Person.");
       await sql`update people set is_parent = ${!!a.isParent} where id = ${a.id}`;
+      return {};
+    }
+    case "person.setCanDelete": {
+      if (!isId(a.id)) throw new OwnerInputError("Unbekannte Person.");
+      await sql`update people set can_delete = ${!!a.canDelete} where id = ${a.id}`;
       return {};
     }
     default:

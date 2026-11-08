@@ -52,7 +52,7 @@ export function PointsView() {
   const history = info.claims.filter((c) => c.status !== "pending").slice(0, 12);
   const isParent = me.isParent;
   const parents = people.filter((p) => p.isParent).map((p) => p.name);
-  const canRemove = (r: Reward) => isParent || me.name === "Selim" || r.createdBy === me.id;
+  const canRemove = (r: Reward) => me.canDelete !== false && (isParent || me.name === "Selim" || r.createdBy === me.id);
   const removable = info.rewards.some(canRemove);
   const inEdit = editing && removable;
   const remove = (r: Reward) => {

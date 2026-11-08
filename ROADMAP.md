@@ -26,8 +26,10 @@
 - Design „Ruhig mit Liquid Glass“ (motion, Sonner, Rückgängig), Verwaltung aus der App, Belohnungen löschen, Aufgaben „für alle“
 - Countdowns in Heute (Schalter im Termin, Emoji, Stapel zum Wischen, live am letzten Tag, Konfetti), Tresor mit sechsstelliger PIN (Geschenkideen, geheime Notizen, eigene API, Sperre nach Fehlversuchen, schließt nach 10 Minuten und beim App-Wechsel)
 - Pinnwand-Auswahl als Kachelübersicht, private Pinnwände (Sichtschutz pro Profil), Punkte in der Verwaltung (gutschreiben, abziehen, Buchung löschen, auf 0 setzen, Eltern-Recht), Aufgaben auf Wunsch im Kalender (abhakbar), Orte mit Adresssuche über Photon (Server-Proxy) und Öffnen in Apple Karten, Koordinaten auch im Kalender-Abo
+- Flüssiger (Blätter auf der Grafikeinheit, feste Höhe, Tabs bleiben geladen), Aufgabe/Termin-Leiste in beiden Blättern, Termine löschen mit Rückfrage und Rückgängig
+- Löschrecht pro Person (Verwaltung, Samira und Yasmina zunächst aus, Server prüft), Offline-Start mit letztem Stand und Einkauf mit Warteschlange (Idee 9)
 
 ## Als Nächstes
-- Offline-Einkauf (Idee 9) und Geburtstage (Idee 11), bewusst zurückgestellt
+- Geburtstage (Idee 11), bewusst zurückgestellt
 
 ## Vorgemerkt

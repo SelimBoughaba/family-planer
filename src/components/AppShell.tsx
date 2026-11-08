@@ -1,10 +1,10 @@
 "use client";
 
 import { Activity, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { motion, useScroll, useTransform } from "motion/react";
+import { AnimatePresence, motion, useScroll, useTransform } from "motion/react";
 import { trackVisualViewport, useSheetDepth } from "@/lib/client/sheets";
 import { Toaster, toast } from "sonner";
-import { FamilyProvider, useFamily } from "@/lib/client/family";
+import { clearOfflineData, FamilyProvider, useFamily } from "@/lib/client/family";
 import { Ambient, Avatar, ContextMenu, TabBar, useNow, type Tab } from "./ui";
 import { TodayView } from "./TodayView";
 import { ShoppingView } from "./ShoppingView";
@@ -153,6 +153,7 @@ function Main() {
 
   const logout = async () => {
     await fetch("/api/logout", { method: "POST" });
+    clearOfflineData();
     setMe(null);
     window.location.reload();
   };
@@ -199,6 +200,7 @@ function Main() {
         </Keep>
       </main>
       <CompactTitle title={tabTitles[tab]} />
+      <OfflinePill />
 
       <Toaster
         position="bottom-center"
@@ -378,6 +380,38 @@ function CompactTitle({ title }: { title: string }) {
  * Solange ein Blatt offen ist, rückt der Inhalt wie in iOS als Karte nach hinten:
  * etwas kleiner, oben abgerundet, dahinter Schwarz. Die Tab-Leiste rückt mit.
  */
+/** Kleiner Hinweis oben, solange kein Netz da ist oder Einkäufe noch warten */
+function OfflinePill() {
+  const { offline, queued } = useFamily();
+  const show = offline || queued > 0;
+  return (
+    <AnimatePresence>
+      {show && (
+        <motion.div
+          key="offline"
+          className="pointer-events-none fixed inset-x-0 z-30 flex justify-center"
+          style={{ top: "calc(env(safe-area-inset-top) + 6px)" }}
+          initial={{ opacity: 0, transform: "translateY(-8px) scale(0.96)" }}
+          animate={{ opacity: 1, transform: "translateY(0px) scale(1)" }}
+          exit={{ opacity: 0, transform: "translateY(-8px) scale(0.96)" }}
+          transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+          role="status"
+        >
+          <span className="glass glass-strong glass-live caption flex items-center gap-1.5 rounded-full px-3 py-1.5 font-semibold">
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: offline ? "var(--warning, #FF9F0A)" : "var(--success)" }} aria-hidden />
+            {offline ? "Offline" : "Wird abgeglichen"}
+            {queued > 0 && (
+              <span style={{ color: "var(--label-2)" }}>
+                · {queued} {queued === 1 ? "Einkauf wartet" : "Einkäufe warten"}
+              </span>
+            )}
+          </span>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
 /**
  * Tabs bleiben nach dem ersten Besuch erhalten (versteckt, Effekte pausiert),
  * damit ein Wechsel sofort da ist und nichts neu aufgebaut werden muss.

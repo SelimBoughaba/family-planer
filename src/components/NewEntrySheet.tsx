@@ -53,6 +53,7 @@ export function NewEntrySheet({
 
 function TaskForm({ onClose, onEvent, task, draftTitle }: { onClose: () => void; onEvent?: (d: EventDraft) => void; task: Task | null; draftTitle?: string }) {
   const { state, me, run } = useFamily();
+  const canDelete = me?.canDelete !== false;
   const kind: Kind = "task";
   const editing = !!task;
   const [title, setTitle] = useState(task?.title ?? draftTitle ?? "");
@@ -467,7 +468,7 @@ function TaskForm({ onClose, onEvent, task, draftTitle }: { onClose: () => void;
         </>
       )}
 
-      {editing && (
+      {editing && canDelete && (
         <button
           type="button"
           onClick={() => void remove()}

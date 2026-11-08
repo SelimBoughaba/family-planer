@@ -25,6 +25,7 @@ export function BoardPicker({
   onTrash,
   onDelete,
   onPrivacy,
+  allowDelete = true,
 }: {
   open: boolean;
   onClose: () => void;
@@ -38,11 +39,12 @@ export function BoardPicker({
   onTrash: () => void;
   onDelete: () => void;
   onPrivacy: (priv: boolean) => void;
+  allowDelete?: boolean;
 }) {
   const board = boards.find((b) => b.id === current);
   const shared = boards.filter((b) => !b.owner).length;
   const isPrivate = !!board?.owner;
-  const canDelete = isPrivate ? board?.owner === meId : shared > 1;
+  const canDelete = allowDelete && (isPrivate ? board?.owner === meId : shared > 1);
   const canPrivate = !!meId && (isPrivate || shared > 1);
 
   return (

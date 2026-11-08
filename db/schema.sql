@@ -302,3 +302,13 @@ alter table events add column if not exists place_lon double precision;
 alter table tasks add column if not exists place text;
 alter table tasks add column if not exists place_lat double precision;
 alter table tasks add column if not exists place_lon double precision;
+-- Löschrecht pro Person (in der Verwaltung schaltbar)
+alter table people add column if not exists can_delete boolean not null default true;
+-- einmalig: Samira und Yasmina dürfen nichts löschen (danach nur noch über die Verwaltung)
+do $$
+begin
+  if not exists (select 1 from app_meta where key = 'init_can_delete') then
+    update people set can_delete = false where name in ('Samira', 'Yasmina');
+    insert into app_meta (key, value) values ('init_can_delete', '"done"'::jsonb);
+  end if;
+end $$;

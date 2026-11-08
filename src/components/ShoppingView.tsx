@@ -13,7 +13,8 @@ import { AmountDial } from "./AmountDial";
 import { IconCheck, IconPlus, IconTrash, IconChevron } from "./icons";
 
 export function ShoppingView({ focus = false }: { focus?: boolean }) {
-  const { state, run, person } = useFamily();
+  const { state, run, person, me } = useFamily();
+  const canDelete = me?.canDelete !== false;
   const [draft, setDraft] = useState("");
   const [showDone, setShowDone] = useState(false);
   const [menu, setMenu] = useState<Item | null>(null);
@@ -93,7 +94,7 @@ export function ShoppingView({ focus = false }: { focus?: boolean }) {
                   <ListItem key={it.id}>
                     <SwipeRow
                       leading={{ label: "Im Wagen", color: "var(--success)", icon: <IconCheck size={18} />, onTrigger: () => toggle(it) }}
-                      trailing={{ label: "Löschen", color: "var(--danger)", icon: <IconTrash size={18} />, onTrigger: () => remove(it) }}
+                      trailing={canDelete ? { label: "Löschen", color: "var(--danger)", icon: <IconTrash size={18} />, onTrigger: () => remove(it) } : undefined}
                       onLongPress={() => setMenu(it)}
                     >
                       <div className="row-press flex items-center gap-3 px-4 py-3" style={{ borderTop: idx ? "0.5px solid var(--separator)" : "none" }}>
@@ -183,7 +184,7 @@ export function ShoppingView({ focus = false }: { focus?: boolean }) {
                 { label: "Im Wagen", icon: <IconCheck size={18} />, onSelect: () => toggle(menu) },
                 { label: "Menge ändern", onSelect: () => setTimeout(() => setDial(menu), 50) },
                 { label: "Andere Abteilung", onSelect: () => setTimeout(() => setMoveFor(menu), 50) },
-                { label: "Löschen", icon: <IconTrash size={18} />, destructive: true, onSelect: () => remove(menu) },
+                ...(canDelete ? [{ label: "Löschen", icon: <IconTrash size={18} />, destructive: true, onSelect: () => remove(menu) }] : []),
               ]
             : []
         }

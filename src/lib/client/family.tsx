@@ -7,6 +7,38 @@ import { FALLBACK_COLOR, localDay } from "@/lib/types";
 
 const SYNC_TOPIC = "familienplaner-sync";
 const ME_KEY = "fp_person";
+const STATE_KEY = "fp_state_v1";
+const QUEUE_KEY = "fp_queue_v1";
+
+/** Einkauf geht auch ohne Netz: diese Änderungen warten und werden später nachgereicht */
+const offlineOk = (m: Mutation) => m.op.startsWith("item.");
+
+type Queued = Mutation & { by: string | null };
+function readQueue(): Queued[] {
+  try {
+    const q = JSON.parse(localStorage.getItem(QUEUE_KEY) ?? "[]");
+    return Array.isArray(q) ? q : [];
+  } catch {
+    return [];
+  }
+}
+function writeQueue(q: Queued[]) {
+  try {
+    if (q.length) localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
+    else localStorage.removeItem(QUEUE_KEY);
+  } catch {}
+}
+
+/** Beim Abmelden: zwischengespeicherten Stand, Warteschlange und App-Hülle löschen */
+export function clearOfflineData() {
+  try {
+    localStorage.removeItem(STATE_KEY);
+    localStorage.removeItem(QUEUE_KEY);
+  } catch {}
+  navigator.serviceWorker?.controller?.postMessage("fp-clear");
+}
+
+class Offline extends Error {}
 
 type Ctx = {
   state: AppState | null;
@@ -20,6 +52,9 @@ type Ctx = {
   /** Kalender meldet, welcher Zeitraum gebraucht wird; lädt bei Bedarf nach */
   ensureRange: (from: Date, to: Date) => void;
   syncing: boolean;
+  /** kein Netz; der Einkauf sammelt Änderungen in queued */
+  offline: boolean;
+  queued: number;
   /** zählt bei jeder Änderung von anderswo hoch; die Pinnwand lädt daraufhin nach */
   tick: number;
 };
@@ -344,6 +379,13 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
   const pending = useRef(0);
   const win = useRef(initialWindow());
   const serverSnap = useRef<{ text: string; state: AppState } | null>(null);
+  const [offline, setOffline] = useState(false);
+  const [queued, setQueued] = useState(0);
+  const queue = useRef<Queued[]>([]);
+  const flushing = useRef(false);
+  const flushRef = useRef<(() => Promise<void>) | null>(null);
+  /** Stand vom Server plus alles, was noch in der Warteschlange wartet */
+  const withQueue = useCallback((data: AppState) => queue.current.reduce((st, m) => optimistic(st, m, m.by), data), []);
   const stateRef = useRef<AppState | null>(null);
   useEffect(() => {
     stateRef.current = state;
@@ -362,28 +404,78 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
       }
       if (!res.ok) throw new Error(String(res.status));
       const text = await res.text();
+      setOffline(false);
       // während eigene Änderungen unterwegs sind, nicht mit älterem Stand überschreiben
       if (pending.current === 0) {
         // unveränderter Stand: nichts neu zeichnen, damit Scrollen und Tippen ungestört bleiben
         const snap = serverSnap.current;
         if (!(snap && snap.text === text && stateRef.current === snap.state)) {
-          const data = JSON.parse(text) as AppState;
+          const data = withQueue(JSON.parse(text) as AppState);
           serverSnap.current = { text, state: data };
           setState(data);
+          // letzter Stand für den Start ohne Netz (der Tresor ist nie Teil davon)
+          try {
+            localStorage.setItem(STATE_KEY, JSON.stringify({ me: meRef.current, text }));
+          } catch {}
         }
       }
       setError(null);
-    } catch {
-      setError("Keine Verbindung. Änderungen werden angezeigt, sobald das Netz wieder da ist.");
+      if (queue.current.length) void flushRef.current?.();
+    } catch (err) {
+      if (err instanceof TypeError || !navigator.onLine) {
+        // kein Netz: ruhig oben anzeigen statt Fehlermeldung
+        setOffline(true);
+      } else setError("Keine Verbindung. Änderungen werden angezeigt, sobald das Netz wieder da ist.");
     }
-  }, []);
+  }, [withQueue]);
+
+  /** Wartende Einkaufs-Änderungen der Reihe nach nachreichen */
+  const flush = useCallback(async () => {
+    if (flushing.current || !queue.current.length) return;
+    flushing.current = true;
+    try {
+      while (queue.current.length) {
+        const m = queue.current[0];
+        let res: Response;
+        try {
+          res = await fetch("/api/mutate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(m) });
+        } catch {
+          setOffline(true);
+          return;
+        }
+        if (res.status === 401) return;
+        // angekommen oder vom Server abgelehnt: so oder so aus der Schlange
+        queue.current = queue.current.slice(1);
+        writeQueue(queue.current);
+        setQueued(queue.current.length);
+      }
+      serverSnap.current = null;
+      setOffline(false);
+      await refresh();
+    } finally {
+      flushing.current = false;
+    }
+  }, [refresh]);
+  useEffect(() => {
+    flushRef.current = flush;
+  }, [flush]);
 
   useEffect(() => {
-    // erster Abruf beim Start
-    const first = setTimeout(refresh, 0);
+    // erster Abruf beim Start; vorher den letzten Stand zeigen, falls das Netz fehlt
+    const first = setTimeout(() => {
+      queue.current = readQueue();
+      setQueued(queue.current.length);
+      try {
+        const saved = JSON.parse(localStorage.getItem(STATE_KEY) ?? "null") as { me: string | null; text: string } | null;
+        if (saved && saved.me === (localStorage.getItem(ME_KEY) ?? null) && !stateRef.current) setState(withQueue(JSON.parse(saved.text) as AppState));
+      } catch {}
+      void refresh();
+    }, 0);
     const onVisible = () => document.visibilityState === "visible" && refresh();
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("online", onVisible);
+    const onOffline = () => setOffline(true);
+    window.addEventListener("offline", onOffline);
     const poll = setInterval(() => document.visibilityState === "visible" && refresh(), 30000);
 
     // Live-Signal: andere Geräte melden Änderungen, wir laden nach
@@ -409,10 +501,11 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
       clearTimeout(first);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("online", onVisible);
+      window.removeEventListener("offline", onOffline);
       clearInterval(poll);
       cleanup();
     };
-  }, [refresh]);
+  }, [refresh, withQueue]);
 
   const ensureRange = useCallback(
     (from: Date, to: Date) => {
@@ -433,7 +526,8 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
   const color = useCallback((id: string | null | undefined) => person(id)?.color ?? FALLBACK_COLOR, [person]);
   useEffect(() => {
     meRef.current = meId;
-    void refresh();
+    const t = setTimeout(() => void refresh(), 0);
+    return () => clearTimeout(t);
   }, [meId, refresh]);
 
   const me = (meId && person(meId)) || null;
@@ -450,15 +544,38 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
     async (input: Mutation) => {
       // neue Aufgaben und Artikel bekommen ihre ID schon hier, so bleibt die Zeile beim Nachladen dieselbe
       const m = (input.op === "task.create" || input.op === "item.create") && !input.id && typeof crypto?.randomUUID === "function" ? { ...input, id: crypto.randomUUID() } : input;
+      const before = stateRef.current;
       setState((s) => (s ? optimistic(s, m, meId) : s));
+      // Einkauf ohne Netz: in die Warteschlange, später nachreichen
+      const enqueue = () => {
+        queue.current = [...queue.current, { ...m, by: meId } as Queued];
+        writeQueue(queue.current);
+        setQueued(queue.current.length);
+        setOffline(true);
+        // Netz ist eigentlich da (nur noch Älteres in der Schlange): gleich nachreichen
+        if (typeof navigator !== "undefined" && navigator.onLine) void flushRef.current?.();
+        return true;
+      };
+      if (offlineOk(m) && (queue.current.length > 0 || (typeof navigator !== "undefined" && navigator.onLine === false))) return enqueue();
       pending.current++;
       setSyncing(true);
       try {
-        const res = await fetch("/api/mutate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...m, by: meId }),
-        });
+        let res: Response;
+        try {
+          if (typeof navigator !== "undefined" && navigator.onLine === false) throw new Offline();
+          res = await fetch("/api/mutate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...m, by: meId }),
+          });
+        } catch {
+          if (offlineOk(m)) return enqueue();
+          // anderes ohne Netz: zurücknehmen und ehrlich sagen
+          setState(before);
+          setOffline(true);
+          setError("Ohne Internet geht nur der Einkauf. Die Änderung wurde nicht gespeichert.");
+          return false;
+        }
         if (res.status === 401) {
           window.location.reload();
           return false;
@@ -469,9 +586,6 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
           return false;
         }
         return true;
-      } catch {
-        setError("Keine Verbindung, die Änderung wurde nicht gespeichert.");
-        return false;
       } finally {
         pending.current--;
         if (pending.current === 0) {
@@ -484,8 +598,8 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ state, error, me, setMe, person, color, run, refresh, ensureRange, syncing, tick }),
-    [state, error, me, setMe, person, color, run, refresh, ensureRange, syncing, tick],
+    () => ({ state, error, me, setMe, person, color, run, refresh, ensureRange, syncing, offline, queued, tick }),
+    [state, error, me, setMe, person, color, run, refresh, ensureRange, syncing, offline, queued, tick],
   );
   return <FamilyCtx.Provider value={value}>{children}</FamilyCtx.Provider>;
 }

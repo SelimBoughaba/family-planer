@@ -1,7 +1,7 @@
 import "server-only";
 import { randomBytes, randomUUID } from "node:crypto";
 import { db } from "./db";
-import { nextInRotation } from "@/lib/types";
+import { DELETE_OPS, NO_DELETE_MESSAGE, nextInRotation } from "@/lib/types";
 import type { TaskFields, AppState, CalEvent, EventFields, EventRecurrence, Item, Meal, Mutation, Person, Recipe, RecipeFields, Recurrence, Task } from "@/lib/types";
 import { aiInfo } from "./ai";
 import { getLists } from "./lists";
@@ -28,6 +28,7 @@ const toPerson = (r: Row): Person => ({
   sort: r.sort as number,
   notifyPrefs: { invited: true, assigned: true, weekly: true, ...((r.notify_prefs as object) ?? {}) },
   isParent: !!r.is_parent,
+  canDelete: r.can_delete !== false,
 });
 const num = (v: unknown) => (v == null ? null : Number(v));
 const toEvent = (r: Row): CalEvent => ({
@@ -253,6 +254,12 @@ function eventFields(m: EventFields) {
 
 /** Führt eine Änderung aus und gibt den betroffenen Bereich zurück */
 export async function mutate(m: Mutation, by: string | null): Promise<string> {
+  // Löschen nur mit Recht; ohne gewähltes Profil wird nichts gelöscht
+  if (DELETE_OPS.has(m.op)) {
+    const id = by && /^[0-9a-f-]{36}$/i.test(by) ? by : null;
+    const [p] = id ? await db()`select can_delete from people where id = ${id}` : [];
+    if (!p || p.can_delete === false) throw new InvalidInput(NO_DELETE_MESSAGE);
+  }
   if (m.op.startsWith("reward.") || m.op.startsWith("claim.")) {
     try {
       return await mutatePoints(m, by && /^[0-9a-f-]{36}$/i.test(by) ? by : null);

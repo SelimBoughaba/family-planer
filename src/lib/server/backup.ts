@@ -39,7 +39,7 @@ export async function snapshot(): Promise<Snapshot> {
       throw new Error(`Sicherung, Schritt ${name}: ${(err as Error).message}`);
     }
   };
-  const people = await step("Personen", () => sql`select id, name, color, sort, notify_prefs, is_parent, created_at from people order by sort`);
+  const people = await step("Personen", () => sql`select id, name, color, sort, notify_prefs, is_parent, can_delete, created_at from people order by sort`);
   const events = await step(
     "Termine",
     () =>
@@ -158,7 +158,8 @@ export async function restore(data: unknown) {
       await tx`insert into people (id, name, color, sort, notify_prefs, is_parent, created_at)
         values (${p.id as string}, ${p.name as string}, ${(p.color as string) ?? null}, ${(p.sort as number) ?? 0}, ${tx.json((p.notify_prefs ?? { invited: true, assigned: true }) as never)}, ${!!p.is_parent}, ${(p.created_at as string) ?? new Date().toISOString()})
         on conflict (id) do update set name = excluded.name, color = excluded.color, sort = excluded.sort, notify_prefs = excluded.notify_prefs,
-          is_parent = ${"is_parent" in p ? !!p.is_parent : tx`people.is_parent`}`;
+          is_parent = ${"is_parent" in p ? !!p.is_parent : tx`people.is_parent`},
+          can_delete = ${"can_delete" in p ? p.can_delete !== false : tx`people.can_delete`}`;
     }
     for (const e of d.tables.events) {
       await tx`insert into events (id, title, place, place_lat, place_lon, notes, starts_at, ends_at, all_day, people, recurrence, recurrence_until, exdates, reminders, countdown, countdown_emoji, created_by, created_at, updated_at)

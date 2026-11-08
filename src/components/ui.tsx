@@ -297,6 +297,8 @@ export type MenuAction = {
   label: string;
   icon?: ReactNode;
   destructive?: boolean;
+  /** ausgeblendet, zum Beispiel ohne Löschrecht */
+  hidden?: boolean;
   onSelect: () => void;
 };
 
@@ -334,23 +336,25 @@ export function ContextMenu({ open, onClose, preview, actions }: { open: boolean
             className="glass glass-strong max-h-[55dvh] w-full max-w-[260px] self-start overflow-y-auto rounded-[18px] sm:self-center"
             style={{ transformOrigin: "left top" }}
           >
-            {actions.map((a, i) => (
-              <button
-                key={a.label}
-                onClick={() => {
-                  a.onSelect();
-                  onClose();
-                }}
-                className="body flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors duration-100 active:bg-[var(--fill)]"
-                style={{
-                  color: a.destructive ? "var(--danger)" : "var(--label)",
-                  borderTop: i ? "0.5px solid var(--separator)" : "none",
-                }}
-              >
-                {a.label}
-                <span style={{ color: a.destructive ? "var(--danger)" : "var(--label-2)" }}>{a.icon}</span>
-              </button>
-            ))}
+            {actions
+              .filter((a) => !a.hidden)
+              .map((a, i) => (
+                <button
+                  key={a.label}
+                  onClick={() => {
+                    a.onSelect();
+                    onClose();
+                  }}
+                  className="body flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors duration-100 active:bg-[var(--fill)]"
+                  style={{
+                    color: a.destructive ? "var(--danger)" : "var(--label)",
+                    borderTop: i ? "0.5px solid var(--separator)" : "none",
+                  }}
+                >
+                  {a.label}
+                  <span style={{ color: a.destructive ? "var(--danger)" : "var(--label-2)" }}>{a.icon}</span>
+                </button>
+              ))}
           </motion.div>
         </div>
       )}

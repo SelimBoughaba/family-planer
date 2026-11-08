@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Ambient, Card } from "../ui";
+import { Ambient, Card, Switch } from "../ui";
 import { IconChevron, IconTrash } from "../icons";
 
 // --- Typen der Status-Antwort ----------------------------------------------
 
 type Device = { id: string; label: string; createdAt: string; lastSuccess: string | null };
-type OwnerPerson = { id: string; name: string; color: string | null; sort: number; calendarActive: boolean; devices: Device[] };
+type OwnerPerson = { id: string; name: string; color: string | null; sort: number; calendarActive: boolean; canDelete: boolean; devices: Device[] };
 type Backup = { id: string; kind: "auto" | "manual" | "before-restore"; size_bytes: number; created_at: string };
 type ErrorEntry = { id: number; source: string; message: string; detail: string | null; created_at: string };
 type Status = {
@@ -515,6 +515,24 @@ function PeopleTab({ s, act, setConfirm }: TabProps) {
               <span className="body flex-1">Umbenennen</span>
               <IconChevron size={14} />
             </Row>
+            <button
+              className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-black/5"
+              style={{ borderBottom: "0.5px solid var(--separator)" }}
+              role="switch"
+              aria-checked={p.canDelete}
+              aria-label={`${p.name} darf löschen`}
+              onClick={() =>
+                void act({ op: "person.setCanDelete", id: p.id, canDelete: !p.canDelete }, p.canDelete ? `${p.name} kann nichts mehr löschen.` : `${p.name} darf wieder löschen.`)
+              }
+            >
+              <span className="min-w-0 flex-1">
+                <span className="body block">Darf löschen</span>
+                <span className="footnote block" style={{ color: "var(--label-2)" }}>
+                  Termine, Aufgaben, Rezepte, Wochenplan, Einkäufe und Pinnwand
+                </span>
+              </span>
+              <Switch on={p.canDelete} />
+            </button>
             <Row>
               <span className="body flex-1">Farbe</span>
               {p.color ? (

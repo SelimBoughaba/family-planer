@@ -35,6 +35,7 @@ export function BoardScreen({ boardId, onClose }: { boardId: string | null; onCl
 
 function Board({ initial, onClose }: { initial: string; onClose: () => void }) {
   const { state, run, tick, me } = useFamily();
+  const canDelete = me?.canDelete !== false;
   const meId = me?.id ?? null;
   const [boardId, setBoardId] = useState(initial);
   const board = state?.boards.find((b) => b.id === boardId) ?? state?.boards[0] ?? null;
@@ -249,7 +250,8 @@ function Board({ initial, onClose }: { initial: string; onClose: () => void }) {
     for (const id of erased.current) {
       const it = itemsRef.current.find((i) => i.id === id);
       if (!it) continue;
-      if (!it.ink?.length) {
+      // ganz wegradiert: ohne Löschrecht bleibt eine leere Zeichnung stehen
+      if (!it.ink?.length && canDelete) {
         setItems((l) => l.filter((i) => i.id !== id));
         void run({ op: "bitem.purge", id });
       } else void run({ op: "bitem.update", id, patch: { ink: it.ink } });
@@ -564,7 +566,7 @@ function Board({ initial, onClose }: { initial: string; onClose: () => void }) {
       : []),
     ...(it.kind !== "ink" ? [{ label: it.rot ? "Gerade hängen" : "Schräg hängen", onSelect: () => update(it.id, { rot: it.rot ? 0 : rnd(5) || 3 }) }] : []),
     ...(it.kind === "note" ? [{ label: "Farbe", onSelect: () => setTimeout(() => setColorFor(it), 50) }] : []),
-    { label: "In den Papierkorb", destructive: true, onSelect: () => remove(it) },
+    { label: "In den Papierkorb", destructive: true, hidden: !canDelete, onSelect: () => remove(it) },
   ];
 
   const boards = state?.boards ?? [];
@@ -764,7 +766,7 @@ function Board({ initial, onClose }: { initial: string; onClose: () => void }) {
           note={note.item}
           onClose={() => setNote(null)}
           onSave={saveNote}
-          onDelete={note.item ? () => (remove(note.item!), setNote(null)) : undefined}
+          onDelete={note.item && canDelete ? () => (remove(note.item!), setNote(null)) : undefined}
         />
       )}
 
@@ -808,6 +810,7 @@ function Board({ initial, onClose }: { initial: string; onClose: () => void }) {
           setTimeout(() => setConfirmBoardDelete(true), 50);
         }}
         onPrivacy={(priv) => void run({ op: "board.privacy", id: boardId, private: priv })}
+        allowDelete={canDelete}
       />
 
       {nameSheet && (
@@ -906,6 +909,7 @@ function Board({ initial, onClose }: { initial: string; onClose: () => void }) {
                   Zurückholen
                 </button>
                 <button
+                  hidden={!canDelete}
                   onClick={() => {
                     setTrash((l) => l.filter((x) => x.id !== t.id));
                     void run({ op: "bitem.purge", id: t.id });

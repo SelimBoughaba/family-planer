@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { PlaceField } from "./PlaceField";
 import { useFamily } from "@/lib/client/family";
 import { allDayReminderOptions, eventRecurrenceLabel, FALLBACK_COLOR, localDay, timedReminderOptions, type EventFields, type EventRecurrence } from "@/lib/types";
@@ -81,6 +82,7 @@ export function EventEditor({ target, onClose, onTask }: { target: EditorTarget 
 
 function Editor({ target, onClose, onTask }: { target: EditorTarget; onClose: () => void; onTask?: (title: string) => void }) {
   const { state, me, run, color } = useFamily();
+  const canDelete = me?.canDelete !== false;
   const [f, setF] = useState(() => initial(target, me?.id ?? null));
   const [busy, setBusy] = useState(false);
   const [scope, setScope] = useState<null | "save" | "delete" | "confirm">(null);
@@ -147,7 +149,28 @@ function Editor({ target, onClose, onTask }: { target: EditorTarget; onClose: ()
   const remove = async (mode: "all" | "one" | "following") => {
     if (target.mode !== "edit") return;
     setBusy(true);
-    finish(run({ op: "event.delete", id: target.occ.event.id, mode, occurrence: target.occ.occurrence }));
+    const e = target.occ.event;
+    const done = run({ op: "event.delete", id: e.id, mode, occurrence: target.occ.occurrence });
+    finish(done);
+    // einzelne Termine lassen sich wie Aufgaben zurückholen
+    if (!e.recurrence) {
+      const back: EventFields = {
+        title: e.title,
+        place: e.place,
+        placeLat: e.placeLat,
+        placeLon: e.placeLon,
+        startsAt: e.startsAt,
+        endsAt: e.endsAt,
+        allDay: e.allDay,
+        people: e.people,
+        recurrence: null,
+        recurrenceUntil: null,
+        reminders: e.reminders,
+        countdown: e.countdown,
+        countdownEmoji: e.countdownEmoji,
+      };
+      toast(`${e.title} gelöscht`, { action: { label: "Rückgängig", onClick: () => void run({ op: "event.create", ...back }) } });
+    }
   };
 
   const togglePerson = (id: string) => set("people", f.people.includes(id) ? f.people.filter((x) => x !== id) : [...f.people, id]);
@@ -359,7 +382,7 @@ function Editor({ target, onClose, onTask }: { target: EditorTarget; onClose: ()
           </div>
         )}
 
-        {editing && (
+        {editing && canDelete && (
           <button
             type="button"
             onClick={() => setScope(recurringSource ? "delete" : "confirm")}

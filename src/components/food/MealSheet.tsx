@@ -29,6 +29,7 @@ export function MealSheet({ day, onClose, onNewRecipe }: { day: string | null; o
 
 function Inner({ day, onClose, onNewRecipe }: { day: string; onClose: () => void; onNewRecipe: (initial: Partial<RecipeFields>, day: string) => void }) {
   const { state, run, me } = useFamily();
+  const canDelete = me?.canDelete !== false;
   const current = state?.meals.find((m) => m.day === day) ?? null;
   const [mode, setMode] = useState<"rezept" | "rad" | "frei" | "ki">("rezept");
   const [q, setQ] = useState("");
@@ -251,7 +252,7 @@ function Inner({ day, onClose, onNewRecipe }: { day: string; onClose: () => void
         </p>
       )}
 
-      {current && (
+      {current && canDelete && (
         <button
           onClick={() => {
             void run({ op: "meal.clear", day });
