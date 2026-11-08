@@ -34,15 +34,28 @@ export type EventDraft = {
 };
 
 /** Neue Aufgabe anlegen oder bestehende bearbeiten (mit task). Neue Einträge erkennen Termine und Einkäufe selbst. */
-export function NewEntrySheet({ open, onClose, onEvent, task }: { open: boolean; onClose: () => void; onEvent?: (d: EventDraft) => void; task?: Task | null }) {
-  return <AnimatePresence>{open && <TaskForm key={task?.id ?? "new"} onClose={onClose} onEvent={onEvent} task={task ?? null} />}</AnimatePresence>;
+export function NewEntrySheet({
+  open,
+  onClose,
+  onEvent,
+  task,
+  draftTitle,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onEvent?: (d: EventDraft) => void;
+  task?: Task | null;
+  /** Titel, der vom Termin-Blatt mitgebracht wird */
+  draftTitle?: string;
+}) {
+  return <AnimatePresence>{open && <TaskForm key={task?.id ?? "new"} onClose={onClose} onEvent={onEvent} task={task ?? null} draftTitle={draftTitle} />}</AnimatePresence>;
 }
 
-function TaskForm({ onClose, onEvent, task }: { onClose: () => void; onEvent?: (d: EventDraft) => void; task: Task | null }) {
+function TaskForm({ onClose, onEvent, task, draftTitle }: { onClose: () => void; onEvent?: (d: EventDraft) => void; task: Task | null; draftTitle?: string }) {
   const { state, me, run } = useFamily();
   const kind: Kind = "task";
   const editing = !!task;
-  const [title, setTitle] = useState(task?.title ?? "");
+  const [title, setTitle] = useState(task?.title ?? draftTitle ?? "");
   const [who, setWho] = useState<string | null>(task ? task.personId : (me?.id ?? null));
   const [area, setArea] = useState(task?.area ?? "Haushalt");
   const [when, setWhen] = useState<When>(() => {

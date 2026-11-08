@@ -53,6 +53,7 @@ function Main() {
   const [tab, setTab] = useState<Tab>("heute");
   const [filter, setFilter] = useState<string | null>(null);
   const [newOpen, setNewOpen] = useState(false);
+  const [newDraft, setNewDraft] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
   const [editor, setEditor] = useState<EditorTarget | null>(null);
   const [subscribe, setSubscribe] = useState(false);
@@ -259,7 +260,11 @@ function Main() {
       />
       <NewEntrySheet
         open={newOpen}
-        onClose={() => setNewOpen(false)}
+        draftTitle={newDraft}
+        onClose={() => {
+          setNewOpen(false);
+          setNewDraft("");
+        }}
         onEvent={(d) => {
           let start = d.start;
           if (!start) {
@@ -279,7 +284,14 @@ function Main() {
       <NewEntrySheet open={!!taskEdit} task={taskEdit} onClose={() => setTaskEdit(null)} />
       <BoardScreen boardId={boardOpen} onClose={() => setBoardOpen(null)} />
       <VaultScreen open={vault} onClose={() => setVault(false)} />
-      <EventEditor target={editor} onClose={() => setEditor(null)} />
+      <EventEditor
+        target={editor}
+        onClose={() => setEditor(null)}
+        onTask={(title) => {
+          setNewDraft(title);
+          setNewOpen(true);
+        }}
+      />
       <SubscribeSheet open={subscribe} onClose={() => setSubscribe(false)} />
       <NotifySheet open={notify} onClose={() => setNotify(false)} />
       <ContextMenu

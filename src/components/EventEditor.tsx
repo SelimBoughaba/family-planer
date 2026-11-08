@@ -6,7 +6,8 @@ import { useFamily } from "@/lib/client/family";
 import { allDayReminderOptions, eventRecurrenceLabel, FALLBACK_COLOR, localDay, timedReminderOptions, type EventFields, type EventRecurrence } from "@/lib/types";
 import type { Occurrence } from "@/lib/recurrence";
 import { COUNTDOWN_EMOJIS, suggestEmoji } from "@/lib/countdown";
-import { AnimatePresence, Avatar, Chips, ContextMenu, SheetFrame, Switch, type MenuAction } from "./ui";
+import { AnimatePresence, Avatar, Chips, ContextMenu, Segmented, SheetFrame, Switch, type MenuAction } from "./ui";
+import { handOffSheet } from "@/lib/client/sheets";
 import { TimeDial, durationLabel } from "./TimeDial";
 import { IconRepeat, IconTrash } from "./icons";
 
@@ -72,17 +73,17 @@ function initial(target: EditorTarget, me: string | null) {
   };
 }
 
-export function EventEditor({ target, onClose }: { target: EditorTarget | null; onClose: () => void }) {
+export function EventEditor({ target, onClose, onTask }: { target: EditorTarget | null; onClose: () => void; onTask?: (title: string) => void }) {
   // Schlüssel sorgt dafür, dass jeder Aufruf mit frischem Formular startet
   const key = !target ? "none" : target.mode === "edit" ? target.occ.key : `new-${+target.start}`;
-  return <AnimatePresence>{target && <Editor key={key} target={target} onClose={onClose} />}</AnimatePresence>;
+  return <AnimatePresence>{target && <Editor key={key} target={target} onClose={onClose} onTask={onTask} />}</AnimatePresence>;
 }
 
-function Editor({ target, onClose }: { target: EditorTarget; onClose: () => void }) {
+function Editor({ target, onClose, onTask }: { target: EditorTarget; onClose: () => void; onTask?: (title: string) => void }) {
   const { state, me, run, color } = useFamily();
   const [f, setF] = useState(() => initial(target, me?.id ?? null));
   const [busy, setBusy] = useState(false);
-  const [scope, setScope] = useState<null | "save" | "delete">(null);
+  const [scope, setScope] = useState<null | "save" | "delete" | "confirm">(null);
   const titleRef = useRef<HTMLInputElement>(null);
   const editing = target.mode === "edit";
   const recurringSource = editing && target.occ.recurring;
@@ -162,8 +163,14 @@ function Editor({ target, onClose }: { target: EditorTarget; onClose: () => void
             { label: "Nur diesen Termin", destructive: true, onSelect: () => void remove("one") },
             { label: "Diesen und alle folgenden", destructive: true, onSelect: () => void remove("following") },
             { label: "Alle Termine der Serie", destructive: true, onSelect: () => void remove("all") },
+            { label: "Abbrechen", onSelect: () => {} },
           ]
-        : [];
+        : scope === "confirm"
+          ? [
+              { label: "Termin löschen", destructive: true, icon: <IconTrash size={18} />, onSelect: () => void remove("all") },
+              { label: "Abbrechen", onSelect: () => {} },
+            ]
+          : [];
 
   return (
     <>
@@ -187,6 +194,24 @@ function Editor({ target, onClose }: { target: EditorTarget; onClose: () => void
           </div>
         }
       >
+        {!editing && onTask && (
+          <div className="mt-3">
+            <Segmented
+              value="event"
+              onChange={(k) => {
+                if (k !== "task") return;
+                // im selben Blatt zur Aufgabe wechseln, der Titel kommt mit
+                handOffSheet();
+                onClose();
+                onTask(f.title.trim());
+              }}
+              options={[
+                { id: "task", label: "Aufgabe" },
+                { id: "event", label: "Termin" },
+              ]}
+            />
+          </div>
+        )}
         <input
           ref={titleRef}
           value={f.title}
@@ -337,7 +362,7 @@ function Editor({ target, onClose }: { target: EditorTarget; onClose: () => void
         {editing && (
           <button
             type="button"
-            onClick={() => (recurringSource ? setScope("delete") : void remove("all"))}
+            onClick={() => setScope(recurringSource ? "delete" : "confirm")}
             className="press body mt-8 flex w-full items-center justify-center gap-2 rounded-[14px] py-3 font-medium"
             style={{ color: "var(--danger)", background: "color-mix(in oklab, var(--danger) 10%, transparent)" }}
           >
@@ -349,7 +374,18 @@ function Editor({ target, onClose }: { target: EditorTarget; onClose: () => void
       <ContextMenu
         open={!!scope}
         onClose={() => setScope(null)}
-        preview={<p className="headline">{scope === "delete" ? "Welche Termine löschen?" : "Änderung übernehmen für"}</p>}
+        preview={
+          scope === "confirm" ? (
+            <div>
+              <p className="headline">„{f.title.trim() || "Termin"}“ wirklich löschen?</p>
+              <p className="footnote mt-1" style={{ color: "var(--label-2)" }}>
+                Der Termin verschwindet für die ganze Familie.
+              </p>
+            </div>
+          ) : (
+            <p className="headline">{scope === "delete" ? "Welche Termine löschen?" : "Änderung übernehmen für"}</p>
+          )
+        }
         actions={scopeActions}
       />
     </>
