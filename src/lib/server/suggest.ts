@@ -36,7 +36,7 @@ export async function suggestMeals(hint: string, day: string | null): Promise<Su
   const sql = db();
   const [recipes, recent, items] = await Promise.all([
     sql`select id, title, minutes, tags from recipes order by favorite desc, updated_at desc limit 80`,
-    sql`select day::text as day, title from meal_plan where day between (now() - interval '14 days')::date and (now() + interval '7 days')::date order by day`,
+    sql`select day::text as day, title from meal_plan where slot = 'abend' and day between (now() - interval '14 days')::date and (now() + interval '7 days')::date order by day`,
     sql`select name from shopping_items where done = false limit 40`,
   ]);
   const list = recipes

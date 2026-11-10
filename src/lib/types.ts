@@ -152,9 +152,23 @@ export type Recipe = {
 
 export type RecipeFields = Omit<Recipe, "id" | "createdBy" | "favorite">;
 
+export type MealSlot = "fruehstueck" | "mittag" | "abend" | "sonstiges";
+/** Reihenfolge im Tag; das Abendessen ist die Hauptmahlzeit (Mitesser, Kochdienst, Vorschläge) */
+export const MEAL_SLOTS: { id: MealSlot; label: string; emoji: string }[] = [
+  { id: "fruehstueck", label: "Frühstück", emoji: "☀️" },
+  { id: "mittag", label: "Mittag", emoji: "🥪" },
+  { id: "abend", label: "Abendessen", emoji: "🌙" },
+  { id: "sonstiges", label: "Sonstiges", emoji: "🍪" },
+];
+export const MAIN_SLOT: MealSlot = "abend";
+export const isMealSlot = (v: unknown): v is MealSlot => MEAL_SLOTS.some((s) => s.id === v);
+/** Hauptmahlzeit eines Tages */
+export const mainMeal = (meals: Meal[] | undefined, day: string) => meals?.find((m) => m.day === day && m.slot === MAIN_SLOT);
+
 export type Meal = {
   id: string;
   day: string; // YYYY-MM-DD
+  slot: MealSlot;
   recipeId: string | null;
   title: string;
   cook: string | null;
@@ -250,8 +264,8 @@ export type Mutation =
   | ({ op: "recipe.update"; id: string } & RecipeFields)
   | { op: "recipe.favorite"; id: string; favorite: boolean }
   | { op: "recipe.delete"; id: string }
-  | { op: "meal.set"; day: string; recipeId: string | null; title: string; cook: string | null; note: string | null }
-  | { op: "meal.clear"; day: string }
+  | { op: "meal.set"; day: string; slot?: MealSlot; recipeId: string | null; title: string; cook: string | null; note: string | null }
+  | { op: "meal.clear"; day: string; slot?: MealSlot }
   | { op: "meal.attend"; day: string; personId: string; present: boolean | null }
   | { op: "reward.create"; title: string; emoji: string | null; cost: number }
   | { op: "reward.delete"; id: string }

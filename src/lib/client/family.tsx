@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createClient } from "@supabase/supabase-js";
 import type { AppState, Item, Mutation, Person, Task, CalEvent, Recipe, Meal } from "@/lib/types";
-import { FALLBACK_COLOR, localDay } from "@/lib/types";
+import { FALLBACK_COLOR, MAIN_SLOT, localDay } from "@/lib/types";
 
 const SYNC_TOPIC = "familienplaner-sync";
 const ME_KEY = "fp_person";
@@ -226,8 +226,9 @@ function optimistic(s: AppState, m: Mutation, me: string | null): AppState {
     case "recipe.delete":
       return { ...s, recipes: s.recipes.filter((r) => r.id !== m.id), meals: s.meals.map((x) => (x.recipeId === m.id ? { ...x, recipeId: null } : x)) };
     case "meal.set": {
-      const meal: Meal = { id: tmp, day: m.day, recipeId: m.recipeId, title: m.title, cook: m.cook, note: m.note };
-      return { ...s, meals: [...s.meals.filter((x) => x.day !== m.day), meal].sort((a, b) => a.day.localeCompare(b.day)) };
+      const slot = m.slot ?? MAIN_SLOT;
+      const meal: Meal = { id: tmp, day: m.day, slot, recipeId: m.recipeId, title: m.title, cook: m.cook, note: m.note };
+      return { ...s, meals: [...s.meals.filter((x) => !(x.day === m.day && x.slot === slot)), meal].sort((a, b) => a.day.localeCompare(b.day)) };
     }
     case "meal.attend": {
       const rest = s.attendance.filter((a) => !(a.day === m.day && a.personId === m.personId));
@@ -274,7 +275,7 @@ function optimistic(s: AppState, m: Mutation, me: string | null): AppState {
     case "bitem.purge":
       return s;
     case "meal.clear":
-      return { ...s, meals: s.meals.filter((x) => x.day !== m.day) };
+      return { ...s, meals: s.meals.filter((x) => !(x.day === m.day && x.slot === (m.slot ?? MAIN_SLOT))) };
     case "event.create": {
       const e: CalEvent = {
         id: tmp,

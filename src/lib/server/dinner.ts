@@ -35,7 +35,7 @@ export async function dinnerHeadsUp(now: number) {
   if (w.h !== 16 || w.mi > 10) return 0;
   const sql = db();
   const day = dayString(now);
-  const [meal] = await sql`select title, cook from meal_plan where day = ${day}`;
+  const [meal] = await sql`select title, cook from meal_plan where day = ${day} and slot = 'abend'`;
   if (!meal?.cook) return 0;
   const [claimed] = await sql`insert into notifications_sent (key) values (${`dinner:${day}`}) on conflict do nothing returning key`;
   if (!claimed) return 0;

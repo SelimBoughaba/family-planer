@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useFamily } from "@/lib/client/family";
 import { recipeEmoji, scaleAmount } from "@/lib/recipes";
 import { guessCategory } from "@/lib/shopping";
-import { localDay, type Recipe } from "@/lib/types";
+import { localDay, mainMeal, type Recipe } from "@/lib/types";
 import { eaters, presenceFor } from "@/lib/attendance";
 import { RecipeImages } from "./RecipeImages";
 import { addDays, startOfDay } from "@/lib/recurrence";
@@ -227,7 +227,7 @@ function Detail({ recipe, onClose, onEdit, forDay }: { recipe: Recipe; onClose: 
         preview={<p className="headline">An welchem Tag gibt es {recipe.title}?</p>}
         actions={days.map((d, k) => {
           const day = localDay(d);
-          const taken = state?.meals.find((m) => m.day === day);
+          const taken = mainMeal(state?.meals, day);
           return {
             label: `${k === 0 ? "Heute" : k === 1 ? "Morgen" : d.toLocaleDateString("de-DE", { weekday: "long" })}${taken ? `, statt ${taken.title}` : ""}`,
             onSelect: () => void run({ op: "meal.set", day, recipeId: recipe.id, title: recipe.title, cook: taken?.cook ?? null, note: null }),

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useFamily } from "@/lib/client/family";
 import { recipeEmoji } from "@/lib/recipes";
-import type { RecipeFields } from "@/lib/types";
+import { MAIN_SLOT, MEAL_SLOTS, type MealSlot, type RecipeFields } from "@/lib/types";
 import { Avatar, Chips, FieldLabel, Sheet } from "../ui";
 import { IconClock } from "../icons";
 import { AttendanceRow, MaybeHint } from "./Attendance";
@@ -21,20 +21,44 @@ const dayLabel = (day: string) => {
   return d.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" });
 };
 
-/** Essen für einen Tag festlegen: eigenes Rezept, freier Text oder KI-Vorschlag */
-export function MealSheet({ day, onClose, onNewRecipe }: { day: string | null; onClose: () => void; onNewRecipe: (initial: Partial<RecipeFields>, day: string) => void }) {
-  if (!day) return null;
-  return <Inner key={day} day={day} onClose={onClose} onNewRecipe={onNewRecipe} />;
+export type MealTarget = { day: string; slot: MealSlot };
+type NewRecipe = (initial: Partial<RecipeFields>, day: string, slot: MealSlot) => void;
+
+const FREE_HINT: Record<MealSlot, string> = {
+  fruehstueck: "z. B. Müsli, Brötchen holen, Pancakes",
+  mittag: "z. B. Brotzeit, Kantine, Reste von gestern",
+  abend: "z. B. Pizza bestellen, Reste, Grillen",
+  sonstiges: "z. B. Kuchen bei Oma, Snacks für den Filmabend",
+};
+
+/** Essen für einen Tag festlegen: Frühstück, Mittag, Abendessen oder Sonstiges, aus Rezepten, frei oder als Vorschlag */
+export function MealSheet({ target, onClose, onNewRecipe }: { target: MealTarget | null; onClose: () => void; onNewRecipe: NewRecipe }) {
+  if (!target) return null;
+  return <Inner key={target.day} day={target.day} initialSlot={target.slot} onClose={onClose} onNewRecipe={onNewRecipe} />;
 }
 
-function Inner({ day, onClose, onNewRecipe }: { day: string; onClose: () => void; onNewRecipe: (initial: Partial<RecipeFields>, day: string) => void }) {
+function Inner({ day, initialSlot, onClose, onNewRecipe }: { day: string; initialSlot: MealSlot; onClose: () => void; onNewRecipe: NewRecipe }) {
   const { state, run, me } = useFamily();
   const canDelete = me?.canDelete !== false;
-  const current = state?.meals.find((m) => m.day === day) ?? null;
-  const [mode, setMode] = useState<"rezept" | "rad" | "frei" | "ki">("rezept");
+  const [slot, setSlot] = useState<MealSlot>(initialSlot);
+  const mealOf = (s: MealSlot) => state?.meals.find((m) => m.day === day && m.slot === s) ?? null;
+  const current = mealOf(slot);
+  const main = slot === MAIN_SLOT;
+  const [mode, setMode] = useState<"rezept" | "rad" | "frei" | "ki">(initialSlot === MAIN_SLOT ? "rezept" : "frei");
   const [q, setQ] = useState("");
   const [free, setFree] = useState(current && !current.recipeId ? current.title : "");
-  const [cook, setCook] = useState<string | null>(current?.cook ?? me?.id ?? null);
+  const [cook, setCook] = useState<string | null>(current?.cook ?? (main ? (me?.id ?? null) : null));
+  // andere Mahlzeit gewählt: Felder auf deren Stand bringen
+  const pickSlot = (s: MealSlot) => {
+    if (s === slot) return;
+    const m = mealOf(s);
+    setSlot(s);
+    setFree(m && !m.recipeId ? m.title : "");
+    setCook(m?.cook ?? (s === MAIN_SLOT ? (me?.id ?? null) : null));
+    setIdeas(null);
+    setMsg(null);
+    setMode(s === MAIN_SLOT ? "rezept" : m?.recipeId ? "rezept" : "frei");
+  };
   const [hint, setHint] = useState("");
   const [ideas, setIdeas] = useState<Suggestion[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -46,7 +70,7 @@ function Inner({ day, onClose, onNewRecipe }: { day: string; onClose: () => void
   );
 
   const choose = async (title: string, recipeId: string | null) => {
-    void run({ op: "meal.set", day, recipeId, title, cook, note: null });
+    void run({ op: "meal.set", day, slot, recipeId, title, cook, note: null });
     onClose();
   };
 
@@ -67,12 +91,16 @@ function Inner({ day, onClose, onNewRecipe }: { day: string; onClose: () => void
     const r = await res.json().catch(() => ({}));
     setBusy(null);
     if (!res.ok) return setMsg(r.message ?? "Rezept gerade nicht möglich.");
-    onNewRecipe(r.recipe, day);
+    onNewRecipe(r.recipe, day, slot);
   };
 
   return (
     <Sheet open large onClose={onClose} title={dayLabel(day)}>
-      <FieldLabel>Wer kocht?</FieldLabel>
+      <div className="mt-1">
+        <Chips value={slot} onChange={pickSlot} options={MEAL_SLOTS.map((sl) => ({ id: sl.id, label: `${sl.emoji} ${sl.label}${mealOf(sl.id) && sl.id !== slot ? " ✓" : ""}` }))} />
+      </div>
+
+      <FieldLabel>{main ? "Wer kocht?" : "Wer kümmert sich? (optional)"}</FieldLabel>
       <div className="no-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4">
         {(state?.people ?? []).map((p) => (
           <button
@@ -89,9 +117,13 @@ function Inner({ day, onClose, onNewRecipe }: { day: string; onClose: () => void
         ))}
       </div>
 
-      <FieldLabel>Wer isst mit?</FieldLabel>
-      <AttendanceRow day={day} size={38} names />
-      <MaybeHint day={day} />
+      {main && (
+        <>
+          <FieldLabel>Wer isst mit?</FieldLabel>
+          <AttendanceRow day={day} size={38} names />
+          <MaybeHint day={day} />
+        </>
+      )}
 
       <div className="mt-5">
         <Chips
@@ -101,7 +133,7 @@ function Inner({ day, onClose, onNewRecipe }: { day: string; onClose: () => void
             { id: "rezept", label: "Aus Rezepten" },
             { id: "rad", label: "🎡 Glücksrad" },
             { id: "frei", label: "Freier Text" },
-            ...(ai?.enabled ? [{ id: "ki" as const, label: "Vorschlag" }] : []),
+            ...(ai?.enabled && main ? [{ id: "ki" as const, label: "Vorschlag" }] : []),
           ]}
         />
       </div>
@@ -161,7 +193,7 @@ function Inner({ day, onClose, onNewRecipe }: { day: string; onClose: () => void
           <input
             value={free}
             onChange={(e) => setFree(e.target.value)}
-            placeholder="z. B. Pizza bestellen, Reste, Grillen"
+            placeholder={FREE_HINT[slot]}
             className="body glass w-full rounded-[14px] px-3 py-2.5"
             maxLength={140}
             aria-label="Essen"
@@ -255,7 +287,7 @@ function Inner({ day, onClose, onNewRecipe }: { day: string; onClose: () => void
       {current && canDelete && (
         <button
           onClick={() => {
-            void run({ op: "meal.clear", day });
+            void run({ op: "meal.clear", day, slot });
             onClose();
           }}
           className="press body mt-7 w-full rounded-[14px] py-3 font-medium"

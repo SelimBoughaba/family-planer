@@ -2,7 +2,7 @@ import "server-only";
 import { db } from "./db";
 import { wall } from "./berlin";
 
-export const BACKUP_VERSION = 6;
+export const BACKUP_VERSION = 7;
 
 const coord = (v: unknown) => (v == null || !Number.isFinite(Number(v)) ? null : Number(v));
 const KEEP_AUTO = 14;
@@ -56,7 +56,7 @@ export async function snapshot(): Promise<Snapshot> {
     "Rezepte",
     () => sql`select id, title, description, servings, minutes, ingredients, steps, tags, source_url, images, favorite, created_by, created_at, updated_at from recipes`,
   );
-  const meals = await step("Wochenplan", () => sql`select id, day::text as day, recipe_id, title, cook, note, created_by, created_at from meal_plan`);
+  const meals = await step("Wochenplan", () => sql`select id, day::text as day, slot, recipe_id, title, cook, note, created_by, created_at from meal_plan`);
   const boards = await step("Pinnwände", () => sql`select id, name, sort, owner, created_at from boards`);
   const boardItems = await step("Pinnwand", () => sql`select * from board_items where deleted_at is null`);
   const ledger = await step("Punkte", () => sql`select person_id, points, kind, task_id, reason, created_at from points_ledger`);
@@ -185,8 +185,9 @@ export async function restore(data: unknown) {
           ${ids.includes(r.created_by as string) ? (r.created_by as string) : null}, ${(r.created_at as string) ?? new Date().toISOString()}, now())`;
     }
     for (const m of d.tables.meal_plan ?? []) {
-      await tx`insert into meal_plan (id, day, recipe_id, title, cook, note, created_by, created_at)
-        values (${m.id as string}, ${m.day as string}, ${recipeIds.includes(m.recipe_id as string) ? (m.recipe_id as string) : null}, ${m.title as string},
+      const slot = ["fruehstueck", "mittag", "abend", "sonstiges"].includes(m.slot as string) ? (m.slot as string) : "abend";
+      await tx`insert into meal_plan (id, day, slot, recipe_id, title, cook, note, created_by, created_at)
+        values (${m.id as string}, ${m.day as string}, ${slot}, ${recipeIds.includes(m.recipe_id as string) ? (m.recipe_id as string) : null}, ${m.title as string},
           ${ids.includes(m.cook as string) ? (m.cook as string) : null}, ${(m.note as string) ?? null}, ${ids.includes(m.created_by as string) ? (m.created_by as string) : null}, ${(m.created_at as string) ?? new Date().toISOString()})`;
     }
     for (const a of d.tables.meal_attendance ?? []) {

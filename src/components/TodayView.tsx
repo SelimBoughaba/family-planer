@@ -3,7 +3,7 @@
 import { MapsLink } from "./PlaceField";
 import { useMemo, useState } from "react";
 import { useFamily } from "@/lib/client/family";
-import { localDay, type Task } from "@/lib/types";
+import { MAIN_SLOT, MEAL_SLOTS, localDay, mainMeal, type Task } from "@/lib/types";
 import { addDays, occurrences, startOfDay, type Occurrence } from "@/lib/recurrence";
 import { recipeEmoji } from "@/lib/recipes";
 import { AnimatePresence, Avatar, AvatarStack, Card, ListItem, PersonFilter, SectionTitle, useLongPress } from "./ui";
@@ -346,7 +346,7 @@ export function TodayView({
       </p>
 
       {(() => {
-        const meal = state?.meals.find((m) => m.day === selDay);
+        const meal = mainMeal(state?.meals, selDay);
         const recipe = meal?.recipeId ? state?.recipes.find((r) => r.id === meal.recipeId) : null;
         return (
           <>
@@ -368,6 +368,24 @@ export function TodayView({
                   </span>
                 </span>
               </button>
+              {/* weitere Mahlzeiten des Tages als feine Zeilen */}
+              {MEAL_SLOTS.filter((sl) => sl.id !== MAIN_SLOT).map((sl) => {
+                const m = state?.meals.find((x) => x.day === selDay && x.slot === sl.id);
+                return m ? (
+                  <button
+                    key={sl.id}
+                    onClick={onOpenFood}
+                    className="footnote flex w-full items-center gap-2 border-t px-4 py-2 text-left"
+                    style={{ borderColor: "var(--separator)", color: "var(--label-2)" }}
+                  >
+                    <span aria-hidden>{sl.emoji}</span>
+                    <span className="w-[68px] shrink-0 font-semibold">{sl.label}</span>
+                    <span className="truncate" style={{ color: "var(--label)" }}>
+                      {m.title}
+                    </span>
+                  </button>
+                ) : null;
+              })}
               <div className="border-t px-4 pt-3 pb-3.5" style={{ borderColor: "var(--separator)" }}>
                 <div className="flex items-center justify-between gap-3">
                   <AttendanceRow day={selDay} size={30} />

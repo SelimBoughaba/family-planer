@@ -6,12 +6,12 @@ import { recipeEmoji, scaleAmount } from "@/lib/recipes";
 import { eaters, presenceFor } from "@/lib/attendance";
 import { AttendanceRow, AttendanceSheet } from "./Attendance";
 import { addDays, startOfDay, startOfWeek } from "@/lib/recurrence";
-import { localDay, type Recipe, type RecipeFields } from "@/lib/types";
+import { MAIN_SLOT, MEAL_SLOTS, localDay, mainMeal, type MealSlot, type Recipe, type RecipeFields } from "@/lib/types";
 import { Card } from "../ui";
 import { IconChevron, IconPlus } from "../icons";
 import { RecipeDetail, useAddToShopping } from "./RecipeDetail";
 import { RecipeEditor, type EditorTarget } from "./RecipeEditor";
-import { MealSheet } from "./MealSheet";
+import { MealSheet, type MealTarget } from "./MealSheet";
 
 type Mode = "woche" | "rezepte";
 
@@ -19,7 +19,8 @@ export function FoodView({ initialDay }: { initialDay?: string | null }) {
   const { state, run, person } = useFamily();
   const [mode, setMode] = useState<Mode>("woche");
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
-  const [mealDay, setMealDay] = useState<string | null>(initialDay ?? null);
+  const [mealFor, setMealFor] = useState<MealTarget | null>(initialDay ? { day: initialDay, slot: MAIN_SLOT } : null);
+  const plan = (day: string, slot: MealSlot = MAIN_SLOT) => setMealFor({ day, slot });
   const [detail, setDetail] = useState<{ recipe: Recipe; day: string | null } | null>(null);
   const [attendDay, setAttendDay] = useState<string | null>(null);
   const [editor, setEditor] = useState<EditorTarget | null>(null);
@@ -36,13 +37,18 @@ export function FoodView({ initialDay }: { initialDay?: string | null }) {
 
   const shopWeek = async () => {
     // Mengen pro Tag auf die Zahl der Mitesser umrechnen
+    // alle Mahlzeiten der Woche mit Rezept, nicht nur das Abendessen
     const list = days.flatMap((d) => {
       const day = localDay(d);
-      const r = byId(state?.meals.find((m) => m.day === day)?.recipeId ?? null);
-      if (!r) return [];
       const n = eaters(presenceFor(day, state?.people ?? [], state?.attendance ?? [], state?.events ?? []));
-      const factor = n / (r.servings || 1);
-      return r.ingredients.map((i) => ({ ...i, amount: scaleAmount(i.amount, factor) }));
+      return (state?.meals ?? [])
+        .filter((m) => m.day === day)
+        .flatMap((m) => {
+          const r = byId(m.recipeId);
+          if (!r) return [];
+          const factor = n / (r.servings || 1);
+          return r.ingredients.map((i) => ({ ...i, amount: scaleAmount(i.amount, factor) }));
+        });
     });
     if (!list.length) return setNote("Für diese Woche sind keine Rezepte mit Zutaten eingeplant.");
     // gleiche Zutat aus mehreren Rezepten nur einmal
@@ -67,7 +73,7 @@ export function FoodView({ initialDay }: { initialDay?: string | null }) {
       <header className="mb-4 flex items-end justify-between">
         <h1 className="large-title">Essen</h1>
         <button
-          onClick={() => (mode === "rezepte" ? setEditor({ mode: "new" }) : setMealDay(today))}
+          onClick={() => (mode === "rezepte" ? setEditor({ mode: "new" }) : plan(today))}
           className="press glass flex h-11 w-11 items-center justify-center rounded-full"
           style={{ color: "var(--tint)" }}
           aria-label={mode === "rezepte" ? "Neues Rezept" : "Essen planen"}
@@ -112,34 +118,69 @@ export function FoodView({ initialDay }: { initialDay?: string | null }) {
           <Card className="mt-3 overflow-hidden">
             {days.map((d, k) => {
               const day = localDay(d);
-              const meal = state?.meals.find((m) => m.day === day);
+              const meal = mainMeal(state?.meals, day);
+              const sides = MEAL_SLOTS.filter((sl) => sl.id !== MAIN_SLOT)
+                .map((sl) => ({ sl, m: state?.meals.find((x) => x.day === day && x.slot === sl.id) }))
+                .filter((x) => !!x.m);
               const r = byId(meal?.recipeId ?? null);
               const isToday = day === today;
               const past = day < today;
               return (
-                <button
-                  key={day}
-                  onClick={() => (r ? setDetail({ recipe: r, day }) : setMealDay(day))}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-left"
-                  style={{ borderTop: k ? "0.5px solid var(--separator)" : "none", opacity: past ? 0.5 : 1 }}
-                >
-                  <span className="flex w-10 shrink-0 flex-col items-center">
-                    <span className="caption font-semibold" style={{ color: isToday ? "var(--danger)" : "var(--label-2)" }}>
-                      {d.toLocaleDateString("de-DE", { weekday: "short" }).replace(".", "")}
-                    </span>
-                    <span className="headline tabular" style={{ color: isToday ? "var(--danger)" : "var(--label)" }}>
-                      {d.getDate()}
-                    </span>
-                  </span>
-                  {meal ? (
-                    <>
-                      <span className="text-2xl" aria-hidden>
-                        {recipeEmoji(meal.title, r?.tags)}
+                <div key={day} style={{ borderTop: k ? "0.5px solid var(--separator)" : "none", opacity: past ? 0.5 : 1 }}>
+                  <button onClick={() => (r ? setDetail({ recipe: r, day }) : plan(day))} className="flex w-full items-center gap-3 px-4 py-3 text-left">
+                    <span className="flex w-10 shrink-0 flex-col items-center">
+                      <span className="caption font-semibold" style={{ color: isToday ? "var(--danger)" : "var(--label-2)" }}>
+                        {d.toLocaleDateString("de-DE", { weekday: "short" }).replace(".", "")}
                       </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="body block truncate font-medium">{meal.title}</span>
-                        <span className="footnote block truncate" style={{ color: "var(--label-2)" }}>
-                          {[person(meal.cook) ? `kocht ${person(meal.cook)!.name}` : "noch niemand kocht", r?.minutes ? `${r.minutes} Min.` : null].filter(Boolean).join(", ")}
+                      <span className="headline tabular" style={{ color: isToday ? "var(--danger)" : "var(--label)" }}>
+                        {d.getDate()}
+                      </span>
+                    </span>
+                    {meal ? (
+                      <>
+                        <span className="text-2xl" aria-hidden>
+                          {recipeEmoji(meal.title, r?.tags)}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="body block truncate font-medium">{meal.title}</span>
+                          <span className="footnote block truncate" style={{ color: "var(--label-2)" }}>
+                            {[person(meal.cook) ? `kocht ${person(meal.cook)!.name}` : "noch niemand kocht", r?.minutes ? `${r.minutes} Min.` : null].filter(Boolean).join(", ")}
+                          </span>
+                          {!past && (
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setAttendDay(day);
+                              }}
+                              className="mt-1 inline-flex rounded-full px-1.5 py-1"
+                              style={{ background: "color-mix(in oklab, var(--label) 5%, transparent)" }}
+                              aria-label="Wer isst mit"
+                            >
+                              <span className="pointer-events-none flex [&>div]:gap-[3px]">
+                                <AttendanceRow day={day} size={14} interactive={false} />
+                              </span>
+                            </span>
+                          )}
+                        </span>
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            plan(day);
+                          }}
+                          className="footnote rounded-full px-2.5 py-1 font-semibold"
+                          style={{ background: "var(--fill)" }}
+                        >
+                          Ändern
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="subhead flex-1" style={{ color: "var(--label-3)" }}>
+                          {past ? (sides.length ? "Kein Abendessen eingetragen" : "Nichts eingetragen") : sides.length ? "Abendessen planen" : "Essen planen"}
                         </span>
                         {!past && (
                           <span
@@ -149,7 +190,7 @@ export function FoodView({ initialDay }: { initialDay?: string | null }) {
                               e.stopPropagation();
                               setAttendDay(day);
                             }}
-                            className="mt-1 inline-flex rounded-full px-1.5 py-1"
+                            className="inline-flex shrink-0 rounded-full px-1.5 py-1"
                             style={{ background: "color-mix(in oklab, var(--label) 5%, transparent)" }}
                             aria-label="Wer isst mit"
                           >
@@ -158,45 +199,33 @@ export function FoodView({ initialDay }: { initialDay?: string | null }) {
                             </span>
                           </span>
                         )}
-                      </span>
-                      <span
-                        role="button"
-                        tabIndex={0}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setMealDay(day);
-                        }}
-                        className="footnote rounded-full px-2.5 py-1 font-semibold"
-                        style={{ background: "var(--fill)" }}
-                      >
-                        Ändern
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="subhead flex-1" style={{ color: "var(--label-3)" }}>
-                        {past ? "Nichts eingetragen" : "Essen planen"}
-                      </span>
-                      {!past && (
-                        <span
-                          role="button"
-                          tabIndex={0}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setAttendDay(day);
+                      </>
+                    )}
+                  </button>
+                  {/* Frühstück, Mittag und Sonstiges nur, wenn etwas geplant ist */}
+                  {sides.length > 0 && (
+                    <div className="-mt-1.5 pb-2.5 pl-[68px] pr-4">
+                      {sides.map(({ sl, m }) => (
+                        <button
+                          key={sl.id}
+                          onClick={() => {
+                            const rr = byId(m!.recipeId);
+                            if (rr) setDetail({ recipe: rr, day });
+                            else plan(day, sl.id);
                           }}
-                          className="inline-flex shrink-0 rounded-full px-1.5 py-1"
-                          style={{ background: "color-mix(in oklab, var(--label) 5%, transparent)" }}
-                          aria-label="Wer isst mit"
+                          className="footnote flex w-full items-center gap-1.5 py-0.5 text-left"
+                          style={{ color: "var(--label-2)" }}
                         >
-                          <span className="pointer-events-none flex [&>div]:gap-[3px]">
-                            <AttendanceRow day={day} size={14} interactive={false} />
+                          <span aria-hidden>{sl.emoji}</span>
+                          <span className="shrink-0 font-semibold">{sl.label}</span>
+                          <span className="min-w-0 truncate" style={{ color: "var(--label)" }}>
+                            {m!.title}
                           </span>
-                        </span>
-                      )}
-                    </>
+                        </button>
+                      ))}
+                    </div>
                   )}
-                </button>
+                </div>
               );
             })}
           </Card>
@@ -266,11 +295,11 @@ export function FoodView({ initialDay }: { initialDay?: string | null }) {
       )}
 
       <MealSheet
-        day={mealDay}
-        onClose={() => setMealDay(null)}
-        onNewRecipe={(initial: Partial<RecipeFields>, day: string) => {
-          setMealDay(null);
-          setEditor({ mode: "new", initial, planDay: day });
+        target={mealFor}
+        onClose={() => setMealFor(null)}
+        onNewRecipe={(initial: Partial<RecipeFields>, day: string, slot: MealSlot) => {
+          setMealFor(null);
+          setEditor({ mode: "new", initial, planDay: day, planSlot: slot });
         }}
       />
       <AttendanceSheet day={attendDay} onClose={() => setAttendDay(null)} />
@@ -288,8 +317,9 @@ export function FoodView({ initialDay }: { initialDay?: string | null }) {
         onClose={() => setEditor(null)}
         onSaved={(id, title) => {
           if (editor?.mode === "new" && editor.planDay) {
-            const existing = state?.meals.find((m) => m.day === editor.planDay);
-            void run({ op: "meal.set", day: editor.planDay, recipeId: id, title, cook: existing?.cook ?? null, note: null });
+            const slot = editor.planSlot ?? MAIN_SLOT;
+            const existing = state?.meals.find((m) => m.day === editor.planDay && m.slot === slot);
+            void run({ op: "meal.set", day: editor.planDay, slot, recipeId: id, title, cook: existing?.cook ?? null, note: null });
           }
         }}
       />

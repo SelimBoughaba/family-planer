@@ -5,10 +5,10 @@ import { prepareFile, uploadFile } from "@/lib/client/upload";
 import { RecipeImages } from "./RecipeImages";
 import { useFamily } from "@/lib/client/family";
 import { parseIngredient } from "@/lib/recipes";
-import type { Recipe, RecipeFields } from "@/lib/types";
+import type { MealSlot, Recipe, RecipeFields } from "@/lib/types";
 import { FieldLabel, Sheet } from "../ui";
 
-export type EditorTarget = { mode: "new"; initial?: Partial<RecipeFields>; planDay?: string } | { mode: "edit"; recipe: Recipe };
+export type EditorTarget = { mode: "new"; initial?: Partial<RecipeFields>; planDay?: string; planSlot?: MealSlot } | { mode: "edit"; recipe: Recipe };
 
 const ingredientsText = (xs: RecipeFields["ingredients"] = []) => xs.map((i) => (i.amount ? `${i.amount} ${i.name}` : i.name)).join("\n");
 const stepsText = (xs: string[] = []) => xs.join("\n\n");

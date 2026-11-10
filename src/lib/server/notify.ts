@@ -62,7 +62,7 @@ export async function planNotifications(m: Mutation, actor: string | null): Prom
   if (m.op === "meal.attend" && m.present !== null) {
     const now = Date.now();
     if (m.day !== dayString(now) || wall(now).h < 16) return null;
-    const [meal] = await sql`select cook from meal_plan where day = ${m.day}`;
+    const [meal] = await sql`select cook from meal_plan where day = ${m.day} and slot = 'abend'`;
     const cook = (meal?.cook as string) ?? null;
     if (!cook || cook === actor || cook === m.personId) return null;
     const [before] = await sql`select present from meal_attendance where day = ${m.day} and person_id = ${m.personId}`;

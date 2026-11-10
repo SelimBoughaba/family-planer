@@ -312,3 +312,13 @@ begin
     insert into app_meta (key, value) values ('init_can_delete', '"done"'::jsonb);
   end if;
 end $$;
+-- Mahlzeiten pro Tag: Frühstück, Mittag, Abend (Hauptmahlzeit wie bisher) und Sonstiges
+alter table meal_plan add column if not exists slot text not null default 'abend';
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'meal_plan_slot_check') then
+    alter table meal_plan add constraint meal_plan_slot_check check (slot in ('fruehstueck', 'mittag', 'abend', 'sonstiges'));
+  end if;
+end $$;
+alter table meal_plan drop constraint if exists meal_plan_day_key;
+create unique index if not exists meal_plan_day_slot_idx on meal_plan (day, slot);

@@ -1,7 +1,7 @@
 import "server-only";
 import { randomBytes, randomUUID } from "node:crypto";
 import { db } from "./db";
-import { DELETE_OPS, NO_DELETE_MESSAGE, nextInRotation } from "@/lib/types";
+import { DELETE_OPS, MAIN_SLOT, NO_DELETE_MESSAGE, isMealSlot, nextInRotation } from "@/lib/types";
 import type { TaskFields, AppState, CalEvent, EventFields, EventRecurrence, Item, Meal, Mutation, Person, Recipe, RecipeFields, Recurrence, Task } from "@/lib/types";
 import { aiInfo } from "./ai";
 import { getLists } from "./lists";
@@ -84,6 +84,7 @@ const toRecipe = (r: Row): Recipe => ({
 const toMeal = (r: Row): Meal => ({
   id: r.id as string,
   day: String(r.day).slice(0, 10),
+  slot: isMealSlot(r.slot) ? r.slot : MAIN_SLOT,
   recipeId: (r.recipe_id as string) ?? null,
   title: r.title as string,
   cook: (r.cook as string) ?? null,
@@ -111,7 +112,7 @@ export async function loadState(from: Date, to: Date, me: string | null = null):
     sql`select * from tasks where done = false or done_at > now() - interval '7 days' order by done, due nulls first, created_at`,
     sql`select * from shopping_items where done = false or done_at > now() - interval '1 day' order by created_at desc`,
     sql`select * from recipes order by favorite desc, lower(title)`,
-    sql`select id, day::text as day, recipe_id, title, cook, note from meal_plan where day between (now() - interval '14 days')::date and (now() + interval '60 days')::date order by day`,
+    sql`select id, day::text as day, slot, recipe_id, title, cook, note from meal_plan where day between (now() - interval '14 days')::date and (now() + interval '60 days')::date order by day`,
     sql`select day::text as day, person_id, present from meal_attendance where day >= (now() - interval '7 days')::date`,
   ]);
   return {
@@ -414,9 +415,10 @@ export async function mutate(m: Mutation, by: string | null): Promise<string> {
     case "meal.set": {
       const day = dateStr(m.day)!;
       const title = str(m.title, 140)!;
-      await sql`insert into meal_plan (day, recipe_id, title, cook, note, created_by)
-        values (${day}, ${uuid(m.recipeId, true)}, ${title}, ${uuid(m.cook, true)}, ${str(m.note, 200, true)}, ${actor})
-        on conflict (day) do update set recipe_id = excluded.recipe_id, title = excluded.title, cook = excluded.cook, note = excluded.note`;
+      const slot = isMealSlot(m.slot) ? m.slot : MAIN_SLOT;
+      await sql`insert into meal_plan (day, slot, recipe_id, title, cook, note, created_by)
+        values (${day}, ${slot}, ${uuid(m.recipeId, true)}, ${title}, ${uuid(m.cook, true)}, ${str(m.note, 200, true)}, ${actor})
+        on conflict (day, slot) do update set recipe_id = excluded.recipe_id, title = excluded.title, cook = excluded.cook, note = excluded.note`;
       return "meals";
     }
     case "meal.attend": {
@@ -429,7 +431,7 @@ export async function mutate(m: Mutation, by: string | null): Promise<string> {
       return "meals";
     }
     case "meal.clear":
-      await sql`delete from meal_plan where day = ${dateStr(m.day)!}`;
+      await sql`delete from meal_plan where day = ${dateStr(m.day)!} and slot = ${isMealSlot(m.slot) ? m.slot : MAIN_SLOT}`;
       return "meals";
     case "item.clearDone":
       await sql`delete from shopping_items where done = true`;

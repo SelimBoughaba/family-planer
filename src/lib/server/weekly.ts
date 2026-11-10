@@ -29,7 +29,7 @@ export async function weeklyPreview(now: number) {
     select * from events where cardinality(people) > 0
       and (recurrence is not null or (starts_at < ${nextMon} and ends_at > ${mon}))`) as unknown as EventRow[];
   const tasks = await sql`select person_id, rotation from tasks where done = false and due between ${monDay}::date and ${sunDay}::date`;
-  const meals = await sql`select day::text as day, cook from meal_plan where day between ${monDay}::date and ${sunDay}::date and cook is not null order by day`;
+  const meals = await sql`select day::text as day, cook from meal_plan where day between ${monDay}::date and ${sunDay}::date and slot = 'abend' and cook is not null order by day`;
   const pts = await sql`
     select person_id, coalesce(sum(points), 0)::int as n from points_ledger
     where created_at >= ${fromWall(w.y, w.m, w.d - 6, 0, 0)} group by person_id order by n desc`;
