@@ -201,7 +201,15 @@ export type RewardClaim = {
   createdAt: string;
 };
 /** Punktestand: Woche (ab Montag), Monat, Kontostand (verdient minus eingelöst und reserviert) */
-export type PointsInfo = { week: Record<string, number>; month: Record<string, number>; balance: Record<string, number>; rewards: Reward[]; claims: RewardClaim[] };
+export type PointsInfo = {
+  week: Record<string, number>;
+  month: Record<string, number>;
+  /** alles je verdient, Einlösungen nicht abgezogen */
+  earned: Record<string, number>;
+  balance: Record<string, number>;
+  rewards: Reward[];
+  claims: RewardClaim[];
+};
 
 /** Ausdrückliche Angabe, ob jemand an einem Tag zum Abendessen da ist; ohne Eintrag gilt „da“ */
 export type Attendance = { day: string; personId: string; present: boolean };

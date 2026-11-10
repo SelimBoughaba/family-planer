@@ -23,16 +23,19 @@ export async function loadPoints(): Promise<PointsInfo> {
     where status = 'pending' or created_at > now() - interval '30 days' order by created_at desc limit 60`;
   const week: Record<string, number> = {};
   const month: Record<string, number> = {};
+  const earned: Record<string, number> = {};
   const balance: Record<string, number> = {};
   for (const r of sums) {
     week[r.person_id as string] = Number(r.week);
     month[r.person_id as string] = Number(r.month);
+    earned[r.person_id as string] = Number(r.earned);
     balance[r.person_id as string] = Number(r.earned);
   }
   for (const r of spent) balance[r.person_id as string] = (balance[r.person_id as string] ?? 0) - Number(r.spent);
   return {
     week,
     month,
+    earned,
     balance,
     rewards: rewards.map((r) => ({
       id: r.id as string,

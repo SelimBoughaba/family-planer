@@ -6,8 +6,6 @@ import { useFamily } from "@/lib/client/family";
 import type { Person, Reward, RewardClaim } from "@/lib/types";
 import { Avatar, Card, Chips, ContextMenu, FieldLabel, SectionTitle, Sheet } from "./ui";
 
-type Range = "week" | "month";
-
 const SUGGESTIONS: { emoji: string; title: string; cost: number }[] = [
   { emoji: "📺", title: "30 Minuten extra Bildschirmzeit", cost: 10 },
   { emoji: "🍕", title: "Abendessen aussuchen", cost: 15 },
@@ -34,7 +32,6 @@ function rankList(people: Person[], score: Record<string, number>) {
 
 export function PointsView() {
   const { state, me, person, run } = useFamily();
-  const [range, setRange] = useState<Range>("week");
   const [newOpen, setNewOpen] = useState(false);
   const [claimFor, setClaimFor] = useState<Reward | null>(null);
   const [manage, setManage] = useState<Reward | null>(null);
@@ -43,7 +40,10 @@ export function PointsView() {
   const people = state?.people ?? [];
   if (!info || !me) return null;
 
-  const ranked = rankList(people, info[range]);
+  // immer der Gesamtstand: alles je Verdiente zählt, Einlösen schiebt niemanden nach unten
+  const total = info.earned ?? info.balance;
+  const ranked = rankList(people, total);
+  const familyTotal = ranked.reduce((a, r) => a + r.n, 0);
   const anyPoints = ranked.some((r) => r.n > 0);
   const podium = ranked.slice(0, 3);
   const rest = ranked.slice(3);
@@ -62,22 +62,11 @@ export function PointsView() {
 
   return (
     <>
-      <div className="mt-5">
-        <Chips
-          value={range}
-          onChange={setRange}
-          options={[
-            { id: "week", label: "Diese Woche" },
-            { id: "month", label: "Dieser Monat" },
-          ]}
-        />
-      </div>
-
-      <Card className="mt-4 overflow-hidden px-3 pt-5 pb-0">
+      <Card className="mt-5 overflow-hidden px-3 pt-5 pb-0">
         <Podium entries={podium} dim={!anyPoints} />
         {!anyPoints && (
           <p className="footnote pb-3 text-center" style={{ color: "var(--label-2)" }}>
-            {range === "week" ? "Diese Woche" : "Diesen Monat"} hat noch niemand Punkte. Aufgaben abhaken bringt welche.
+            Noch hat niemand Punkte. Aufgaben abhaken bringt welche.
           </p>
         )}
       </Card>
@@ -96,13 +85,47 @@ export function PointsView() {
         </Card>
       )}
 
+      {anyPoints && (
+        <>
+          <SectionTitle>Statistik</SectionTitle>
+          <Card className="p-4">
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="subhead font-semibold" style={{ color: "var(--label-2)" }}>
+                Familie gesamt
+              </p>
+              <p className="title-2 tabular">{pts(familyTotal)}</p>
+            </div>
+            {/* Anteil jeder Person am Familienstand */}
+            <div className="mt-3 flex h-2.5 overflow-hidden rounded-full" style={{ background: "var(--fill)" }} aria-hidden>
+              {ranked
+                .filter((r) => r.n > 0)
+                .map(({ p, n }) => (
+                  <span key={p.id} style={{ width: `${(n / familyTotal) * 100}%`, background: p.color ?? "var(--tint)", transition: "width 400ms var(--ease-out)" }} />
+                ))}
+            </div>
+            <div className="mt-3 space-y-2">
+              {ranked.map(({ p, n }) => (
+                <div key={p.id} className="flex items-center gap-2.5">
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: p.color ?? "var(--tint)" }} aria-hidden />
+                  <span className="subhead min-w-0 flex-1 truncate">{p.name}</span>
+                  <span className="footnote tabular" style={{ color: "var(--label-2)" }}>
+                    {familyTotal ? Math.round((n / familyTotal) * 100) : 0} %
+                  </span>
+                  <span className="subhead tabular w-[84px] text-right font-semibold">{pts(n)}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </>
+      )}
+
       <SectionTitle>Dein Punktekonto</SectionTitle>
       <Card className="flex items-center gap-4 p-4">
         <Avatar person={me} size={44} />
         <div className="min-w-0 flex-1">
           <p className="title-2 tabular">{pts(balance)}</p>
           <p className="footnote" style={{ color: "var(--label-2)" }}>
-            zum Einlösen, {pts(info.week[me.id] ?? 0)} diese Woche verdient
+            zum Einlösen, insgesamt {pts(total[me.id] ?? 0)} verdient
           </p>
         </div>
       </Card>
